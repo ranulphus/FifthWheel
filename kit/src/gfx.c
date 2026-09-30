@@ -3,6 +3,8 @@
 #include <GL/gl.h>
 #include <math.h>
 
+uint32_t dgk_gfx_tris;
+
 void dgk_gfx_perspective(float fovy_deg, float aspect, float znear, float zfar)
 {
     float f = znear * tanf(fovy_deg * 3.14159265f / 360.0f);
@@ -48,6 +50,7 @@ void dgk_gfx_draw_mesh(const dgk_mesh *m)
     glVertexPointer(3, GL_FLOAT, 0, m->pos);
     glColorPointer(4, GL_UNSIGNED_BYTE, 0, m->rgba);
     glDrawElements(GL_TRIANGLES, m->ntris * 3, GL_UNSIGNED_SHORT, m->idx);
+    dgk_gfx_tris += (uint32_t)m->ntris;
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);
 }

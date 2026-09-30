@@ -1,5 +1,7 @@
 /* app.c - the main loop (see dgk/app.h). */
 #include "dgk/app.h"
+#include "dgk/bench.h"
+#include "dgk/gfx.h"
 #include "dgk/log.h"
 #include "dgk/mix.h"
 #include "dgk/test.h"
@@ -21,7 +23,21 @@ static struct {
     int nshots;
     struct { uint32_t frame; char name[16]; } shots[MAX_SHOTS];
 } opt;
-static uint64_t last_service_us;
+static uint64_t last_service_us, last_swap_us;
+static int bench_on;
+
+void dgk_app_bench_start(const char *test, int warmup_frames)
+{
+    dgk_bench_begin(test, warmup_frames);
+    bench_on = 1;
+}
+
+void dgk_app_bench_stop(const char *status, const char *notes)
+{
+    if (bench_on)
+        dgk_bench_end(status, notes);
+    bench_on = 0;
+}
 
 static void usage(const char *a)
 {
@@ -160,6 +176,13 @@ int dgk_app_run(const dgk_app_desc *d, void *u, int argc, char **argv)
                 failed = 1;
         dgk_service();
         plat_swap();
+        {
+            uint64_t now = plat_now_us();
+            if (bench_on && last_swap_us)
+                dgk_bench_frame(now - last_swap_us, dgk_gfx_tris);
+            last_swap_us = now;
+            dgk_gfx_tris = 0;
+        }
         dgk_app.frame++;
         if (opt.frames && dgk_app.frame >= (uint32_t)opt.frames)
             dgk_app.quit = 1;

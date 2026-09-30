@@ -1,5 +1,6 @@
 /* text.c - bitmap text from a baked atlas (see dgk/text.h). */
 #include "dgk/text.h"
+#include "dgk/gfx.h"
 #include <GL/gl.h>
 #include <stdlib.h>
 
@@ -87,6 +88,7 @@ void dgk_text(const dgk_font *f, float x, float y, float scale, uint32_t rgba, c
     glTexCoordPointer(2, GL_FLOAT, 0, st);
     glColorPointer(4, GL_UNSIGNED_BYTE, 0, col);
     glDrawArrays(GL_QUADS, 0, n * 4);
+    dgk_gfx_tris += (uint32_t)n * 2;
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);

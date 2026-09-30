@@ -2,12 +2,17 @@
  *
  *   FWHEEL [kit options, see dgk/app.h] [-world FILE] [-autopilot [-laps N]]
  *          [-record FILE | -replay FILE] [-hash]
+ *   FWHEEL -timedemo FILE -dbtest NAME   a replay as fast as it will go, timed
+ *                                        as DOSBench test NAME (RESULTS.TXT)
+ *   FWHEEL -probe [quick]                the performance probe (probe.h)
  *
  * Keys: arrows or WASD (steer, accelerate, brake; hold the brake at a stop
  * to reverse), Space the handbrake, Esc to quit. */
 #include "dgk/dgk.h"
+#include "dgk/bench.h"
 #include "dgk/replay.h"
 #include "autopilot.h"
+#include "probe.h"
 #include "camera.h"
 #include "lorry.h"
 #include "sound.h"
@@ -30,7 +35,7 @@ typedef struct input_frame {
 } input_frame;
 
 typedef struct game {
-    const char *world_path, *record_path, *replay_path;
+    const char *world_path, *record_path, *replay_path, *dbtest;
     int use_autopilot, laps_wanted, hash, desync, last_laps;
     world w;
     rig r, r_prev;
@@ -90,6 +95,10 @@ static int init(void *u)
     } else if (g->record_path)
         g->replay = dgk_replay_record((int)sizeof(input_frame), 0);
     sound_init();
+    if (g->dbtest) {
+        dgk_bench_run("FWHEEL", "F2");
+        dgk_app_bench_start(g->dbtest, 30);
+    }
     glClearColor(0.55f, 0.78f, 0.95f, 1);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
@@ -257,14 +266,36 @@ static void quit(void *u)
                        g->laps_wanted, g->r.damage, g->r.hits);
     if (g->replay_path)
         dgk_test_check("replay", !g->desync, "%s", g->desync ? "went elsewhere" : "the recorded state throughout");
+    if (g->dbtest) {
+        char notes[64];
+        snprintf(notes, sizeof notes, "drive=%s ticks=%lu", g->replay_path ? "replay" : g->use_autopilot ? "autopilot" : "keys",
+                 (unsigned long)dgk_app.ticks);
+        dgk_app_bench_stop(g->desync ? "fail" : "ok", notes);
+    }
     dgk_replay_free(g->replay);
     world_free(&g->w);
+}
+
+static int probe_quick;
+
+static int init_probe(void *u)
+{
+    DGK_UNUSED(u);
+    return probe_init(probe_quick);
+}
+
+static void draw_probe(void *u, float alpha)
+{
+    DGK_UNUSED(u);
+    DGK_UNUSED(alpha);
+    probe_draw();
 }
 
 int main(int argc, char **argv)
 {
     static game g;
     static const dgk_app_desc desc = { "Fifth Wheel", init, tick, draw, quit };
+    static const dgk_app_desc probe = { "Fifth Wheel probe", init_probe, NULL, draw_probe, NULL };
     int i;
 #ifdef DGK_DOS
     g.world_path = "YARD.PAK";
@@ -285,6 +316,14 @@ int main(int argc, char **argv)
             g.record_path = argv[++i];
         else if (!strcmp(a, "-replay") && v)
             g.replay_path = argv[++i];
+        else if (!strcmp(a, "-timedemo") && v)
+            g.replay_path = argv[++i];
+        else if (!strcmp(a, "-dbtest") && v)
+            g.dbtest = argv[++i];
+        else if (!strcmp(a, "-probe")) {
+            probe_quick = v && !strcmp(v, "quick");
+            return dgk_app_run(&probe, NULL, argc, argv);
+        }
     }
     return dgk_app_run(&desc, &g, argc, argv);
 }

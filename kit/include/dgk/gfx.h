@@ -16,6 +16,8 @@ typedef struct dgk_mesh {
     int nverts, ntris;
 } dgk_mesh;
 
+extern uint32_t dgk_gfx_tris;              /* triangles submitted this frame (the loop resets it) */
+
 void dgk_gfx_perspective(float fovy_deg, float aspect, float znear, float zfar);
 void dgk_gfx_look_at(dgk_v3 eye, dgk_v3 at, dgk_v3 up);
 void dgk_gfx_draw_mesh(const dgk_mesh *m);
