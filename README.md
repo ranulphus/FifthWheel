@@ -16,8 +16,11 @@ its own repository once a second game uses it.
 Minimum machine: Pentium II 266, Matrox G200, Sound Blaster 16 (or none),
 640x480. Faster machines and the G400/G450 get more detail.
 
-**Status:** milestone F0: the kit's first scene runs on DOS (86Box, G200 and
-G450), on Linux and headless, with the same pictures on all three.
+**Status:** milestone F1: the articulated lorry drives round a test yard
+(`build/data/YARD.PAK`) on DOS, Linux and headless: kinematic tractor and
+trailer (reversing is as tricky as the real thing), an automatic six-speed
+box, collisions, the follow camera, synthesised engine and air-brake
+sounds, an autopilot, and input replays checked by state hashes.
 
 ## Building
 
@@ -32,9 +35,13 @@ make headless     # build/headless/fwheel-hl (OSMesa, for tests)
 make loopa CARD=g450              # FWHEEL.EXE in 86Box (DOSGL's harness)
 ```
 
+Keys: arrows or WASD to steer, accelerate and brake (hold the brake at a
+standstill to reverse), Space for the handbrake, Esc to quit.
+
 Command line: `-mode WxH`, `-novsync`, `-nosound`, and for tests `-frames N`,
 `-fixed` (one tick per frame), `-shot F:NAME`, `-test` (see
-`kit/include/dgk/app.h`). F0 adds `-tone` (a 440 Hz test tone).
+`kit/include/dgk/app.h`); the game adds `-world FILE`, `-autopilot`
+(`-laps N`), `-record FILE`, `-replay FILE` and `-hash`.
 
 ## Licence
 

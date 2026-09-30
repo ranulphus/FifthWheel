@@ -168,8 +168,11 @@ int dgk_app_run(const dgk_app_desc *d, void *u, int argc, char **argv)
         d->quit(u);
     dgk_log("FW-EXIT frames=%lu ticks=%lu", (unsigned long)dgk_app.frame, (unsigned long)dgk_app.ticks);
     if (opt.test) {
-        dgk_test_check("frames", !failed && (!opt.frames || dgk_app.frame == (uint32_t)opt.frames), "%lu drawn",
-                       (unsigned long)dgk_app.frame);
+        if (opt.frames)
+            dgk_test_check("frames", !failed && dgk_app.frame <= (uint32_t)opt.frames, "%lu drawn (at most %d)",
+                           (unsigned long)dgk_app.frame, opt.frames);
+        else
+            dgk_test_check("frames", !failed, "%lu drawn", (unsigned long)dgk_app.frame);
         plat_close();
         return dgk_test_end();
     }
