@@ -46,7 +46,7 @@ void camera_tick(camera *c, const rig *r, float dt)
     c->dist += (dist - c->dist) * k;
 }
 
-void camera_apply(const camera *c, const camera *prev, float alpha, float aspect)
+void camera_apply(const camera *c, const camera *prev, float alpha, float aspect, float ground)
 {
     const float pitch = 64.0f * FW_PI / 180.0f;
     float yaw = prev->yaw + wrap(c->yaw - prev->yaw) * alpha;
@@ -54,10 +54,10 @@ void camera_apply(const camera *c, const camera *prev, float alpha, float aspect
     float dist = prev->dist + (c->dist - prev->dist) * alpha;
     dgk_v3 at, eye, up = { 0, 1, 0 };
     at.x = tx;
-    at.y = 1.0f;
+    at.y = ground + 1.0f;
     at.z = -ty;
     eye.x = tx - dist * cosf(pitch) * cosf(yaw);
-    eye.y = dist * sinf(pitch);
+    eye.y = ground + dist * sinf(pitch);
     eye.z = -(ty - dist * cosf(pitch) * sinf(yaw));
     dgk_gfx_perspective(42.0f, aspect, 8.0f, 140.0f);
     dgk_gfx_look_at(eye, at, up);

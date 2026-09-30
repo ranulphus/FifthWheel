@@ -14,6 +14,6 @@ typedef struct camera {
 
 void camera_reset(camera *c, const rig *r);
 void camera_tick(camera *c, const rig *r, float dt);
-void camera_apply(const camera *c, const camera *prev, float alpha, float aspect);
+void camera_apply(const camera *c, const camera *prev, float alpha, float aspect, float ground);
 
 #endif

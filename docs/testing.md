@@ -8,6 +8,8 @@
 | Linux | `xvfb-run build/linux/fwheel -test -fixed -frames 120 -shot 119:F0L -nosound` in the dev container | the frame equals the headless one |
 
 | Autopilot | `-test -fixed -autopilot -laps 1 -hash` (DOS in Loop A with `--file build/data/YARD.PAK`, or headless) | a lap with no damage (`FW-LAP`, `HX-TEST laps`) |
+| World | `make data-check` | seed 1's pack hash equals `data/golden/world.sha`, built at -O0 and -O2 |
+| World pictures | `-test -fixed -tourshots 10` on DOS (Loop A, `--file build/data/WORLD.PAK`) and headless, compared with `imgcmp.py` | ten poses along the tour and at two depots within conformance tolerances |
 | Replays | record with `-record FILE`, play with `-replay FILE` on the same platform | `HX-TEST replay PASS`: every second's state hash as recorded |
 
 86Box's speed says nothing about real hardware: performance numbers come

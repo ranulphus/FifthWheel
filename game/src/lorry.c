@@ -46,18 +46,33 @@ void lorry_build(lorry_meshes *m)
     mb_mesh(&m->trailer, &b);
 }
 
-void lorry_draw(const lorry_meshes *m, const rig *r)
+/* Posed on the ground: the tractor pitched between its axles and rolled
+ * across its wheels, the trailer pitched from the fifth wheel to its axles
+ * (the physics stays flat: this is only how it looks). */
+void lorry_draw(const lorry_meshes *m, const rig *r, const world *w)
 {
-    float hx, hy;
+    float c = cosf(r->heading), s = sinf(r->heading), hx, hy, ax, ay;
+    float h_rear = world_height(w, r->x, r->y);
+    float h_front = world_height(w, r->x + RIG_WHEELBASE * c, r->y + RIG_WHEELBASE * s);
+    float h_left = world_height(w, r->x + 1.9f * c - 1.2f * s, r->y + 1.9f * s + 1.2f * c);
+    float h_right = world_height(w, r->x + 1.9f * c + 1.2f * s, r->y + 1.9f * s - 1.2f * c);
+    float pitch = atan2f(h_front - h_rear, RIG_WHEELBASE) * 57.29578f;
+    float roll = atan2f(h_left - h_right, 2.4f) * 57.29578f;
+    float h_hitch;
     glPushMatrix();
-    glTranslatef(r->x, 0, -r->y);
+    glTranslatef(r->x, h_rear, -r->y);
     glRotatef(r->heading * 57.29578f, 0, 1, 0);
+    glRotatef(pitch, 0, 0, 1);
+    glRotatef(-roll, 1, 0, 0);
     dgk_gfx_draw_mesh(&m->tractor);
     glPopMatrix();
     rig_hitch(r, &hx, &hy);
+    rig_trailer_axle(r, &ax, &ay);
+    h_hitch = h_rear + (h_front - h_rear) * RIG_HITCH / RIG_WHEELBASE;
     glPushMatrix();
-    glTranslatef(hx, 0, -hy);
+    glTranslatef(hx, h_hitch, -hy);
     glRotatef(r->trailer_heading * 57.29578f, 0, 1, 0);
+    glRotatef(atan2f(h_hitch - world_height(w, ax, ay), RIG_TRAILER_LEN) * 57.29578f, 0, 0, 1);
     dgk_gfx_draw_mesh(&m->trailer);
     glPopMatrix();
 }

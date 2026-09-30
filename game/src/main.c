@@ -5,6 +5,8 @@
  *   FWHEEL -timedemo FILE -dbtest NAME   a replay as fast as it will go, timed
  *                                        as DOSBench test NAME (RESULTS.TXT)
  *   FWHEEL -probe [quick]                the performance probe (probe.h)
+ *   FWHEEL -tourshots N                  N frames with the rig placed along the tour and at
+ *                                        two depots, each saved as P<n> (DOS against Mesa)
  *
  * Keys: arrows or WASD (steer, accelerate, brake; hold the brake at a stop
  * to reverse), Space the handbrake, Esc to quit. */
@@ -36,7 +38,7 @@ typedef struct input_frame {
 
 typedef struct game {
     const char *world_path, *record_path, *replay_path, *dbtest;
-    int use_autopilot, laps_wanted, hash, desync, last_laps;
+    int use_autopilot, laps_wanted, hash, desync, last_laps, tourshots;
     world w;
     rig r, r_prev;
     camera cam, cam_prev;
@@ -108,12 +110,47 @@ static int init(void *u)
     return 0;
 }
 
+/* -tourshots: the rig at pose k, no simulation: tour points evenly spread,
+ * then depot 0's waiting trailer spot and depot 1's first bay. */
+static void pose(game *g, int k)
+{
+    float x, y, heading;
+    int n = g->tourshots - 2;
+    if (k < n || !g->w.ndepots) {
+        int i = (int)((long)k * g->w.npath / (n > 0 ? n : 1)) % g->w.npath, j = (i + 1) % g->w.npath;
+        x = g->w.path[i * 2];
+        y = g->w.path[i * 2 + 1];
+        heading = atan2f(g->w.path[j * 2 + 1] - y, g->w.path[j * 2] - x);
+    } else if (k == n) {
+        x = g->w.depots[0].pickup[0];
+        y = g->w.depots[0].pickup[1];
+        heading = g->w.depots[0].pickup[2];
+    } else {
+        const wg_depot *d = &g->w.depots[g->w.ndepots > 1 ? 1 : 0];
+        x = d->bay[0][0] + 12.0f * cosf(d->bay[0][2]);       /* the tractor ahead of a docked trailer */
+        y = d->bay[0][1] + 12.0f * sinf(d->bay[0][2]);
+        heading = d->bay[0][2];
+    }
+    rig_init(&g->r, x, y, heading);
+    g->r_prev = g->r;
+    camera_reset(&g->cam, &g->r);
+    g->cam_prev = g->cam;
+}
+
 static void tick(void *u)
 {
     game *g = (game *)u;
     input_frame f;
     rig_input in;
     uint32_t h;
+    if (g->tourshots) {                              /* pose k is drawn and saved in frame k + 1 */
+        if ((int)dgk_app.ticks >= g->tourshots) {
+            dgk_app.quit = 1;
+            return;
+        }
+        pose(g, (int)dgk_app.ticks);
+        return;
+    }
     if (dgk_app.key_pressed[DGK_KEY_ESCAPE])
         dgk_app.quit = 1;
     if (g->replay_path) {
@@ -242,9 +279,20 @@ static void draw(void *u, float alpha)
     r.heading = lerp_angle(g->r_prev.heading, g->r.heading, alpha);
     r.trailer_heading = lerp_angle(g->r_prev.trailer_heading, g->r.trailer_heading, alpha);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    camera_apply(&g->cam, &g->cam_prev, alpha, (float)dgk_app.width / dgk_app.height);
-    dgk_gfx_draw_mesh(&g->w.mesh);
-    lorry_draw(&g->lorry, &r);
+    {
+        float tx = g->cam_prev.tx + (g->cam.tx - g->cam_prev.tx) * alpha;
+        float ty = g->cam_prev.ty + (g->cam.ty - g->cam_prev.ty) * alpha;
+        camera_apply(&g->cam, &g->cam_prev, alpha, (float)dgk_app.width / dgk_app.height, world_height(&g->w, tx, ty));
+        world_draw(&g->w, tx, ty, 90.0f);
+    }
+    lorry_draw(&g->lorry, &r, &g->w);
+    if (g->tourshots) {
+        char name[16];
+        snprintf(name, sizeof name, "P%d", (int)dgk_app.ticks - 1);
+        if (dgk_app.ticks > 0 && (int)dgk_app.ticks <= g->tourshots)
+            dgk_test_snapshot(name);                    /* the world and the lorry, no HUD */
+        return;
+    }
     hud(g);
 }
 
@@ -298,9 +346,9 @@ int main(int argc, char **argv)
     static const dgk_app_desc probe = { "Fifth Wheel probe", init_probe, NULL, draw_probe, NULL };
     int i;
 #ifdef DGK_DOS
-    g.world_path = "YARD.PAK";
+    g.world_path = "WORLD.PAK";
 #else
-    g.world_path = "build/data/YARD.PAK";
+    g.world_path = "build/data/WORLD.PAK";
 #endif
     for (i = 1; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
@@ -320,6 +368,8 @@ int main(int argc, char **argv)
             g.replay_path = argv[++i];
         else if (!strcmp(a, "-dbtest") && v)
             g.dbtest = argv[++i];
+        else if (!strcmp(a, "-tourshots") && v)
+            g.tourshots = atoi(argv[++i]);
         else if (!strcmp(a, "-probe")) {
             probe_quick = v && !strcmp(v, "quick");
             return dgk_app_run(&probe, NULL, argc, argv);

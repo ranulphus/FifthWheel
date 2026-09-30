@@ -20,8 +20,27 @@ Ground-plane coordinates: x east, y north, metres; GL is (x, height, -y).
 | `FWPA` | u32 count, then points {float x, y}: a closed loop (the autopilot's) |
 | `FWSP` | float x, y, heading: the start |
 
-The test yard (`tools/fwyard.c`, `build/data/YARD.PAK`) is F1's world; F3's
-generator replaces these with chunked sections.
+The test yard (`tools/fwyard.c`, `build/data/YARD.PAK`) is F1's world; the
+generated world (below) has the same `FWCO`, `FWPA` and `FWSP`.
+
+### The generated world (`tools/fwgen.c`, `build/data/WORLD.PAK`; game/src/wgen.h)
+
+4 x 4 km from (0, 0) to (4096, 4096), in 32 x 32 chunks of 128 m.
+`make data-check` requires seed 1 to give `data/golden/world.sha`'s hash
+when the generator is built at -O0 and at -O2.
+
+| Section | Layout |
+|---|---|
+| `WRLD` | u32 version (1), seed, chunks per side (32), heightfield samples per side (257); float world size, chunk size, heightfield spacing (16 m), vertex units per metre (32) |
+| `CIDX` | per chunk, row-major from the south-west: u32 first vertex, vertices, first index, triangles; s16 lowest and highest height (decimetres) |
+| `CVRT` | vertices: s16 x, y, z, pad (chunk-local GL coordinates, 32 per metre: x - chunk x, height, chunk y - y), u8 r, g, b, a (lighting baked in) |
+| `CTRI` | u16 indices, chunk-local |
+| `HGHT` | s16 heights (decimetres), 257 x 257 at 16 m: the terrain's own (the game reads the ground with the terrain triangles' split) |
+| `FWCO` | collision boxes, as in the yard (buildings, docks, tree trunks, the world's edge) |
+| `GRPH` | u32 nodes, edges, points; nodes {float x, y; u32 kind (0 town, 1 depot), place}; edges {u32 a, b, first point, points; float length}; points {float x, y} (8 m apart) |
+| `FWDP` | u32 count; depots {float x, y, heading; bays[3] {float x, y, heading}: a docked trailer's rear; pickup {float x, y, heading}: a waiting trailer's kingpin; u32 road node} |
+| `FWPA` | the autopilot's tour: the longest loop of the road network that avoids the depots' dead ends |
+| `FWSP` | the start, on the tour |
 
 ## Replays (`DGKR`, dgk/replay.h)
 

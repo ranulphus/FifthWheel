@@ -16,11 +16,12 @@ its own repository once a second game uses it.
 Minimum machine: Pentium II 266, Matrox G200, Sound Blaster 16 (or none),
 640x480. Faster machines and the G400/G450 get more detail.
 
-**Status:** milestone F1: the articulated lorry drives round a test yard
-(`build/data/YARD.PAK`) on DOS, Linux and headless: kinematic tractor and
-trailer (reversing is as tricky as the real thing), an automatic six-speed
-box, collisions, the follow camera, synthesised engine and air-brake
-sounds, an autopilot, and input replays checked by state hashes.
+**Status:** milestone F3: a generated 4 x 4 km world (`make data`:
+towns, depots with loading bays, a road network levelled into gentle hills,
+patchwork fields, woods), drawn chunk by chunk, the lorry riding its slopes.
+The articulated lorry drives it on DOS, Linux and headless (kinematic
+tractor and trailer, a six-speed automatic, collisions, synthesised sounds,
+an autopilot, checked replays), and DOSBench times it (FW1, FWP).
 
 ## Building
 
@@ -38,10 +39,15 @@ make loopa CARD=g450              # FWHEEL.EXE in 86Box (DOSGL's harness)
 Keys: arrows or WASD to steer, accelerate and brake (hold the brake at a
 standstill to reverse), Space for the handbrake, Esc to quit.
 
+The world comes from a seed: `make data WORLD_SEED=n` (default 1;
+`make data-check` checks seed 1 against `data/golden/world.sha`).
+
 Command line: `-mode WxH`, `-novsync`, `-nosound`, and for tests `-frames N`,
 `-fixed` (one tick per frame), `-shot F:NAME`, `-test` (see
-`kit/include/dgk/app.h`); the game adds `-world FILE`, `-autopilot`
-(`-laps N`), `-record FILE`, `-replay FILE` and `-hash`.
+`kit/include/dgk/app.h`); the game adds `-world FILE` (default
+`WORLD.PAK`; the F1 test yard is `YARD.PAK`), `-autopilot` (`-laps N`),
+`-record FILE`, `-replay FILE`, `-hash`, `-timedemo FILE -dbtest NAME`,
+`-probe [quick]` and `-tourshots N`.
 
 ## Licence
 

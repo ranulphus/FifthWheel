@@ -153,13 +153,16 @@ static void drivetrain(rig *r, float dt, float *force)
 
 static void collide(rig *r, const world *w)
 {
+    const obb *near[WORLD_NEAR_MAX];
     obb t, tr;
-    int i;
+    int i, n;
     tractor_box(r, &t);
     trailer_box(r, &tr);
-    for (i = 0; i < w->nboxes; i++) {
+    n = world_boxes_near(w, r->x - 4.0f * cosf(r->heading), r->y - 4.0f * sinf(r->heading), 16.0f, near,
+                         WORLD_NEAR_MAX);
+    for (i = 0; i < n; i++) {
         float mx, my;
-        if (obb_overlap(&t, &w->boxes[i], &mx, &my)) {
+        if (obb_overlap(&t, near[i], &mx, &my)) {
             float into = r->v * (cosf(r->heading) * mx + sinf(r->heading) * my);
             r->x += mx;
             r->y += my;
@@ -170,7 +173,7 @@ static void collide(rig *r, const world *w)
             }
             tractor_box(r, &t);
         }
-        if (obb_overlap(&tr, &w->boxes[i], &mx, &my)) {
+        if (obb_overlap(&tr, near[i], &mx, &my)) {
             /* The trailer is pushed around its kingpin: turn it the way that
              * moves its middle along the push, and stop a rig backing into it. */
             float hx, hy, ox, oy, turn;

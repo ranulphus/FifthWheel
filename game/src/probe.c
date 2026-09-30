@@ -161,7 +161,12 @@ void probe_draw(void)
         dgk_app_bench_stop("ok", "probe=1");
         if (current + 1 < NCASES)
             start_case(current + 1);
-        else
+        else {
+            char notes[32];
+            snprintf(notes, sizeof notes, "probe=summary cases=%d", NCASES);
+            dgk_bench_begin("FWP", 0);                     /* the run as a whole, for DOSBench's test list */
+            dgk_bench_end("ok", notes);
             dgk_app.quit = 1;
+        }
     }
 }

@@ -11,6 +11,6 @@ typedef struct lorry_meshes {
 } lorry_meshes;
 
 void lorry_build(lorry_meshes *m);
-void lorry_draw(const lorry_meshes *m, const rig *r);   /* at the rig's pose */
+void lorry_draw(const lorry_meshes *m, const rig *r, const world *w);   /* at the rig's pose, on the ground */
 
 #endif

@@ -43,22 +43,41 @@ build/tools/fwyard: tools/fwyard.c game/src/mesh.c kit/tools/pakw.c kit/src/base
 build/data/YARD.PAK: build/tools/fwyard
 	@mkdir -p $(dir $@)
 	$(Q)build/tools/fwyard $@
-data: build/data/YARD.PAK
-.PHONY: data
+build/tools/fwgen: tools/fwgen.c game/src/mesh.c kit/tools/pakw.c kit/src/base.c game/src/wgen.h $(HDRS) kit/tools/pakw.h
+	@mkdir -p $(dir $@)
+	$(Q)$(HOST_CC) $(TOOL_CFLAGS) -o $@ tools/fwgen.c game/src/mesh.c kit/tools/pakw.c kit/src/base.c -lm
+WORLD_SEED ?= 1
+build/data/WORLD.PAK: build/tools/fwgen
+	@mkdir -p $(dir $@)
+	$(Q)build/tools/fwgen $(WORLD_SEED) $@
+data: build/data/YARD.PAK build/data/WORLD.PAK
+# The generator is deterministic: seed 1 must give data/golden/world.sha's
+# hash when built at -O0 and at -O2. Change the golden file only on purpose.
+data-check:
+	$(Q)mkdir -p build/check
+	$(Q)$(HOST_CC) $(filter-out -O2,$(TOOL_CFLAGS)) -O0 -o build/check/fwgen-O0 tools/fwgen.c game/src/mesh.c \
+	  kit/tools/pakw.c kit/src/base.c -lm
+	$(Q)$(HOST_CC) $(TOOL_CFLAGS) -o build/check/fwgen-O2 tools/fwgen.c game/src/mesh.c kit/tools/pakw.c kit/src/base.c -lm
+	$(Q)for o in O0 O2; do build/check/fwgen-$$o 1 build/check/w-$$o.pak | sed -n 's/.*hash //p' > build/check/$$o.sha; done
+	$(Q)cmp -s build/check/O0.sha build/check/O2.sha || { echo "data-check: -O0 and -O2 differ"; exit 1; }
+	$(Q)cmp -s build/check/O2.sha data/golden/world.sha \
+	  || { echo "data-check: world hash $$(cat build/check/O2.sha), golden $$(cat data/golden/world.sha)"; exit 1; }
+	$(Q)echo "data-check: world $$(cat data/golden/world.sha) at -O0 and -O2"
+.PHONY: data data-check
 
 # ---- DOS -------------------------------------------------------------------
 DJCC := env LD_LIBRARY_PATH=$(DJGPP_PREFIX)/hostlib $(DJGPP_PREFIX)/bin/i586-pc-msdosdjgpp-gcc
 DOS_CFLAGS := $(COMMON) -march=i586 -fexcess-precision=standard -I$(DOSGL)/include \
               -I$(DOSGL)/build/sdl/dos/include -I$(MGAHAL)/tests/shim -I$(MGAHAL)/hal/include -DHX_BUILD_ID='"$(BUILD_ID)"'
 DOS_LIBS := $(DOSGL)/build/sdl/dos/lib/libSDL3.a $(DOSGL)/build/lib/libGL.a -lm
-build/dos/FWHEEL.EXE: build/data/YARD.PAK $(KIT_SRCS) kit/src/plat_sdl.c $(GAME_SRCS) $(GEN_SRCS) $(HDRS) $(MGAHAL)/tests/shim/hx.c \
+build/dos/FWHEEL.EXE: build/data/WORLD.PAK $(KIT_SRCS) kit/src/plat_sdl.c $(GAME_SRCS) $(GEN_SRCS) $(HDRS) $(MGAHAL)/tests/shim/hx.c \
                       $(DOSGL)/build/sdl/dos/lib/libSDL3.a $(DOSGL)/build/lib/libGL.a
 	@mkdir -p $(dir $@)
 	$(Q)echo "  DJLD    $@"
 	$(Q)$(DJCC) $(DOS_CFLAGS) -o $@ $(KIT_SRCS) kit/src/plat_sdl.c $(GAME_SRCS) $(GEN_SRCS) \
 	  $(MGAHAL)/tests/shim/hx.c $(DOS_LIBS)
 	@if [ -e "$(@:.EXE=.exe)" ] && ! [ "$(@:.EXE=.exe)" -ef "$@" ]; then rm -f "$(@:.EXE=.exe)"; fi
-dos: build/dos/FWHEEL.EXE build/data/YARD.PAK
+dos: build/dos/FWHEEL.EXE build/data/WORLD.PAK build/data/YARD.PAK
 
 # ---- Linux and headless: built in the dev container ------------------------
 # The container sees this repository, not DOSGL: stage what it needs first.
@@ -75,19 +94,19 @@ endif
 deps: build/deps/stamp
 
 HOST_CFLAGS := $(COMMON) -g -Ibuild/deps/include
-build/linux/fwheel: build/data/YARD.PAK $(KIT_SRCS) kit/src/plat_sdl.c $(GAME_SRCS) $(GEN_SRCS) $(HDRS) build/deps/stamp
+build/linux/fwheel: build/data/WORLD.PAK $(KIT_SRCS) kit/src/plat_sdl.c $(GAME_SRCS) $(GEN_SRCS) $(HDRS) build/deps/stamp
 	@mkdir -p $(dir $@)
 	$(Q)echo "  CC      $@"
 	$(Q)$(HOST_CC) $(HOST_CFLAGS) -o $@ $(KIT_SRCS) kit/src/plat_sdl.c $(GAME_SRCS) $(GEN_SRCS) \
 	  build/deps/lib/libSDL3.a -lGL -lm -ldl -lpthread
-build/headless/fwheel-hl: build/data/YARD.PAK $(KIT_SRCS) kit/src/plat_headless.c $(GAME_SRCS) $(GEN_SRCS) $(HDRS) build/deps/stamp
+build/headless/fwheel-hl: build/data/WORLD.PAK $(KIT_SRCS) kit/src/plat_headless.c $(GAME_SRCS) $(GEN_SRCS) $(HDRS) build/deps/stamp
 	@mkdir -p $(dir $@)
 	$(Q)echo "  CC      $@"
 	$(Q)$(HOST_CC) $(HOST_CFLAGS) -o $@ $(KIT_SRCS) kit/src/plat_headless.c $(GAME_SRCS) $(GEN_SRCS) \
 	  -lOSMesa -lm
-linux: build/deps/stamp $(GEN_SRCS) build/data/YARD.PAK
+linux: build/deps/stamp $(GEN_SRCS) build/data/WORLD.PAK
 	$(Q)$(DEV) $(MAKE) -s IN_DEV=1 build/linux/fwheel
-headless: build/deps/stamp $(GEN_SRCS) build/data/YARD.PAK
+headless: build/deps/stamp $(GEN_SRCS) build/data/WORLD.PAK
 	$(Q)$(DEV) $(MAKE) -s IN_DEV=1 build/headless/fwheel-hl
 
 # ---- Loop A ----------------------------------------------------------------
@@ -95,7 +114,7 @@ CARD ?= g450
 ARGS ?= -test -fixed -autopilot -laps 1 -hash
 loopa: dos
 	$(Q)$(MGAHAL)/tools/dev python3 $(MGAHAL)/tools/loopa/run.py --name fwheel --card $(CARD) \
-	  --exe build/dos/FWHEEL.EXE --file build/data/YARD.PAK --args="$(ARGS)" --out $(CURDIR)/out/loopa-$(CARD) --sound sb16 \
+	  --exe build/dos/FWHEEL.EXE --file build/data/WORLD.PAK --args="$(ARGS)" --out $(CURDIR)/out/loopa-$(CARD) --sound sb16 \
 	  --pre "SET BLASTER=A220 I5 D1 H5 T6" --idle 90 --timeout 600; cat out/loopa-$(CARD)/status
 
 shots: dos headless
