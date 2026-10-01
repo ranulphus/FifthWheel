@@ -14,7 +14,20 @@
 static SDL_Window *window;
 static SDL_GLContext context;
 static SDL_AudioStream *audio;
+static uint32_t audio_rate;
+static int underruns = -1, underrun_chunks;
 static char describe[160];
+
+/* SDL's own log through ours; the Sound Blaster driver's underrun count
+ * (DOSGL's SDL patch 0005, debug priority) is picked out of it. */
+static void SDLCALL sdl_log(void *u, int category, SDL_LogPriority priority, const char *msg)
+{
+    DGK_UNUSED(u);
+    DGK_UNUSED(category);
+    DGK_UNUSED(priority);
+    dgk_log("FW-SDL %s", msg);
+    sscanf(msg, "SoundBlaster: %d of %d chunks underran", &underruns, &underrun_chunks);
+}
 
 /* SDL asks for more samples: mix them (the mixer's lock is the stream's). */
 static void SDLCALL audio_more(void *u, SDL_AudioStream *s, int additional, int total)
@@ -35,6 +48,11 @@ static void SDLCALL audio_more(void *u, SDL_AudioStream *s, int additional, int 
 int plat_open(const plat_config *c, int *width, int *height)
 {
     SDL_InitFlags flags = SDL_INIT_VIDEO | SDL_INIT_JOYSTICK;
+    SDL_SetLogOutputFunction(sdl_log, NULL);
+#ifdef DGK_DOS
+    SDL_SetLogPriority(SDL_LOG_CATEGORY_AUDIO, SDL_LOG_PRIORITY_DEBUG);
+#endif
+    audio_rate = c->audio_rate;
     if (c->sound)
         flags |= SDL_INIT_AUDIO;
     if (!SDL_Init(flags)) {
@@ -59,24 +77,40 @@ int plat_open(const plat_config *c, int *width, int *height)
     }
     SDL_GL_SetSwapInterval(c->vsync ? 1 : 0);
     SDL_GetWindowSizeInPixels(window, width, height);
-    if (SDL_WasInit(SDL_INIT_AUDIO)) {
-        SDL_AudioSpec spec = { SDL_AUDIO_S16, 1, (int)c->audio_rate };
-        audio = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, audio_more, NULL);
-        if (audio)
-            SDL_ResumeAudioStreamDevice(audio);
-        else
-            dgk_log("FW-WARN audio device: %s", SDL_GetError());
-    }
     snprintf(describe, sizeof describe, "%s; video %s, audio %s", (const char *)glGetString(GL_RENDERER),
-             SDL_GetCurrentVideoDriver(), audio ? SDL_GetCurrentAudioDriver() : "none");
+             SDL_GetCurrentVideoDriver(), SDL_WasInit(SDL_INIT_AUDIO) ? SDL_GetCurrentAudioDriver() : "none");
     return 0;
 }
 
-void plat_close(void)
+void plat_audio_open(void)
+{
+    SDL_AudioSpec spec = { SDL_AUDIO_S16, 1, (int)audio_rate };
+    if (audio || !SDL_WasInit(SDL_INIT_AUDIO))
+        return;
+    audio = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, audio_more, NULL);
+    if (audio)
+        SDL_ResumeAudioStreamDevice(audio);
+    else
+        dgk_log("FW-WARN audio device: %s", SDL_GetError());
+}
+
+void plat_audio_close(void)
 {
     if (audio)
         SDL_DestroyAudioStream(audio);
     audio = NULL;
+}
+
+int plat_audio_underruns(int *u, int *chunks)
+{
+    *u = underruns;
+    *chunks = underrun_chunks;
+    return underruns >= 0;
+}
+
+void plat_close(void)
+{
+    plat_audio_close();
     if (context)
         SDL_GL_DestroyContext(context);
     context = NULL;

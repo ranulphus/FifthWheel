@@ -25,6 +25,14 @@ int      plat_next_event(plat_event *e);    /* 0 when none are left */
 void     plat_swap(void);
 uint64_t plat_now_us(void);
 int      plat_snapshot(const char *name);   /* the frame being drawn (before the swap) */
+/* The audio device: opened once the game has loaded (a long load would
+ * leave the Sound Blaster's ring to run dry), closed before it quits. */
+void     plat_audio_open(void);
+void     plat_audio_close(void);
+/* The Sound Blaster driver's count of chunks played as silence because the
+ * ring was empty (DOSGL's SDL patch 0005), once the device has closed: 1 if
+ * it reported, 0 if not (no SB, not DOS). */
+int      plat_audio_underruns(int *underruns, int *chunks);
 void     plat_audio_lock(void);
 void     plat_audio_unlock(void);
 const char *plat_describe(void);            /* renderer and drivers, for the log */

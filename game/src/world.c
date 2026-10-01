@@ -1,6 +1,7 @@
 /* world.c - loading worlds, the ground's height, box buckets, drawing
  * (see world.h). */
 #include "world.h"
+#include "dgk/app.h"
 #include "dgk/log.h"
 #include <GL/gl.h>
 #include <math.h>
@@ -210,6 +211,7 @@ void world_draw(world *w, float x, float y, float r)
             glPopMatrix();
             dgk_gfx_tris += c->ntris;
             w->drawn_chunks++;
+            dgk_service_if_due();                    /* the audio thread's turn on a slow frame (DOS) */
         }
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);

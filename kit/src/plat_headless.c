@@ -77,6 +77,20 @@ int plat_snapshot(const char *name)
     return fclose(f) == 0 ? 0 : -1;
 }
 
+void plat_audio_open(void)
+{
+}
+
+void plat_audio_close(void)
+{
+}
+
+int plat_audio_underruns(int *underruns, int *chunks)
+{
+    *underruns = *chunks = 0;
+    return 0;
+}
+
 void plat_audio_lock(void)
 {
 }

@@ -149,6 +149,8 @@ int dgk_app_run(const dgk_app_desc *d, void *u, int argc, char **argv)
         plat_close();
         return opt.test ? dgk_test_end() : 1;
     }
+    if (opt.sound)
+        plat_audio_open();                    /* after the load: nothing yields during it */
     prev = plat_now_us();
     while (!dgk_app.quit) {
         dgk_service();
@@ -191,10 +193,14 @@ int dgk_app_run(const dgk_app_desc *d, void *u, int argc, char **argv)
         if (opt.frames && dgk_app.frame >= (uint32_t)opt.frames)
             dgk_app.quit = 1;
     }
+    plat_audio_close();                       /* before the game's own clean-up, which does not yield */
     if (d->quit)
         d->quit(u);
     dgk_log("FW-EXIT frames=%lu ticks=%lu", (unsigned long)dgk_app.frame, (unsigned long)dgk_app.ticks);
     if (opt.test) {
+        int under, chunks;
+        if (plat_audio_underruns(&under, &chunks))
+            dgk_test_check("audio", under == 0, "%d of %d chunks underran", under, chunks);
         if (opt.frames)
             dgk_test_check("frames", !failed && dgk_app.frame <= (uint32_t)opt.frames, "%lu drawn (at most %d)",
                            (unsigned long)dgk_app.frame, opt.frames);
