@@ -243,6 +243,37 @@ static void rear_cam(game *g)
     }
 }
 
+/* ---- the joystick's set-up ------------------------------------------------ */
+
+static void calibration_panel(game *g)
+{
+    static const char *const steps[] = { "REST", "LEFT", "RIGHT", "ACCEL", "BRAKE" };
+    const calib *c = &g->cal;
+    char line[48];
+    int a, i;
+    panel(120, 110, 400, 250);
+    dgk_text(&g->font, 320 - dgk_text_width(&g->font, 1.5f, "JOYSTICK SET-UP") / 2, 122, 1.5f, 0xFFD23FFFu,
+             "JOYSTICK SET-UP");
+    dgk_text(&g->font, 320 - dgk_text_width(&g->font, 1.0f, calib_prompt(c)) / 2, 160, 1.0f, 0xFFFFFFFFu,
+             calib_prompt(c));
+    for (i = 0; i < 5; i++) {                        /* the steps, done ones ticked green */
+        uint32_t rgba = c->step > i + 1 ? 0x9FFFB0FFu : c->step == i + 1 ? 0xFFD23FFFu : 0x8A8F99FFu;
+        dgk_text(&g->font, 140 + i * 76, 190, 1.0f, rgba, steps[i]);
+    }
+    for (a = 0; a < DGK_JOY_AXES; a++) {             /* each axis: its bar, where it is, where it rests */
+        float y = 222 + a * 26, x = 230 + (dgk_app.joy_axis[a] + 32768) * 270.0f / 65535.0f;
+        uint32_t rgba = a == c->axis ? 0xFFD23FFFu : 0xFFFFFFFFu;
+        snprintf(line, sizeof line, "AXIS %d", a + 1);
+        dgk_text(&g->font, 132, y - 2, 1.0f, rgba, line);
+        bar(230, y + 4, 270, 6, 0x55555FFFu);
+        if (c->step > CAL_REST)
+            bar(230 + (c->rest[a] + 32768) * 270.0f / 65535.0f - 1, y, 2, 14, 0x9FFFB0FFu);
+        bar(x - 4, y - 1, 8, 16, rgba);
+    }
+    dgk_text(&g->font, 320 - dgk_text_width(&g->font, 1.0f, "ESC: CANCEL") / 2, 330, 1.0f, 0x9FFFB0FFu,
+             dgk_app.joy_present ? "ESC: CANCEL" : "NO JOYSTICK FOUND. ESC: CANCEL");
+}
+
 /* ---- the job ------------------------------------------------------------ */
 
 static void job_board(game *g)
@@ -380,9 +411,13 @@ void hud_draw(game *g)
     if (g->has_jobs) {
         snprintf(line, sizeof line, "$%d", g->jobs.money);
         dgk_text(&g->font, 620 - dgk_text_width(&g->font, 1.5f, line), 12, 1.5f, 0xFFD23FFFu, line);
-        job_panel(g);
-        minimap(g);
+        if (g->cal.step == CAL_OFF) {                /* the set-up has the screen to itself */
+            job_panel(g);
+            minimap(g);
+        }
     }
+    if (g->cal.step != CAL_OFF)
+        calibration_panel(g);
     if (g->callout && dgk_app.ticks - g->callout_tick < 150) {
         float t = (dgk_app.ticks - g->callout_tick) / 150.0f, s = 2.0f + 0.6f * sinf(t * 30.0f) * (1 - t) * (1 - t);
         dgk_text(&g->font, 320 - dgk_text_width(&g->font, s, g->callout) / 2, 180, s, g->callout_rgba, g->callout);

@@ -15,11 +15,11 @@
 
 dgk_app_state dgk_app;
 
-void dgk_test_begin(const char *name);   /* test.c */
+void dgk_test_begin(const char *name, int noexit);   /* test.c */
 int  dgk_test_end(void);
 
 static struct {
-    int width, height, vsync, frames, test, sound, nodraw;
+    int width, height, vsync, frames, test, sound, nodraw, noexit;
     int nshots;
     struct { uint32_t frame; char name[16]; } shots[MAX_SHOTS];
 } opt;
@@ -67,6 +67,8 @@ static void parse(int argc, char **argv)
             opt.sound = 0;
         else if (!strcmp(a, "-nodraw"))
             opt.nodraw = 1;
+        else if (!strcmp(a, "-noexit"))
+            opt.noexit = 1;
         else if (!strcmp(a, "-shot") && v && opt.nshots < MAX_SHOTS) {
             const char *colon = strchr(v, ':');
             if (colon && colon[1]) {
@@ -105,7 +107,20 @@ static void events(void)
     while (plat_next_event(&e)) {
         if (e.type == PLAT_EV_QUIT)
             dgk_app.quit = 1;
-        else if (e.key >= 0 && e.key < DGK_KEY_MAX) {
+        else if (e.type == PLAT_EV_JOY_ADDED) {
+            dgk_app.joy_present = 1;
+            snprintf(dgk_app.joy_name, sizeof dgk_app.joy_name, "%s", e.name ? e.name : "joystick");
+            dgk_log("FW-JOYSTICK %s: %d axes, %d buttons", dgk_app.joy_name, e.key, e.value);
+        } else if (e.type == PLAT_EV_JOY_AXIS) {
+            if (e.key >= 0 && e.key < DGK_JOY_AXES)
+                dgk_app.joy_axis[e.key] = (int16_t)DGK_CLAMP(e.value, -32768, 32767);
+        } else if (e.type == PLAT_EV_JOY_DOWN || e.type == PLAT_EV_JOY_UP) {
+            if (e.key >= 0 && e.key < DGK_JOY_BUTTONS) {
+                dgk_app.joy_down[e.key] = e.type == PLAT_EV_JOY_DOWN;
+                if (e.type == PLAT_EV_JOY_DOWN)
+                    dgk_app.joy_pressed[e.key] = 1;
+            }
+        } else if (e.key >= 0 && e.key < DGK_KEY_MAX) {
             if (e.type == PLAT_EV_KEY_DOWN) {
                 dgk_app.key_down[e.key] = 1;
                 dgk_app.key_pressed[e.key] = 1;
@@ -121,6 +136,7 @@ static void tick(const dgk_app_desc *d, void *u)
         d->tick(u);
     dgk_app.ticks++;
     memset(dgk_app.key_pressed, 0, sizeof dgk_app.key_pressed);
+    memset(dgk_app.joy_pressed, 0, sizeof dgk_app.joy_pressed);
 }
 
 int dgk_app_run(const dgk_app_desc *d, void *u, int argc, char **argv)
@@ -131,7 +147,7 @@ int dgk_app_run(const dgk_app_desc *d, void *u, int argc, char **argv)
 
     parse(argc, argv);
     if (opt.test)
-        dgk_test_begin(d->title);
+        dgk_test_begin(d->title, opt.noexit);
     c.title = d->title;
     c.width = opt.width;
     c.height = opt.height;

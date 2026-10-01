@@ -4,6 +4,9 @@
  *          [-trace N]                    the rig's pose every N ticks (FW-TRACE)
  *   FWHEEL -dockpose                     a trailer reversing into a bay, held still (pictures)
  *   FWHEEL -soundtest                    each sound in turn, then quit (the SOUND suite)
+ *   FWHEEL -calibrate                    the joystick's calibration screen, saved, then quit
+ *          [-joylog]                     the joystick's axes and mapped controls every 0.5 s (FW-JOY)
+ * Settings: FWHEEL.CFG beside the game (fwheel.cfg on Linux; FW_CFG overrides).
  *   FWHEEL -autopilot [-laps N]          round the world's tour with a trailer
  *   FWHEEL -autojob [-job D:T:B]         the autopilot does the shortest job on offer at
  *                                        depot 0, or the job from depot D to depot T's bay B
@@ -16,7 +19,9 @@
  *
  * Keys: arrows or WASD (steer, accelerate, brake; hold the brake at a stop
  * to reverse), Space the handbrake, H the horn, 1-3 take a job from the
- * board, Backspace cancel it (before coupling), Esc to quit. */
+ * board, Backspace cancel it (before coupling), J the joystick's set-up,
+ * Esc to quit. A joystick or wheel: steering, accelerator and brake as
+ * calibrated, button 1 the handbrake, button 2 the horn. */
 #include "game.h"
 #include "dgk/bench.h"
 #include "guides.h"
@@ -30,7 +35,7 @@
 
 extern const dgk_font_data fw_font;
 
-enum { SC_A = 4, SC_D = 7, SC_H = 11, SC_S = 22, SC_W = 26, SC_1 = 30, SC_BACKSPACE = 42 };
+enum { SC_A = 4, SC_D = 7, SC_H = 11, SC_J = 13, SC_S = 22, SC_W = 26, SC_1 = 30, SC_BACKSPACE = 42 };
 
 /* One tick of input, as recorded. Buttons: bit 0 the handbrake, bits 1-2
  * a job taken from the board (1-3), bit 3 the job cancelled, bit 4 the
@@ -45,30 +50,67 @@ static float approach(float v, float target, float rate)
     return v < target ? DGK_MIN(target, v + rate) : DGK_MAX(target, v - rate);
 }
 
-/* The keyboard, smoothed so that digital keys steer like a wheel. */
-static void keyboard(game *g, input_frame *f)
+/* The keyboard, smoothed so that digital keys steer like a wheel, and the
+ * joystick (input.h): the keys steer when held, the stick otherwise; the
+ * pedals take the further of the two. */
+static void controls(game *g, input_frame *f)
 {
     const float dt = 1.0f / DGK_TICK_HZ;
     int left = dgk_app.key_down[DGK_KEY_LEFT] || dgk_app.key_down[SC_A];
     int right = dgk_app.key_down[DGK_KEY_RIGHT] || dgk_app.key_down[SC_D];
     int up = dgk_app.key_down[DGK_KEY_UP] || dgk_app.key_down[SC_W];
     int down = dgk_app.key_down[DGK_KEY_DOWN] || dgk_app.key_down[SC_S];
-    float target = (float)(left - right);
+    float target = (float)(left - right), steer, accel, decel, js = 0, ja = 0, jb = 0;
     int i;
     g->steer = approach(g->steer, target, (target == 0 ? 3.5f : 2.5f) * dt);
     g->accel = approach(g->accel, up ? 1.0f : 0.0f, 4.0f * dt);
     g->decel = approach(g->decel, down ? 1.0f : 0.0f, 5.0f * dt);
-    f->steer = (int8_t)(g->steer * 127.0f);
-    f->accel = (uint8_t)(g->accel * 255.0f);
-    f->decel = (uint8_t)(g->decel * 255.0f);
-    f->buttons = (uint8_t)(dgk_app.key_down[DGK_KEY_SPACE] ? 1 : 0);
+    if (dgk_app.joy_present)
+        joymap_read(&g->jmap, &js, &ja, &jb);
+    steer = (left || right || js == 0) ? g->steer : js;
+    accel = DGK_MAX(g->accel, ja);
+    decel = DGK_MAX(g->decel, jb);
+    f->steer = (int8_t)(steer * 127.0f);
+    f->accel = (uint8_t)(accel * 255.0f);
+    f->decel = (uint8_t)(decel * 255.0f);
+    f->buttons = (uint8_t)(dgk_app.key_down[DGK_KEY_SPACE] || dgk_app.joy_down[g->jmap.handbrake_button] ? 1 : 0);
     for (i = 0; i < JOB_OFFERS; i++)
         if (dgk_app.key_pressed[SC_1 + i])
             f->buttons |= (uint8_t)((i + 1) << 1);
     if (dgk_app.key_pressed[SC_BACKSPACE])
         f->buttons |= 8;
-    if (dgk_app.key_down[SC_H])
+    if (dgk_app.key_down[SC_H] || dgk_app.joy_down[g->jmap.horn_button])
         f->buttons |= 16;
+}
+
+/* The calibration screen, while it is open: the world waits. Done, the
+ * joystick's map goes into the settings file. */
+static void calibration(game *g)
+{
+    joymap *m = &g->cal.result;
+    int ok;
+    if (dgk_app.key_pressed[DGK_KEY_ESCAPE]) {
+        g->cal.step = CAL_OFF;
+        dgk_log("FW-CAL cancelled");
+        if (g->calibrate_only)
+            dgk_app.quit = 1;
+        return;
+    }
+    if (!calib_tick(&g->cal))
+        return;
+    g->jmap = *m;
+    joymap_store(m, &g->cfg);
+    ok = dgk_cfg_save(&g->cfg, g->cfg_path) == 0;
+    dgk_log("FW-CAL saved %s %s: steer axis %d (%d, rest %d, %d), accel axis %d (rest %d, %d), brake axis %d "
+            "(rest %d, %d)", g->cfg_path, ok ? "ok" : "FAILED", m->steer_axis, m->steer_left, m->steer_rest,
+            m->steer_right, m->accel_axis, m->accel_rest, m->accel_full, m->brake_axis, m->brake_rest,
+            m->brake_full);
+    if (g->calibrate_only)
+        dgk_test_check("calibrate", ok, "steer axis %d, accel axis %d, brake axis %d, saved to %s", m->steer_axis,
+                       m->accel_axis, m->brake_axis, g->cfg_path);
+    g->cal.step = CAL_OFF;
+    if (g->calibrate_only)
+        dgk_app.quit = 1;
 }
 
 /* -dockpose: a docking scene to look at (DOS against Mesa): a box trailer
@@ -99,6 +141,14 @@ static int init(void *u)
     game *g = (game *)u;
     if (world_load(&g->w, g->world_path) != 0)
         return -1;
+    if (dgk_cfg_load(&g->cfg, g->cfg_path) == 0)
+        dgk_log("FW-CFG loaded %s", g->cfg_path);
+    joymap_load(&g->jmap, &g->cfg);
+    if (g->jmap.calibrated)
+        dgk_log("FW-CFG joystick: steer axis %d, accel axis %d, brake axis %d", g->jmap.steer_axis,
+                g->jmap.accel_axis, g->jmap.brake_axis);
+    if (g->calibrate_only)
+        calib_start(&g->cal);
     rig_init(&g->r, g->w.spawn_x, g->w.spawn_y, g->w.spawn_heading);
     g->has_jobs = g->w.ndepots > 0 && g->mode != MODE_TOUR && !g->tourshots;
     if (g->has_jobs) {
@@ -249,6 +299,24 @@ static void tick(void *u)
         pose(g, (int)dgk_app.ticks);
         return;
     }
+    if (g->cal.step != CAL_OFF) {
+        calibration(g);
+        return;
+    }
+    if (dgk_app.key_pressed[SC_J] && !g->replay_path && !g->record_path && g->mode == MODE_DRIVE) {
+        calib_start(&g->cal);                        /* not while recording: the world waits meanwhile */
+        return;
+    }
+    if (g->joylog && (dgk_app.ticks == 0 || (dgk_app.ticks + 1) % 30 == 0)) {
+        float js = 0, ja = 0, jb = 0;
+        joymap_read(&g->jmap, &js, &ja, &jb);
+        if (dgk_app.ticks == 0)
+            dgk_log("FW-JOYLOG ready");
+        else
+            dgk_log("FW-JOY axes %d %d %d %d buttons %d%d steer %.2f accel %.2f brake %.2f", dgk_app.joy_axis[0],
+                    dgk_app.joy_axis[1], dgk_app.joy_axis[2], dgk_app.joy_axis[3], dgk_app.joy_down[0],
+                    dgk_app.joy_down[1], js, ja, jb);
+    }
     if (g->soundtest) {                              /* each sound in turn, nothing driven */
         if (!sound_test_tick(dgk_app.ticks))
             dgk_app.quit = 1;
@@ -277,7 +345,7 @@ static void tick(void *u)
         f.buttons = (uint8_t)(g->autotake << 1);
         g->autotake = 0;
     } else
-        keyboard(g, &f);
+        controls(g, &f);
     if (g->record_path && !g->replay_path)
         dgk_replay_frame(g->replay, &f);
     in.steer = f.steer / 127.0f;
@@ -448,6 +516,13 @@ int main(int argc, char **argv)
     static const dgk_app_desc probe = { "Fifth Wheel probe", init_probe, NULL, draw_probe, NULL };
     int i;
     g.job_to = -1;
+    g.cfg_path = getenv("FW_CFG");
+    if (!g.cfg_path)
+#ifdef DGK_DOS
+        g.cfg_path = "FWHEEL.CFG";
+#else
+        g.cfg_path = "fwheel.cfg";
+#endif
 #ifdef DGK_DOS
     g.world_path = "WORLD.PAK";
 #else
@@ -467,6 +542,10 @@ int main(int argc, char **argv)
             g.dockpose = 1;
         else if (!strcmp(a, "-soundtest"))
             g.soundtest = 1;
+        else if (!strcmp(a, "-calibrate"))
+            g.calibrate_only = 1;
+        else if (!strcmp(a, "-joylog"))
+            g.joylog = 1;
         else if (!strcmp(a, "-trace") && v)
             g.trace = atoi(argv[++i]);
         else if (!strcmp(a, "-laps") && v)

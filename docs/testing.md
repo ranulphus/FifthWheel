@@ -5,6 +5,8 @@
 | DOS in 86Box | `make loopa CARD=g450` (or g200, g400) | `HX-DONE 0`: the frames ran, the snapshot was written |
 | DOS against Mesa | a DOS `-test -fixed -frames 120 -shot 119:F0` run and `build/headless/fwheel-hl` with the same options, compared with the harness's `imgcmp.py` | within conformance tolerances (RGB565 quantisation, tolerance 24, 0.5%, edges excluded) |
 | Sound | `make suite CHECKS="sb16 sbpro"` (`tools/suite.sh`): `-soundtest` (each sound in turn) through an SB16 and an SB Pro 2 (8-bit) with `--wav` | every sound's tones are in the recording (`wavcheck.py`), and `HX-TEST audio`: no chunk was played as silence (SDL patch 0005) |
+| Joystick | `make suite CHECKS=joy`: in one Loop A run, `-calibrate` with 86Box's virtual joystick moved at each step (anchored on its `FW-CAL` lines), then `-joylog` with the saved file | `HX-TEST calibrate PASS`, `FW-CFG loaded`, and half left, full forward and button 1 read as steering 0.4-0.5, the accelerator and the handbrake |
+| Joystick, headless | `DGK_JOY=TICK:axis:N:V,...` scripts a joystick (`FW_CFG=FILE` for the settings): `-calibrate`, then `-joylog` | the same, for a stick and for a wheel with pedals |
 | Sound, headless | `DGK_WAV=FILE build/headless/fwheel-hl -test -fixed -nodraw -soundtest`: the mixer's output in step with the virtual clock | the same samples every run; the tones are there |
 | Linux | `xvfb-run build/linux/fwheel -test -fixed -frames 120 -shot 119:F0L -nosound` in the dev container | the frame equals the headless one |
 | Autopilot | `-test -fixed -autopilot -laps 1 -hash` (DOS in Loop A with `--file build/data/YARD.PAK`, or headless) | a lap with no damage (`FW-LAP`, `HX-TEST laps`) |

@@ -10,6 +10,7 @@
 #include <GL/gl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static OSMesaContext ctx;
 static unsigned char *buffer;
@@ -87,9 +88,49 @@ void plat_pump(void)
 {
 }
 
+/* DGK_JOY: a scripted joystick (see dgk/app.h): its items, applied at
+ * their ticks (frames of the virtual clock). */
+static struct joy_item { uint32_t tick; int axis, n, value; } joy_items[256];
+static int joy_count = -1, joy_next;
+
+static void joy_script(void)
+{
+    const char *s = getenv("DGK_JOY");
+    joy_count = 0;
+    while (s && *s && joy_count < (int)DGK_ARRAY_LEN(joy_items)) {
+        struct joy_item *j = &joy_items[joy_count];
+        char kind[8];
+        unsigned long t;
+        if (sscanf(s, "%lu:%7[a-z]:%d:%d", &t, kind, &j->n, &j->value) == 4) {
+            j->tick = (uint32_t)t;
+            j->axis = kind[0] == 'a';
+            joy_count++;
+        }
+        s = strchr(s, ',');
+        s = s ? s + 1 : NULL;
+    }
+}
+
 int plat_next_event(plat_event *e)
 {
-    DGK_UNUSED(e);
+    uint32_t tick = (uint32_t)(now_us / (1000000 / 60));
+    if (joy_count < 0) {
+        joy_script();
+        if (joy_count > 0) {
+            e->type = PLAT_EV_JOY_ADDED;
+            e->name = "DGK_JOY script";
+            e->key = 4;
+            e->value = 4;
+            return 1;
+        }
+    }
+    if (joy_next < joy_count && joy_items[joy_next].tick <= tick) {
+        const struct joy_item *j = &joy_items[joy_next++];
+        e->type = j->axis ? PLAT_EV_JOY_AXIS : j->value ? PLAT_EV_JOY_DOWN : PLAT_EV_JOY_UP;
+        e->key = j->n;
+        e->value = j->value;
+        return 1;
+    }
     return 0;
 }
 

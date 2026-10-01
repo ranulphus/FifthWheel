@@ -48,6 +48,22 @@ cleans up: neither yields, and the Sound Blaster's ring holds about 90 ms.
 On DOS the kit routes SDL's log through its own, and the driver's count
 of chunks played as silence becomes a test check (`HX-TEST audio`).
 
+## Controls (game/src/input.c)
+
+The keyboard's digital keys are smoothed so they steer like a wheel. A
+joystick or wheel (a DOS gameport through SDL; up to four axes) gives the
+steering, the accelerator and the brake as the set-up screen (J, or
+`-calibrate`) mapped them: it asks for the controls at rest, full left,
+full right, full accelerator and full brake, and takes whichever axis
+moves in each step, so a stick (forward and back) and a wheel with
+separate pedals both work whatever their axes' order or direction. The
+map goes into the settings file (`FWHEEL.CFG` beside the game; written
+to a temporary file first, then swapped in). Button 1 is the handbrake,
+button 2 the horn. The keys steer while held, the stick otherwise; each
+pedal takes the further of the two. SDL's gameport driver learns each
+axis's range as it moves, in every run: until the stick has been to an
+end once, part of the way reads as all of it.
+
 ## Jobs (game/src/jobs.c)
 
 A trailer waits at every depot, parked along the apron's left edge, and

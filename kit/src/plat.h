@@ -11,11 +11,14 @@ typedef struct plat_config {
     uint32_t audio_rate;
 } plat_config;
 
-enum { PLAT_EV_NONE, PLAT_EV_QUIT, PLAT_EV_KEY_DOWN, PLAT_EV_KEY_UP };
+enum { PLAT_EV_NONE, PLAT_EV_QUIT, PLAT_EV_KEY_DOWN, PLAT_EV_KEY_UP, PLAT_EV_JOY_ADDED, PLAT_EV_JOY_AXIS,
+       PLAT_EV_JOY_DOWN, PLAT_EV_JOY_UP };
 
 typedef struct plat_event {
     int type;
-    int key;                                /* SDL scancode */
+    int key;                                /* SDL scancode; a joystick's axis or button */
+    int value;                              /* an axis: -32768..32767 */
+    const char *name;                       /* PLAT_EV_JOY_ADDED */
 } plat_event;
 
 int      plat_open(const plat_config *c, int *width, int *height);   /* 0 on success */

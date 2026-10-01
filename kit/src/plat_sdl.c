@@ -14,6 +14,18 @@
 static SDL_Window *window;
 static SDL_GLContext context;
 static SDL_AudioStream *audio;
+static SDL_Joystick *joystick;
+static int joystick_announced;          /* PLAT_EV_JOY_ADDED sent for it */
+
+/* The first joystick present: SDL's DOS gameport driver finds its stick at
+ * start-up without an "added" event; on Linux one may come later. */
+static void open_joystick(SDL_JoystickID id)
+{
+    if (joystick)
+        return;
+    joystick = SDL_OpenJoystick(id);
+    joystick_announced = 0;
+}
 static uint32_t audio_rate;
 static int underruns = -1, underrun_chunks;
 static char describe[160];
@@ -76,6 +88,13 @@ int plat_open(const plat_config *c, int *width, int *height)
         return -1;
     }
     SDL_GL_SetSwapInterval(c->vsync ? 1 : 0);
+    {
+        int n = 0;
+        SDL_JoystickID *ids = SDL_GetJoysticks(&n);
+        if (ids && n > 0)
+            open_joystick(ids[0]);
+        SDL_free(ids);
+    }
     SDL_GetWindowSizeInPixels(window, width, height);
     snprintf(describe, sizeof describe, "%s; video %s, audio %s", (const char *)glGetString(GL_RENDERER),
              SDL_GetCurrentVideoDriver(), SDL_WasInit(SDL_INIT_AUDIO) ? SDL_GetCurrentAudioDriver() : "none");
@@ -111,6 +130,9 @@ int plat_audio_underruns(int *u, int *chunks)
 void plat_close(void)
 {
     plat_audio_close();
+    if (joystick)
+        SDL_CloseJoystick(joystick);
+    joystick = NULL;
     if (context)
         SDL_GL_DestroyContext(context);
     context = NULL;
@@ -128,6 +150,14 @@ void plat_pump(void)
 int plat_next_event(plat_event *e)
 {
     SDL_Event ev;
+    if (joystick && !joystick_announced) {
+        joystick_announced = 1;
+        e->type = PLAT_EV_JOY_ADDED;
+        e->name = SDL_GetJoystickName(joystick);
+        e->key = SDL_GetNumJoystickAxes(joystick);
+        e->value = SDL_GetNumJoystickButtons(joystick);
+        return 1;
+    }
     while (SDL_PollEvent(&ev)) {
         switch (ev.type) {
         case SDL_EVENT_QUIT:
@@ -142,6 +172,30 @@ int plat_next_event(plat_event *e)
         case SDL_EVENT_KEY_UP:
             e->type = PLAT_EV_KEY_UP;
             e->key = (int)ev.key.scancode;
+            return 1;
+        case SDL_EVENT_JOYSTICK_ADDED:              /* the first one only */
+            open_joystick(ev.jdevice.which);
+            if (!joystick || joystick_announced)
+                continue;
+            joystick_announced = 1;
+            e->type = PLAT_EV_JOY_ADDED;
+            e->name = SDL_GetJoystickName(joystick);
+            e->key = SDL_GetNumJoystickAxes(joystick);
+            e->value = SDL_GetNumJoystickButtons(joystick);
+            return 1;
+        case SDL_EVENT_JOYSTICK_AXIS_MOTION:
+            if (!joystick || ev.jaxis.which != SDL_GetJoystickID(joystick))
+                continue;
+            e->type = PLAT_EV_JOY_AXIS;
+            e->key = ev.jaxis.axis;
+            e->value = ev.jaxis.value;
+            return 1;
+        case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
+        case SDL_EVENT_JOYSTICK_BUTTON_UP:
+            if (!joystick || ev.jbutton.which != SDL_GetJoystickID(joystick))
+                continue;
+            e->type = ev.type == SDL_EVENT_JOYSTICK_BUTTON_DOWN ? PLAT_EV_JOY_DOWN : PLAT_EV_JOY_UP;
+            e->key = ev.jbutton.button;
             return 1;
         default:
             continue;

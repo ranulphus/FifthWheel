@@ -7,6 +7,7 @@
 #include "dgk/replay.h"
 #include "autopilot.h"
 #include "camera.h"
+#include "input.h"
 #include "jobpilot.h"
 #include "jobs.h"
 #include "lorry.h"
@@ -20,6 +21,11 @@ typedef struct game {
     int mode, laps_wanted, hash, trace, desync, last_laps, tourshots;
     int job_from, job_to, job_bay;  /* -job D:T:B (job_to -1: none) */
     int dockpose;                   /* -dockpose */
+    int calibrate_only, joylog;     /* -calibrate (then quit), -joylog */
+    dgk_cfg cfg;                    /* the settings file */
+    const char *cfg_path;
+    joymap jmap;                    /* the joystick's controls */
+    calib cal;                      /* the calibration screen (cal.step CAL_OFF: closed) */
     int soundtest;                  /* -soundtest */
     int rearcam;                    /* coupling or docking in reverse: the reversing camera's look */
     world w;

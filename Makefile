@@ -17,7 +17,7 @@ DEV      := $(MGAHAL)/tools/dev
 BUILD_ID := $(shell git describe --always --dirty 2>/dev/null || echo unknown)
 Q ?= @
 
-KIT_SRCS  := kit/src/base.c kit/src/log.c kit/src/app.c kit/src/gfx.c kit/src/text.c kit/src/mix.c kit/src/test.c \
+KIT_SRCS  := kit/src/base.c kit/src/cfg.c kit/src/log.c kit/src/app.c kit/src/gfx.c kit/src/text.c kit/src/mix.c kit/src/test.c \
              kit/src/pak.c kit/src/replay.c kit/src/bench.c
 GAME_SRCS := $(wildcard game/src/*.c)
 GEN_SRCS  := build/gen/font_gen.c

@@ -13,6 +13,13 @@
  *   -test           report on COM1 with the HX- protocol (DOS; Loop A)
  *   -nosound        no audio device
  *   -nodraw         draw only the frames -shot saves (long simulation tests)
+ *   -noexit         with -test: do not end the Loop A run at the end (a job
+ *                   that runs more programs after this one)
+ *
+ * The first joystick (a DOS gameport stick or wheel through SDL) is read
+ * into dgk_app.joy_*. Headless, DGK_JOY scripts one: a comma list of
+ * TICK:axis:N:VALUE (-32768..32767) and TICK:button:N:0|1, each applied
+ * at that tick (as Loop A's --keys joy items are in 86Box).
  */
 #ifndef DGK_APP_H
 #define DGK_APP_H
@@ -28,6 +35,9 @@ enum {
     DGK_KEY_MAX = 512
 };
 
+#define DGK_JOY_AXES 4
+#define DGK_JOY_BUTTONS 8
+
 typedef struct dgk_app_desc {
     const char *title;
     int (*init)(void *u);                 /* after the window and GL exist; 0 = go on */
@@ -41,6 +51,11 @@ typedef struct dgk_app_state {
     uint32_t frame, ticks;                /* frames drawn, ticks run */
     uint8_t key_down[DGK_KEY_MAX];        /* held */
     uint8_t key_pressed[DGK_KEY_MAX];     /* went down since the last tick */
+    int joy_present;                      /* a joystick is open */
+    char joy_name[40];
+    int16_t joy_axis[DGK_JOY_AXES];       /* -32768..32767 */
+    uint8_t joy_down[DGK_JOY_BUTTONS];
+    uint8_t joy_pressed[DGK_JOY_BUTTONS]; /* went down since the last tick */
     int quit;                             /* set to end the loop */
     int fixed;                            /* -fixed */
 } dgk_app_state;

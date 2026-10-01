@@ -11,18 +11,20 @@
 
 static int active, failures;
 
-void dgk_test_begin(const char *name)
+void dgk_test_begin(const char *name, int noexit)
 {
     active = 1;
 #ifdef DGK_DOS
     {
-        char *argv[2];
+        char *argv[3];
         argv[0] = (char *)name;
-        argv[1] = NULL;
+        argv[1] = (char *)"--noexit";
+        argv[2] = NULL;
         dgk_log_serial(1);
-        hx_init(1, argv, name);
+        hx_init(noexit ? 2 : 1, argv, name);
     }
 #else
+    DGK_UNUSED(noexit);
     printf("HX-START %s\n", name);
 #endif
 }
