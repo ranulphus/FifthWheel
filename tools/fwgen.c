@@ -610,13 +610,13 @@ static void build_depot(const place *d, wg_depot *out)
         block(bx, by, 2.0f, 0.4f, d->heading, 4.2f, 0x2A2A33u, 0x2A2A33u, 0, 0);
         depot_frame(d, u - 7.5f, 31, &px, &py);             /* the dock between bays */
         block(px, py, 4.0f, 3.0f, d->heading, 1.3f, 0xC8C8D0u, 0xB0B0B8u, 0, 1);
-        for (k = -1; k <= 1; k += 2) {                       /* bold bay lines, in the depot's frame */
+        for (k = -1; k <= 1; k += 2) {                       /* bold white bay lines, in the depot's frame */
             float q[4][2], lu = u + k * 1.6f;
             depot_frame(d, lu - 0.15f, 14, &q[0][0], &q[0][1]);
             depot_frame(d, lu + 0.15f, 14, &q[1][0], &q[1][1]);
             depot_frame(d, lu + 0.15f, 34, &q[2][0], &q[2][1]);
             depot_frame(d, lu - 0.15f, 34, &q[3][0], &q[3][1]);
-            ground_quad(q[0][0], q[0][1], q[1][0], q[1][1], q[2][0], q[2][1], q[3][0], q[3][1], 0.2f, 0xFFD23Fu, 1.0f);
+            ground_quad(q[0][0], q[0][1], q[1][0], q[1][1], q[2][0], q[2][1], q[3][0], q[3][1], 0.2f, 0xF4F4F0u, 1.0f);
         }
         /* Docked: the trailer's rear at the dock face, pointing out of the bay. */
         depot_frame(d, u, 33.5f, &out->bay[i][0], &out->bay[i][1]);

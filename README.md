@@ -18,8 +18,8 @@ Minimum machine: Pentium II 266, Matrox G200, Sound Blaster 16 (or none),
 
 **Status:** milestone F4: the jobs loop. Take a job from a depot's board,
 back under its trailer (box, flatbed or tanker), follow the route on the
-minimap to another depot and reverse the trailer into a bay; the dock is
-graded and paid. The world is generated (`make data`: towns, depots with
+minimap to another depot and reverse the trailer into a bay, watching a
+reversing camera's guide lines; the dock is graded and paid. The world is generated (`make data`: towns, depots with
 loading bays, a road network levelled into gentle hills, patchwork fields,
 woods) and drawn chunk by chunk, the lorry riding its slopes. The game
 runs on DOS, Linux and headless (kinematic tractor and trailer, a six-speed
@@ -51,7 +51,7 @@ Command line: `-mode WxH`, `-novsync`, `-nosound`, and for tests `-frames N`,
 `-fixed` (one tick per frame), `-shot F:NAME`, `-nodraw`, `-test` (see
 `kit/include/dgk/app.h`); the game adds `-world FILE` (default
 `WORLD.PAK`; the F1 test yard is `YARD.PAK`), `-autopilot` (`-laps N`),
-`-autojob` (`-job D:T:B`),
+`-autojob` (`-job D:T:B`), `-dockpose`,
 `-record FILE`, `-replay FILE`, `-hash`, `-trace N`, `-timedemo FILE -dbtest NAME`,
 `-probe [quick]` and `-tourshots N`.
 

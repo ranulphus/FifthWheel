@@ -56,6 +56,16 @@ cancelling are input like the pedals, so replays carry them.
   taken, and a delivered one is unloaded and gone. Parked trailers are
   solid, from 2 m behind the kingpin (room for a tractor backing under).
 
+Coupling and docking in reverse, the camera turns to look the way the rig
+is backing (along the waiting trailer, or into the bay) and takes on a
+car's reversing camera: guide lines on the ground where the rig's back
+corners will go if it keeps reversing with the wheels where they are
+(`rig_predict_reverse`, the physics' own kinematics, so they bend as you
+steer), red to 1.5 m, yellow to 4 m, green to 10 m, with bars across; the
+picture's edges darkened, viewfinder brackets and a blinking REAR CAM
+label (`guides.c`, `hud.c`). `-dockpose` holds such a scene still for
+pictures (`make shots`).
+
 The job autopilot (`-autojob`, `jobpilot.c`) makes the inputs a player
 would: it backs under the trailer, drives out through the gate, follows
 the route, crosses the far apron to the right of the bay, loops round to

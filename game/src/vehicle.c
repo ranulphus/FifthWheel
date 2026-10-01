@@ -292,6 +292,39 @@ void rig_step(rig *r, const rig_input *in, float dt, const world *w)
     }
 }
 
+void rig_predict_reverse(const rig *r, float metres, int n, float (*left)[2], float (*right)[2])
+{
+    rig p = *r;
+    float ds = metres / (float)n, yaw = -tanf(r->steer) / RIG_WHEELBASE;   /* per metre, backwards */
+    int i;
+    for (i = 0; i <= n; i++) {
+        float bx, by, h, half, phi, om;
+        if (p.has_trailer) {
+            rig_trailer_rear(&p, &bx, &by);
+            h = p.trailer_heading;
+            half = 1.28f;
+        } else {
+            h = p.heading;
+            bx = p.x - 1.1f * cosf(h);
+            by = p.y - 1.1f * sinf(h);
+            half = 1.25f;
+        }
+        left[i][0] = bx - sinf(h) * half;
+        left[i][1] = by + cosf(h) * half;
+        right[i][0] = bx + sinf(h) * half;
+        right[i][1] = by - cosf(h) * half;
+        if (i == n)
+            break;
+        /* One step back: v = -1 for ds seconds (rig_step's kinematics). */
+        phi = rig_articulation(&p);
+        om = p.has_trailer ? (-sinf(phi) + RIG_HITCH * yaw * cosf(phi)) / RIG_TRAILER_LEN : 0;
+        p.heading = wrap(p.heading + yaw * ds);
+        p.trailer_heading = wrap(p.trailer_heading + om * ds);
+        p.x -= cosf(p.heading) * ds;
+        p.y -= sinf(p.heading) * ds;
+    }
+}
+
 uint32_t rig_hash(const rig *r, uint32_t h)
 {
     float f[8];

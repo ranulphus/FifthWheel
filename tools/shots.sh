@@ -3,8 +3,9 @@
 # (Loop A) and by the headless build (OSMesa), compared with the harness's
 # imgcmp.py (RGB565, tolerance 24, 0.5% of pixels, colour edges excluded).
 # The frames: the world's ten poses (-tourshots 10: along the tour and at
-# two depots, no HUD) and the first scene with its HUD (the job board, the
-# minimap). Needs MGAHAL and DEV (make shots sets them).
+# two depots, no HUD), the first scene with its HUD (the job board, the
+# minimap) and a trailer reversing into a bay (-dockpose: the reversing
+# camera, its guide lines). Needs MGAHAL and DEV (make shots sets them).
 #
 #   tools/shots.sh [CARD]    (default g450; make shots CARD=...)
 set -eu
@@ -16,10 +17,11 @@ rm -rf $dos $hl
 mkdir -p $dos $hl/out
 
 # DOS, one boot per set of frames; the guest's C:\OUT comes back as files/.
-for name in tour hud; do
+for name in tour hud dock; do
     case $name in
     tour) args="-tourshots 10" ;;
     hud) args="-frames 61 -shot 60:H0" ;;
+    dock) args="-dockpose -frames 121 -shot 120:H1" ;;
     esac
     "$DEV" python3 "$MGAHAL/tools/loopa/run.py" --name "fwshots-$name" --card "$card" \
         --exe build/dos/FWHEEL.EXE --file build/data/WORLD.PAK --args="-test -fixed -nosound $args" \

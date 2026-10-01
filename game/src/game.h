@@ -19,6 +19,8 @@ typedef struct game {
     const char *world_path, *record_path, *replay_path, *dbtest;
     int mode, laps_wanted, hash, trace, desync, last_laps, tourshots;
     int job_from, job_to, job_bay;  /* -job D:T:B (job_to -1: none) */
+    int dockpose;                   /* -dockpose */
+    int rearcam;                    /* coupling or docking in reverse: the reversing camera's look */
     world w;
     rig r, r_prev;
     camera cam, cam_prev;

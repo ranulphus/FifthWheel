@@ -58,6 +58,11 @@ void rig_trailer_rear(const rig *r, float *rx, float *ry);      /* the middle of
  * 2 m behind the kingpin (room for a tractor backing under it) to its back. */
 void rig_parked_box(float kx, float ky, float heading, obb *b);
 void rig_step(rig *r, const rig_input *in, float dt, const world *w);
+/* Where the back corners go if the rig reverses `metres` with the front
+ * wheels held where they are: n + 1 points each, from where they are now
+ * (the trailer's back, or the tractor's without one). The same kinematics
+ * as rig_step, without collisions: the reversing camera's guide lines. */
+void rig_predict_reverse(const rig *r, float metres, int n, float (*left)[2], float (*right)[2]);
 void rig_hitch(const rig *r, float *hx, float *hy);           /* the fifth wheel */
 void rig_trailer_axle(const rig *r, float *ax, float *ay);
 float rig_articulation(const rig *r);                         /* tractor minus trailer heading */

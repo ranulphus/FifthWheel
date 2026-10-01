@@ -2,6 +2,7 @@
  *
  *   FWHEEL [kit options, see dgk/app.h] [-world FILE] [-record FILE | -replay FILE] [-hash]
  *          [-trace N]                    the rig's pose every N ticks (FW-TRACE)
+ *   FWHEEL -dockpose                     a trailer reversing into a bay, held still (pictures)
  *   FWHEEL -autopilot [-laps N]          round the world's tour with a trailer
  *   FWHEEL -autojob [-job D:T:B]         the autopilot does the shortest job on offer at
  *                                        depot 0, or the job from depot D to depot T's bay B
@@ -17,6 +18,7 @@
  * Backspace cancel it (before coupling), Esc to quit. */
 #include "game.h"
 #include "dgk/bench.h"
+#include "guides.h"
 #include "probe.h"
 #include "sound.h"
 #include <GL/gl.h>
@@ -65,6 +67,29 @@ static void keyboard(game *g, input_frame *f)
         f->buttons |= 8;
 }
 
+/* -dockpose: a docking scene to look at (DOS against Mesa): a box trailer
+ * reversing into depot 1's middle bay, 8 m out, a little off line, the
+ * wheels turned (held by the tick's input). */
+static void dock_pose(game *g)
+{
+    const float th_off = 4.0f * WG_PI / 180.0f, phi = 10.0f * WG_PI / 180.0f;
+    float bx, by, bh, th, rx, ry, hx, hy;
+    jobs *j = &g->jobs;
+    jobs_set_offer(j, &g->w, 0, 0, 1, 1);
+    jobs_take(j, &g->w, &g->r, 0);
+    j->trailers[0].present = 0;
+    j->state = JOB_DOCKING;
+    jobs_bay(j, &g->w, &bx, &by, &bh);
+    th = bh + th_off;                                  /* the trailer points out of the bay */
+    rx = bx + cosf(bh) * 8.0f - sinf(bh) * 0.6f;       /* its back: 8 m out, 0.6 m across */
+    ry = by + sinf(bh) * 8.0f + cosf(bh) * 0.6f;
+    hx = rx + RIG_TRAILER_REAR * cosf(th);
+    hy = ry + RIG_TRAILER_REAR * sinf(th);
+    rig_init(&g->r, hx - RIG_HITCH * cosf(th + phi), hy - RIG_HITCH * sinf(th + phi), th + phi);
+    rig_couple(&g->r, TRAILER_BOX, 16000.0f, th);
+    g->r.gear = -1;
+}
+
 static int init(void *u)
 {
     game *g = (game *)u;
@@ -93,6 +118,8 @@ static int init(void *u)
             g->autotake = best + 1;
             jobpilot_reset(&g->jp, &g->jobs);
         }
+        if (g->dockpose)
+            dock_pose(g);
     } else if (g->mode == MODE_JOB) {
         dgk_log("FW-ERROR -autojob needs a world with depots");
         return -1;
@@ -220,7 +247,10 @@ static void tick(void *u)
     }
     if (dgk_app.key_pressed[DGK_KEY_ESCAPE])
         dgk_app.quit = 1;
-    if (g->replay_path) {
+    if (g->dockpose) {                               /* held still, the wheels turned */
+        f.steer = 60;
+        f.accel = f.decel = f.buttons = 0;
+    } else if (g->replay_path) {
         if (!dgk_replay_frame(g->replay, &f)) {
             dgk_log("FW-REPLAY end at tick %lu", (unsigned long)dgk_app.ticks);
             dgk_app.quit = 1;
@@ -259,7 +289,9 @@ static void tick(void *u)
         job_events(g);
     {
         camera_focus f;
-        camera_tick(&g->cam, &g->r, 1.0f / DGK_TICK_HZ, g->has_jobs && camera_focus_for(g, &f) ? &f : NULL);
+        int focus = g->has_jobs && camera_focus_for(g, &f);
+        camera_tick(&g->cam, &g->r, 1.0f / DGK_TICK_HZ, focus ? &f : NULL);
+        g->rearcam = focus && g->r.gear < 0;          /* the reversing camera's look and guides */
     }
     sound_tick(&g->r);
     if (g->mode == MODE_TOUR && g->replay_path) {
@@ -340,6 +372,8 @@ static void draw(void *u, float alpha)
                 lorry_draw_trailer(&g->lorry, d->type, d->x, d->y, d->heading, &g->w);
         }
     }
+    if (g->rearcam)
+        guides_draw(&r, &g->w);
     if (g->tourshots) {
         char name[16];
         snprintf(name, sizeof name, "P%d", (int)dgk_app.ticks - 1);
@@ -420,6 +454,8 @@ int main(int argc, char **argv)
             sscanf(argv[++i], "%d:%d:%d", &g.job_from, &g.job_to, &g.job_bay);
         else if (!strcmp(a, "-hash"))
             g.hash = 1;
+        else if (!strcmp(a, "-dockpose"))
+            g.dockpose = 1;
         else if (!strcmp(a, "-trace") && v)
             g.trace = atoi(argv[++i]);
         else if (!strcmp(a, "-laps") && v)

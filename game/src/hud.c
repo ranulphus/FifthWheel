@@ -206,6 +206,43 @@ static void minimap(const game *g)
     glLineWidth(1.0f);
 }
 
+/* ---- the reversing camera ----------------------------------------------- */
+
+/* The look of a car's rear camera: the picture's edges darkened, viewfinder
+ * brackets in the corners, a label with a blinking dot. */
+static void rear_cam(game *g)
+{
+    static const float inset = 26, len = 44, thick = 5;
+    int c;
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    bar(0, 0, 640, 14, 0x00000070u);
+    bar(0, 466, 640, 14, 0x00000070u);
+    bar(0, 14, 14, 452, 0x00000070u);
+    bar(626, 14, 14, 452, 0x00000070u);
+    glDisable(GL_BLEND);
+    for (c = 0; c < 4; c++) {
+        float x = (c & 1) ? 640 - inset : inset, y = (c & 2) ? 480 - inset : inset;
+        float dx = (c & 1) ? -1.0f : 1.0f, dy = (c & 2) ? -1.0f : 1.0f;
+        int pass;
+        for (pass = 0; pass < 2; pass++) {             /* a dark shadow, then white */
+            float o = pass ? 0 : 2;
+            uint32_t rgba = pass ? 0xFFFFFFFFu : 0x000000FFu;
+            bar(DGK_MIN(x, x + dx * len) + o, DGK_MIN(y, y + dy * thick) + o, len, thick, rgba);
+            bar(DGK_MIN(x, x + dx * thick) + o, DGK_MIN(y, y + dy * len) + o, thick, len, rgba);
+        }
+    }
+    {
+        const char *label = "REAR CAM";
+        float w = dgk_text_width(&g->font, 1.0f, label), x = 320 - w / 2 + 8;
+        if ((dgk_app.ticks / 30) & 1) {
+            bar(x - 18, 20, 10, 10, 0x000000FFu);
+            bar(x - 17, 21, 8, 8, 0xFF3030FFu);
+        }
+        dgk_text(&g->font, x, 16, 1.0f, 0xFFFFFFFFu, label);
+    }
+}
+
 /* ---- the job ------------------------------------------------------------ */
 
 static void job_board(game *g)
@@ -312,7 +349,7 @@ static void job_panel(game *g)
         break;
     }
     }
-    if (point)
+    if (point && !g->rearcam)                          /* reversing, the camera looks the way to go */
         arrow(320, 40, bearing(g, tx - g->r.x, ty - g->r.y), 16.0f, 0xFFD23FFFu);
 }
 
@@ -326,6 +363,8 @@ void hud_draw(game *g)
     else
         snprintf(gbuf, sizeof gbuf, "%d", g->r.gear);
     dgk_gfx_overlay_begin();
+    if (g->rearcam)
+        rear_cam(g);
     panel(18, 424, 204, 40);
     bar(22, 452, 196 * DGK_CLAMP((g->r.rpm - 600.0f) / 1600.0f, 0.0f, 1.0f), 8,
         g->r.rpm > 1900 ? 0xFF5030FFu : 0x9FFFB0FFu);
