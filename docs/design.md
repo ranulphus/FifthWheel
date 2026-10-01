@@ -48,6 +48,19 @@ cleans up: neither yields, and the Sound Blaster's ring holds about 90 ms.
 On DOS the kit routes SDL's log through its own, and the driver's count
 of chunks played as silence becomes a test check (`HX-TEST audio`).
 
+## Career and garage (game/src/career.c, garage.c)
+
+A career (`CAREER.DAT`) keeps the money, the deliveries and the garage's
+items between runs; it is saved after each delivery and purchase and at
+the end. The garage (G, stopped) is a showroom: the tractor turns on a
+platform under the sky while the shop browses paint jobs, horns, decals,
+licences and cabs, each with a price and a rarity whose colour lights the
+card and the platform's rim (common grey, uncommon green, rare blue, epic
+purple, legendary gold). What is shown is tried on before it is bought.
+Box trailers come with the job; flatbeds and tankers need a licence, and
+their jobs show greyed on the board until then. Tests, replays and
+recordings leave the career alone (a test can name one with `-career`).
+
 ## Controls (game/src/input.c)
 
 The keyboard's digital keys are smoothed so they steer like a wheel. A

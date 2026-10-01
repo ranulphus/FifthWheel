@@ -1,5 +1,6 @@
 /* cfg.c - settings files (see dgk/cfg.h). */
 #include "dgk/cfg.h"
+#include "dgk/save.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,16 +39,8 @@ int dgk_cfg_load(dgk_cfg *c, const char *path)
 int dgk_cfg_save(const dgk_cfg *c, const char *path)
 {
     char tmp[96];
-    char *dot;
-    FILE *f;
+    FILE *f = fopen(dgk_temp_path(path, tmp, sizeof tmp), "w");
     int i, ok;
-    snprintf(tmp, sizeof tmp, "%s", path);
-    dot = strrchr(tmp, '.');
-    if (dot && !strchr(dot, '/') && !strchr(dot, '\\'))
-        snprintf(dot, sizeof tmp - (size_t)(dot - tmp), ".TMP");   /* 8.3: FWHEEL.CFG -> FWHEEL.TMP */
-    else
-        snprintf(tmp + strlen(tmp), sizeof tmp - strlen(tmp), ".TMP");
-    f = fopen(tmp, "w");
     if (!f)
         return -1;
     for (i = 0; i < c->n; i++)
@@ -57,8 +50,7 @@ int dgk_cfg_save(const dgk_cfg *c, const char *path)
         remove(tmp);
         return -1;
     }
-    remove(path);
-    return rename(tmp, path) == 0 ? 0 : -1;
+    return dgk_replace(tmp, path);
 }
 
 const char *dgk_cfg_get(const dgk_cfg *c, const char *key)

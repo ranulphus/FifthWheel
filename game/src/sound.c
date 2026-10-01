@@ -27,6 +27,16 @@ static int16_t horn_pcm[HORN_FRAMES];
 static int16_t thud_pcm[RATE / 4];
 static int16_t screech_pcm[RATE * 7 / 10];
 static int16_t ref_pcm[RATE / 2];
+/* The other horns: a chord of periods 100, 80 and 67 samples (220, 276 and
+ * 329 Hz), looped over their common multiple; a four-note jingle; a duck. */
+#define AIR_FRAMES 26800
+#define JINGLE_NOTE (RATE * 14 / 100)
+static int16_t air_pcm[AIR_FRAMES];
+static int16_t jingle_pcm[JINGLE_NOTE * 4];
+static int16_t quack_pcm[RATE * 34 / 100];
+static dgk_sound air, jingle, quack;
+static const dgk_sound *horn_sound = NULL;
+static int preview_ticks;
 static dgk_sound engine_lo, engine_hi, hiss, beep, puff, clunk, chime, horn, thud, screech, ref;
 static int lo_voice = -1, hi_voice = -1, beep_voice = -1, horn_voice = -1;
 static int hits_seen, jackknifes_seen, thud_wait;
@@ -114,6 +124,32 @@ void sound_init(void)
         double sq = sin(ph * 1900 * (1 + wob)) + 0.8 * sin(ph * 2150 * (1 - wob)) + 0.6 * sin(ph * 2420 * (1 + 0.5 * wob));
         screech_pcm[i] = (int16_t)((sq * 0.33 + 0.15 * noise16() / 32768.0) * env * 12000.0);
     }
+    for (i = 0; i < AIR_FRAMES; i++) {
+        double s = 0;
+        int k;
+        static const int period[3] = { 100, 80, 67 };
+        for (k = 0; k < 3; k++) {
+            double a = 2 * FW_PI * (i % period[k]) / period[k];
+            s += sin(a) + 0.5 * sin(2 * a) + 0.3 * sin(3 * a);
+        }
+        air_pcm[i] = (int16_t)(s * 2600.0);
+    }
+    for (i = 0; i < JINGLE_NOTE * 4; i++) {         /* C, E, G, E: a little square-ish tune */
+        static const double note[4] = { 523.25, 659.25, 783.99, 659.25 };
+        double t = (double)(i % JINGLE_NOTE) / RATE, a = 2 * FW_PI * note[i / JINGLE_NOTE] * t;
+        double env = (t < 0.01 ? t / 0.01 : 1.0) * exp(-t * 7.0);
+        jingle_pcm[i] = (int16_t)((sin(a) + sin(3 * a) / 4 + sin(5 * a) / 10) * env * 7000.0);
+    }
+    {
+        double ph = 0;                               /* quack: a nasal buzz falling in pitch, then a gap */
+        for (i = 0; i < (int)DGK_ARRAY_LEN(quack_pcm); i++) {
+            double t = (double)i / RATE, f = 420.0 - 380.0 * t, saw;
+            ph += f / RATE;
+            saw = 2.0 * (ph - floor(ph)) - 1.0;
+            quack_pcm[i] = t < 0.22 ? (int16_t)((saw + 0.6 * sin(2 * FW_PI * 3 * ph)) * (t < 0.02 ? t / 0.02 : 1.0) *
+                                                exp(-t * 4.0) * 7000.0) : 0;
+        }
+    }
     for (i = 0; i < (int)DGK_ARRAY_LEN(ref_pcm); i++)        /* the sound test's reference: 440 Hz */
         ref_pcm[i] = (int16_t)(sin(2 * FW_PI * 440 * i / RATE) * 9000.0);
     sound_of(&engine_lo, engine_lo_pcm, ENGINE_FRAMES);
@@ -127,6 +163,27 @@ void sound_init(void)
     sound_of(&thud, thud_pcm, DGK_ARRAY_LEN(thud_pcm));
     sound_of(&screech, screech_pcm, DGK_ARRAY_LEN(screech_pcm));
     sound_of(&ref, ref_pcm, DGK_ARRAY_LEN(ref_pcm));
+    sound_of(&air, air_pcm, AIR_FRAMES);
+    sound_of(&jingle, jingle_pcm, DGK_ARRAY_LEN(jingle_pcm));
+    sound_of(&quack, quack_pcm, DGK_ARRAY_LEN(quack_pcm));
+    horn_sound = &horn;
+}
+
+void sound_set_horn(int which)
+{
+    const dgk_sound *const horns[HORNS] = { &horn, &air, &jingle, &quack };
+    horn_sound = horns[DGK_CLAMP(which, 0, HORNS - 1)];
+    if (horn_voice >= 0) {                           /* changed while sounding: the new one next time */
+        dgk_mix_stop(horn_voice);
+        horn_voice = -1;
+    }
+}
+
+void sound_horn_preview(void)
+{
+    if (horn_voice < 0)
+        horn_voice = dgk_mix_play(horn_sound, 150, 0x10000, DGK_MIX_LOOP);
+    preview_ticks = 30;
 }
 
 /* The engine: both loops pitched by rpm, crossfaded from low to high
@@ -146,8 +203,10 @@ static void engine(float rpm, float throttle)
 
 static void horn_held(int held)
 {
+    if (preview_ticks > 0 && --preview_ticks > 0)     /* the garage's preview plays on */
+        return;
     if (held && horn_voice < 0)
-        horn_voice = dgk_mix_play(&horn, 150, 0x10000, DGK_MIX_LOOP);
+        horn_voice = dgk_mix_play(horn_sound ? horn_sound : &horn, 150, 0x10000, DGK_MIX_LOOP);
     else if (!held && horn_voice >= 0) {
         dgk_mix_stop(horn_voice);
         horn_voice = -1;

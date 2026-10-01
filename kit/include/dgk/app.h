@@ -17,9 +17,10 @@
  *                   that runs more programs after this one)
  *
  * The first joystick (a DOS gameport stick or wheel through SDL) is read
- * into dgk_app.joy_*. Headless, DGK_JOY scripts one: a comma list of
- * TICK:axis:N:VALUE (-32768..32767) and TICK:button:N:0|1, each applied
- * at that tick (as Loop A's --keys joy items are in 86Box).
+ * into dgk_app.joy_*. Headless, DGK_INPUT (or DGK_JOY) scripts input: a
+ * comma list of TICK:axis:N:VALUE (-32768..32767), TICK:button:N:0|1 and
+ * TICK:key:SCANCODE:1|0 (down, up), each applied at that tick (as Loop A's
+ * --keys items are in 86Box).
  */
 #ifndef DGK_APP_H
 #define DGK_APP_H

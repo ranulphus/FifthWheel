@@ -52,3 +52,23 @@ u8 brake, u8 buttons (bit 0 handbrake, bits 1-2 a job taken from the board
 reports the first second that differs (`FW-DESYNC`). A replay plays back
 on the platform that recorded it: DOS's x87 and the desktop's SSE differ in
 low-order bits, so hashes differ across them even when the drive does not.
+
+## Saves (`dgk/save.h`) and the career
+
+A save is a 16-byte header (u32 magic, version, data size, CRC-32 of the
+data) and the data, written to a `.TMP` file beside it and then swapped
+in (the old file removed first: DOS's rename does not replace). A reader
+refuses another magic, version or size, or a CRC that does not match, and
+takes up the `.TMP` file if a crash came between the removal and the
+rename.
+
+`CAREER.DAT`: magic `FWCR`, version 1, 52 bytes of u32s: money,
+deliveries, perfect docks, metres hauled, a bit per garage item owned, the
+item fitted of each kind (paint, horn, decal, licence, cab), three spare.
+
+## Settings (`dgk/cfg.h`)
+
+`FWHEEL.CFG`: `key = value` lines (`#` comments), saved the same way; the
+joystick's map is `joy.steer.axis`, `.rest`, `.left`, `.right`,
+`joy.accel.*`, `joy.brake.*`, `joy.deadzone` (thousandths), `joy.handbrake`
+and `joy.horn` (buttons).

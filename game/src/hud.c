@@ -289,9 +289,14 @@ static void job_board(game *g)
         const job *o = &j->offers[i];
         snprintf(line, sizeof line, "%d  DEPOT %d BAY %d  %4.1f KM  $%d", i + 1, o->to + 1, o->bay + 1,
                  o->distance / 1000.0f, (int)o->pay);
-        dgk_text(&g->font, 22, 76 + 22 * i, 1.0f, 0xFFFFFFFFu, line);
+        dgk_text(&g->font, 22, 76 + 22 * i, 1.0f, j->licences >> o->type & 1u ? 0xFFFFFFFFu : 0x8A8F99FFu, line);
     }
-    dgk_text(&g->font, 22, 76 + 22 * JOB_OFFERS, 1.0f, 0x9FFFB0FFu, "PRESS 1, 2 OR 3");
+    if (j->licences >> j->trailers[j->offers_at].type & 1u)
+        dgk_text(&g->font, 22, 76 + 22 * JOB_OFFERS, 1.0f, 0x9FFFB0FFu, "PRESS 1, 2 OR 3");
+    else {                                           /* the garage sells the licence */
+        snprintf(line, sizeof line, "NEEDS A %s LICENCE (G: GARAGE)", trailer_name[j->trailers[j->offers_at].type]);
+        dgk_text(&g->font, 22, 76 + 22 * JOB_OFFERS, 1.0f, 0xFFB030FFu, line);
+    }
 }
 
 static void dock_gauge(game *g)

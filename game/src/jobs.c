@@ -173,6 +173,7 @@ void jobs_init(jobs *j, const world *w, uint32_t seed)
         j->trailers[i].present = 1;
     }
     j->money = 250;
+    j->licences = (1u << TRAILER_TYPES) - 1;
     j->at_depot = j->offers_at = -1;
     if (w->ndepots)
         offer(j, w, 0);
@@ -182,6 +183,10 @@ void jobs_take(jobs *j, const world *w, const rig *r, int n)
 {
     if (j->state != JOB_NONE || j->offers_at < 0 || !j->trailers[j->offers_at].present)
         return;
+    if (!(j->licences >> j->offers[n].type & 1u)) {
+        dgk_log("FW-JOB locked: no licence for the %s", trailer_name[j->offers[n].type]);
+        return;
+    }
     j->current = j->offers[n];
     j->state = JOB_TO_PICKUP;
     j->elapsed = 0;

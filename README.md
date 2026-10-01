@@ -42,7 +42,8 @@ make jobsweep                     # the job autopilot on every job, headless
 
 Keys: arrows or WASD to steer, accelerate and brake (hold the brake at a
 standstill to reverse), Space for the handbrake, H for the horn, 1-3 to take a job from a
-depot's board, Backspace to cancel it before coupling, J to set up a
+depot's board, Backspace to cancel it before coupling, G for the garage
+(paint, horns, decals, licences, a bigger cab), J to set up a
 joystick or wheel, Esc to quit. With a joystick: its steering, accelerator
 and brake as set up, button 1 the handbrake, button 2 the horn.
 
@@ -53,7 +54,7 @@ Command line: `-mode WxH`, `-novsync`, `-nosound`, and for tests `-frames N`,
 `-fixed` (one tick per frame), `-shot F:NAME`, `-nodraw`, `-test` (see
 `kit/include/dgk/app.h`); the game adds `-world FILE` (default
 `WORLD.PAK`; the F1 test yard is `YARD.PAK`), `-autopilot` (`-laps N`),
-`-autojob` (`-job D:T:B`), `-dockpose`, `-soundtest`, `-calibrate`, `-joylog`,
+`-autojob` (`-job D:T:B`), `-dockpose`, `-soundtest`, `-calibrate`, `-joylog`, `-career FILE`, `-money N`,
 `-record FILE`, `-replay FILE`, `-hash`, `-trace N`, `-timedemo FILE -dbtest NAME`,
 `-probe [quick]` and `-tourshots N`.
 

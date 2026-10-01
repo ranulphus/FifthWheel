@@ -6,7 +6,9 @@
  *   FWHEEL -soundtest                    each sound in turn, then quit (the SOUND suite)
  *   FWHEEL -calibrate                    the joystick's calibration screen, saved, then quit
  *          [-joylog]                     the joystick's axes and mapped controls every 0.5 s (FW-JOY)
- * Settings: FWHEEL.CFG beside the game (fwheel.cfg on Linux; FW_CFG overrides).
+ *          [-career FILE] [-money N]     keep a career in FILE in a test run; start it with $N
+ * Settings: FWHEEL.CFG beside the game (fwheel.cfg on Linux; FW_CFG overrides). The career:
+ * CAREER.DAT (career.dat; FW_CAREER), kept when playing (not in tests, replays or recordings).
  *   FWHEEL -autopilot [-laps N]          round the world's tour with a trailer
  *   FWHEEL -autojob [-job D:T:B]         the autopilot does the shortest job on offer at
  *                                        depot 0, or the job from depot D to depot T's bay B
@@ -19,12 +21,13 @@
  *
  * Keys: arrows or WASD (steer, accelerate, brake; hold the brake at a stop
  * to reverse), Space the handbrake, H the horn, 1-3 take a job from the
- * board, Backspace cancel it (before coupling), J the joystick's set-up,
+ * board, Backspace cancel it (before coupling), G the garage (stopped), J the joystick's set-up,
  * Esc to quit. A joystick or wheel: steering, accelerator and brake as
  * calibrated, button 1 the handbrake, button 2 the horn. */
 #include "game.h"
 #include "dgk/bench.h"
 #include "guides.h"
+#include "dgk/save.h"
 #include "probe.h"
 #include "sound.h"
 #include <GL/gl.h>
@@ -35,7 +38,7 @@
 
 extern const dgk_font_data fw_font;
 
-enum { SC_A = 4, SC_D = 7, SC_H = 11, SC_J = 13, SC_S = 22, SC_W = 26, SC_1 = 30, SC_BACKSPACE = 42 };
+enum { SC_A = 4, SC_D = 7, SC_G = 10, SC_H = 11, SC_J = 13, SC_S = 22, SC_W = 26, SC_1 = 30, SC_BACKSPACE = 42 };
 
 /* One tick of input, as recorded. Buttons: bit 0 the handbrake, bits 1-2
  * a job taken from the board (1-3), bit 3 the job cancelled, bit 4 the
@@ -81,6 +84,52 @@ static void controls(game *g, input_frame *f)
         f->buttons |= 8;
     if (dgk_app.key_down[SC_H] || dgk_app.joy_down[g->jmap.horn_button])
         f->buttons |= 16;
+}
+
+/* The career: loaded at the start of play, saved after each delivery, each
+ * purchase and at the end. Tests leave it alone unless given -career. */
+static void career_save_now(game *g, const char *why)
+{
+    if (!g->careerful)
+        return;
+    g->car.money = (uint32_t)DGK_MAX(g->jobs.money, 0);
+    if (dgk_save_write(g->career_path, CAREER_MAGIC, CAREER_VERSION, &g->car, sizeof g->car) == 0)
+        dgk_log("FW-CAREER saved %s (%s): money %lu, %lu delivered", g->career_path, why,
+                (unsigned long)g->car.money, (unsigned long)g->car.delivered);
+    else
+        dgk_log("FW-WARN cannot save %s", g->career_path);
+}
+
+/* The career's fitted items on the lorry and in the horn. */
+static void career_style(game *g)
+{
+    lorry_style(&g->lorry, career_item(&g->car, KIND_PAINT)->value, (int)career_item(&g->car, KIND_DECAL)->value,
+                (int)career_item(&g->car, KIND_CAB)->value);
+    sound_set_horn((int)career_item(&g->car, KIND_HORN)->value);
+}
+
+static void career_start(game *g)
+{
+    int r;
+    g->careerful = g->career_given || (g->mode == MODE_DRIVE && !dgk_test_active() && !g->replay_path &&
+                                       !g->record_path && !g->tourshots && !g->dockpose && !g->soundtest &&
+                                       !g->calibrate_only);
+    if (!g->careerful)
+        return;
+    r = dgk_save_read(g->career_path, CAREER_MAGIC, CAREER_VERSION, &g->car, sizeof g->car);
+    if (r == DGK_SAVE_OK)
+        dgk_log("FW-CAREER loaded %s: money %lu, %lu delivered, paint %s, horn %s", g->career_path,
+                (unsigned long)g->car.money, (unsigned long)g->car.delivered, career_item(&g->car, KIND_PAINT)->name,
+                career_item(&g->car, KIND_HORN)->name);
+    else {
+        if (r == DGK_SAVE_BAD)
+            dgk_log("FW-WARN %s is damaged or from another version: a new career", g->career_path);
+        career_new(&g->car);
+    }
+    if (g->start_money >= 0)
+        g->car.money = (uint32_t)g->start_money;
+    g->jobs.money = (int)g->car.money;
+    g->jobs.licences = career_licences(&g->car);
 }
 
 /* The calibration screen, while it is open: the world waits. Done, the
@@ -141,6 +190,7 @@ static int init(void *u)
     game *g = (game *)u;
     if (world_load(&g->w, g->world_path) != 0)
         return -1;
+    career_new(&g->car);                             /* the starting items, whatever the mode */
     if (dgk_cfg_load(&g->cfg, g->cfg_path) == 0)
         dgk_log("FW-CFG loaded %s", g->cfg_path);
     joymap_load(&g->jmap, &g->cfg);
@@ -156,6 +206,7 @@ static int init(void *u)
         float x, y, heading;
         int from = 0;
         jobs_init(&g->jobs, &g->w, 1);
+        career_start(g);
         if (g->job_to >= 0 && g->job_from < g->w.ndepots && g->job_to < g->w.ndepots && g->job_from != g->job_to) {
             from = g->job_from;
             jobs_set_offer(&g->jobs, &g->w, 0, from, g->job_to, g->job_bay % WG_BAYS);
@@ -192,6 +243,7 @@ static int init(void *u)
     } else if (g->record_path)
         g->replay = dgk_replay_record((int)sizeof(input_frame), 0);
     sound_init();
+    career_style(g);
     if (g->dbtest) {
         dgk_bench_run("FWHEEL", "F2");
         dgk_app_bench_start(g->dbtest, 30);
@@ -244,6 +296,10 @@ static void job_events(game *g)
         static const char *const cheer[] = { "", "DELIVERED", "GOOD PARK!", "GREAT PARK!", "PERFECT PARK!" };
         static const uint32_t cheer_rgba[] = { 0, 0xFFFFFFFFu, 0x9FFFB0FFu, 0x5FD8FFFFu, 0xFFD23FFFu };
         sound_chime(j->grade);
+        g->car.delivered++;
+        g->car.perfect += j->grade == GRADE_PERFECT;
+        g->car.metres += (uint32_t)j->current.distance;
+        career_save_now(g, "delivery");
         snprintf(g->callout_buf, sizeof g->callout_buf, "+$%d", j->earned);
         hud_callout(g, cheer[j->grade], g->callout_buf, cheer_rgba[j->grade]);
         if (g->mode == MODE_JOB)
@@ -299,8 +355,29 @@ static void tick(void *u)
         pose(g, (int)dgk_app.ticks);
         return;
     }
+    if (dgk_app.ticks == 0 && g->mode == MODE_DRIVE)
+        dgk_log("FW-PLAY ready");                    /* scripted keys start from here */
     if (g->cal.step != CAL_OFF) {
         calibration(g);
+        return;
+    }
+    if (g->gar.open) {                               /* the garage: the world waits */
+        int changed;
+        g->car.money = (uint32_t)DGK_MAX(g->jobs.money, 0);
+        changed = garage_tick(&g->gar, &g->car, &g->lorry);
+        g->jobs.money = (int)g->car.money;           /* what was spent, before the save copies it back */
+        if (g->careerful)
+            g->jobs.licences = career_licences(&g->car);
+        if (changed)
+            career_save_now(g, "garage");
+        if (!g->gar.open)
+            career_style(g);                         /* what is fitted, not what was tried on */
+        return;
+    }
+    if (dgk_app.key_pressed[SC_G] && fabsf(g->r.v) < 0.5f && g->has_jobs && !g->replay_path && !g->record_path &&
+        g->mode == MODE_DRIVE) {
+        g->car.money = (uint32_t)DGK_MAX(g->jobs.money, 0);
+        garage_open(&g->gar, &g->car, &g->lorry);
         return;
     }
     if (dgk_app.key_pressed[SC_J] && !g->replay_path && !g->record_path && g->mode == MODE_DRIVE) {
@@ -423,6 +500,10 @@ static float lerp_angle(float a, float b, float t)
 static void draw(void *u, float alpha)
 {
     game *g = (game *)u;
+    if (g->gar.open) {
+        garage_draw(&g->gar, &g->car, &g->lorry, &g->font, alpha);
+        return;
+    }
     rig r = g->r;
     r.x = g->r_prev.x + (g->r.x - g->r_prev.x) * alpha;
     r.y = g->r_prev.y + (g->r.y - g->r_prev.y) * alpha;
@@ -435,7 +516,7 @@ static void draw(void *u, float alpha)
         camera_apply(&g->cam, &g->cam_prev, alpha, (float)dgk_app.width / dgk_app.height, world_height(&g->w, tx, ty));
         world_draw(&g->w, tx, ty, 90.0f);
     }
-    lorry_draw(&g->lorry, &r, &g->w);
+    lorry_draw(&g->lorry, &r, &g->w, NULL);
     if (g->has_jobs) {
         int i;
         for (i = 0; i < g->w.ndepots; i++) {
@@ -464,6 +545,7 @@ static void draw(void *u, float alpha)
 static void quit(void *u)
 {
     game *g = (game *)u;
+    career_save_now(g, "the end");
     sound_stop();
     if (g->record_path && !g->replay_path) {
         if (dgk_replay_save(g->replay, g->record_path) == 0)
@@ -516,6 +598,15 @@ int main(int argc, char **argv)
     static const dgk_app_desc probe = { "Fifth Wheel probe", init_probe, NULL, draw_probe, NULL };
     int i;
     g.job_to = -1;
+    g.start_money = -1;
+    g.career_path = getenv("FW_CAREER");
+    g.career_given = g.career_path != NULL;
+    if (!g.career_path)
+#ifdef DGK_DOS
+        g.career_path = "CAREER.DAT";
+#else
+        g.career_path = "career.dat";
+#endif
     g.cfg_path = getenv("FW_CFG");
     if (!g.cfg_path)
 #ifdef DGK_DOS
@@ -546,6 +637,11 @@ int main(int argc, char **argv)
             g.calibrate_only = 1;
         else if (!strcmp(a, "-joylog"))
             g.joylog = 1;
+        else if (!strcmp(a, "-career") && v) {
+            g.career_path = argv[++i];
+            g.career_given = 1;
+        } else if (!strcmp(a, "-money") && v)
+            g.start_money = atoi(argv[++i]);
         else if (!strcmp(a, "-trace") && v)
             g.trace = atoi(argv[++i]);
         else if (!strcmp(a, "-laps") && v)

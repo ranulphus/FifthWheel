@@ -7,6 +7,8 @@
 #include "dgk/replay.h"
 #include "autopilot.h"
 #include "camera.h"
+#include "career.h"
+#include "garage.h"
 #include "input.h"
 #include "jobpilot.h"
 #include "jobs.h"
@@ -26,6 +28,11 @@ typedef struct game {
     const char *cfg_path;
     joymap jmap;                    /* the joystick's controls */
     calib cal;                      /* the calibration screen (cal.step CAL_OFF: closed) */
+    career car;                     /* money and the garage's items, kept in CAREER.DAT */
+    garage gar;                     /* the garage (gar.open) */
+    const char *career_path;        /* -career FILE, FW_CAREER, or the default */
+    int careerful;                  /* the career is loaded and saved (play, or -career given) */
+    int career_given, start_money;  /* -career; -money N (tests) */
     int soundtest;                  /* -soundtest */
     int rearcam;                    /* coupling or docking in reverse: the reversing camera's look */
     world w;

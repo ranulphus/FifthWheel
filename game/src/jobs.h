@@ -40,6 +40,7 @@ typedef struct jobs {
     float elapsed, damage_start, still;
     float lat, gap, angle;          /* docking errors: metres, metres, radians */
     int money, earned;
+    uint32_t licences;              /* a bit per trailer type the player may haul (all, unless a career says) */
     float route[ROUTE_MAX][2];      /* road points to the destination's gate */
     int nroute, route_next;
     float route_left;               /* metres of road left */

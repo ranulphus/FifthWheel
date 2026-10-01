@@ -3,7 +3,7 @@
 # one line, exit status 0 when all pass. Needs MGAHAL and DEV (make suite
 # sets them) and build/dos/FWHEEL.EXE.
 #
-#   tools/suite.sh [CARD] [CHECK...]    checks: sb16 sbpro joy (default: all)
+#   tools/suite.sh [CARD] [CHECK...]    checks: sb16 sbpro joy shop (default: all)
 #
 #   sb16, sbpro   -soundtest through the Sound Blaster 16 and the Sound
 #                 Blaster Pro 2 (8-bit): every sound's tones are in the
@@ -15,10 +15,13 @@
 #                 braked (back), and saves FWHEEL.CFG; then a run that loads
 #                 it maps half left, full forward and button 1 to steering
 #                 0.4-0.5, the accelerator and the handbrake (-joylog)
+#   shop          keys typed in 86Box: the garage (G) buys Sky Blue paint and
+#                 the Big Air horn with $600, is left (Esc) and the game quit;
+#                 a second run loads CAREER.DAT with them fitted and $50 left
 set -uo pipefail
 : "${MGAHAL:?}" "${DEV:?}"
 card=${1:-g450}; shift || true
-checks=${*:-sb16 sbpro joy}
+checks=${*:-sb16 sbpro joy shop}
 out=$PWD/out/suite-$card
 mkdir -p "$out"
 fail=0
@@ -60,9 +63,23 @@ joy() {
     else bad joy "($st; $(log joy | grep -a 'HX-TEST calibrate\|FW-CAL saved\|FW-CFG loaded' | tr '\n' ' ') last: $j)"; fi
 }
 
+shop() {
+    local st keys l
+    # 86Box scancodes: G 0x22, Enter 0x1c, Esc 0x01; extended Right 0x14d, Down 0x150.
+    keys="@FW-PLAY ready,1:0x22,2.5:0x14d,3.5:0x1c,4.5:0x150,5.5:0x14d,6.5:0x1c,7.5:0x01,9:0x01"
+    st=$(run shop --cmd "FWHEEL -test -nosound -career CAREER.DAT -money 600 -noexit" \
+         --cmd "FWHEEL -test -nosound -career CAREER.DAT -frames 30" --keys "$keys")
+    l=$(log shop | grep -a 'FW-CAREER loaded' | tail -1)
+    if [ "$st" = PASS ] && log shop | grep -q "FW-MENU buy SKY BLUE" && log shop | grep -q "FW-MENU buy BIG AIR" \
+       && [[ $l == *"money 50,"*"paint SKY BLUE, horn BIG AIR"* ]]; then
+        say shop "PASS (bought two, saved, loaded: ${l#*: })"
+    else bad shop "($st; $(log shop | grep -a 'FW-MENU buy\|FW-MENU short\|FW-CAREER' | tr '\n' ' '))"; fi
+}
+
 for c in $checks; do
     case $c in
     joy) joy ;;
+    shop) shop ;;
     sb16) sound sb16 sb16 "A220 I5 D1 H5 T6" ;;
     sbpro) sound sbpro sbprov2 "A220 I7 D1 T4" ;;   # 86Box's SB Pro 2 is on IRQ 7
     *) bad "$c" "(no such check)" ;;

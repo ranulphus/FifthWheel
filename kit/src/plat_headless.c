@@ -88,14 +88,17 @@ void plat_pump(void)
 {
 }
 
-/* DGK_JOY: a scripted joystick (see dgk/app.h): its items, applied at
- * their ticks (frames of the virtual clock). */
-static struct joy_item { uint32_t tick; int axis, n, value; } joy_items[256];
-static int joy_count = -1, joy_next;
+/* DGK_INPUT (or DGK_JOY): scripted input (see dgk/app.h): its items,
+ * applied at their ticks (frames of the virtual clock). */
+enum { ITEM_AXIS, ITEM_BUTTON, ITEM_KEY };
+static struct joy_item { uint32_t tick; int kind, n, value; } joy_items[256];
+static int joy_count = -1, joy_next, joy_any;
 
 static void joy_script(void)
 {
-    const char *s = getenv("DGK_JOY");
+    const char *s = getenv("DGK_INPUT");
+    if (!s)
+        s = getenv("DGK_JOY");
     joy_count = 0;
     while (s && *s && joy_count < (int)DGK_ARRAY_LEN(joy_items)) {
         struct joy_item *j = &joy_items[joy_count];
@@ -103,7 +106,8 @@ static void joy_script(void)
         unsigned long t;
         if (sscanf(s, "%lu:%7[a-z]:%d:%d", &t, kind, &j->n, &j->value) == 4) {
             j->tick = (uint32_t)t;
-            j->axis = kind[0] == 'a';
+            j->kind = kind[0] == 'a' ? ITEM_AXIS : kind[0] == 'b' ? ITEM_BUTTON : ITEM_KEY;
+            joy_any |= j->kind != ITEM_KEY;
             joy_count++;
         }
         s = strchr(s, ',');
@@ -116,7 +120,7 @@ int plat_next_event(plat_event *e)
     uint32_t tick = (uint32_t)(now_us / (1000000 / 60));
     if (joy_count < 0) {
         joy_script();
-        if (joy_count > 0) {
+        if (joy_any) {
             e->type = PLAT_EV_JOY_ADDED;
             e->name = "DGK_JOY script";
             e->key = 4;
@@ -126,7 +130,10 @@ int plat_next_event(plat_event *e)
     }
     if (joy_next < joy_count && joy_items[joy_next].tick <= tick) {
         const struct joy_item *j = &joy_items[joy_next++];
-        e->type = j->axis ? PLAT_EV_JOY_AXIS : j->value ? PLAT_EV_JOY_DOWN : PLAT_EV_JOY_UP;
+        if (j->kind == ITEM_KEY)
+            e->type = j->value ? PLAT_EV_KEY_DOWN : PLAT_EV_KEY_UP;
+        else
+            e->type = j->kind == ITEM_AXIS ? PLAT_EV_JOY_AXIS : j->value ? PLAT_EV_JOY_DOWN : PLAT_EV_JOY_UP;
         e->key = j->n;
         e->value = j->value;
         return 1;
