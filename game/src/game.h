@@ -20,6 +20,7 @@ typedef struct game {
     int mode, laps_wanted, hash, trace, desync, last_laps, tourshots;
     int job_from, job_to, job_bay;  /* -job D:T:B (job_to -1: none) */
     int dockpose;                   /* -dockpose */
+    int soundtest;                  /* -soundtest */
     int rearcam;                    /* coupling or docking in reverse: the reversing camera's look */
     world w;
     rig r, r_prev;

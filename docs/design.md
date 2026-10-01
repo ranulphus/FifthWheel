@@ -32,6 +32,22 @@ build replaces SDL with OSMesa and a virtual clock. The Linux and headless
 builds run in the harness's dev container (`build/deps/` stages what they
 need from DOSGL).
 
+## Sound (game/src/sound.c, kit/src/mix.c)
+
+Every sound is synthesised at start-up: the diesel as two loops recorded at
+1000 rpm (a deep one with a knock on each firing, a raspy one with a turbo
+whistle) pitched by rpm and crossfaded from low to high between 900 and
+1900 rpm; the air brakes' hiss, the reversing beeper, a puff on each gear
+change; a two-tone horn (H, held) whose tones loop seamlessly (periods of
+67 and 53 samples); a clunk when the fifth wheel locks, a thud on a bump,
+a squeal on a jackknife, a chime for a delivery. The mixer ramps every
+volume change over 3 ms, so starts, stops and crossfades do not click.
+
+The audio device opens once the game has loaded and closes before it
+cleans up: neither yields, and the Sound Blaster's ring holds about 90 ms.
+On DOS the kit routes SDL's log through its own, and the driver's count
+of chunks played as silence becomes a test check (`HX-TEST audio`).
+
 ## Jobs (game/src/jobs.c)
 
 A trailer waits at every depot, parked along the apron's left edge, and

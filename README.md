@@ -41,7 +41,7 @@ make jobsweep                     # the job autopilot on every job, headless
 ```
 
 Keys: arrows or WASD to steer, accelerate and brake (hold the brake at a
-standstill to reverse), Space for the handbrake, 1-3 to take a job from a
+standstill to reverse), Space for the handbrake, H for the horn, 1-3 to take a job from a
 depot's board, Backspace to cancel it before coupling, Esc to quit.
 
 The world comes from a seed: `make data WORLD_SEED=n` (default 1;
@@ -51,7 +51,7 @@ Command line: `-mode WxH`, `-novsync`, `-nosound`, and for tests `-frames N`,
 `-fixed` (one tick per frame), `-shot F:NAME`, `-nodraw`, `-test` (see
 `kit/include/dgk/app.h`); the game adds `-world FILE` (default
 `WORLD.PAK`; the F1 test yard is `YARD.PAK`), `-autopilot` (`-laps N`),
-`-autojob` (`-job D:T:B`), `-dockpose`,
+`-autojob` (`-job D:T:B`), `-dockpose`, `-soundtest`,
 `-record FILE`, `-replay FILE`, `-hash`, `-trace N`, `-timedemo FILE -dbtest NAME`,
 `-probe [quick]` and `-tourshots N`.
 

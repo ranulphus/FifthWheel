@@ -48,7 +48,7 @@ Header (16 bytes): `"DGKR"`, u16 version (1), u16 frame size, u32 ticks,
 u32 seed; then one frame per tick, and after every 60th tick a u32 hash of
 the game's state. Fifth Wheel's frame is 4 bytes: s8 steer, u8 accelerator,
 u8 brake, u8 buttons (bit 0 handbrake, bits 1-2 a job taken from the board
-(1-3), bit 3 the job cancelled). Playback checks the hashes and
+(1-3), bit 3 the job cancelled, bit 4 the horn held). Playback checks the hashes and
 reports the first second that differs (`FW-DESYNC`). A replay plays back
 on the platform that recorded it: DOS's x87 and the desktop's SSE differ in
 low-order bits, so hashes differ across them even when the drive does not.

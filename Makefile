@@ -5,6 +5,7 @@
 #   make headless       build/headless/fwheel-hl (OSMesa, virtual clock; dev container)
 #   make loopa [CARD=g450] [ARGS="-frames 60"]   run FWHEEL.EXE in 86Box: out/loopa-CARD/
 #   make shots [CARD=g450]   the same frames from DOS (Loop A) and OSMesa, compared (tools/shots.sh)
+#   make suite [CARD=g450] [CHECKS="sb16 sbpro"]   Loop A suites (tools/suite.sh)
 #   make jobsweep       the job autopilot on every depot pair and bay, headless (tools/jobsweep.sh)
 #   make check-deps     DOSGL at or after deps.mk's pin
 include config.mk
@@ -25,7 +26,7 @@ WARN      := -std=gnu99 -Wall -Wextra -Werror
 # Every target compiles its GL against DOS-GL's own <GL/gl.h>: the subset is enforced.
 COMMON    := $(WARN) -O2 -ffp-contract=off -Ikit/include -Ikit/src
 
-.PHONY: all dos linux headless loopa shots jobsweep check-deps deps clean help
+.PHONY: all dos linux headless loopa shots suite jobsweep check-deps deps clean help
 all: dos
 
 check-deps:
@@ -122,6 +123,9 @@ loopa: dos
 shots: dos headless
 	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) sh tools/shots.sh $(CARD)
 
+suite: dos
+	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) tools/suite.sh $(CARD) $(CHECKS)
+
 jobsweep: headless
 	$(Q)$(DEV) sh tools/jobsweep.sh $(or $(PAR),8)
 
@@ -129,4 +133,4 @@ clean:
 	rm -rf build out
 
 help:
-	@sed -n '3,10p' Makefile
+	@sed -n '3,11p' Makefile

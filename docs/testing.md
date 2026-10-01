@@ -4,7 +4,8 @@
 |---|---|---|
 | DOS in 86Box | `make loopa CARD=g450` (or g200, g400) | `HX-DONE 0`: the frames ran, the snapshot was written |
 | DOS against Mesa | a DOS `-test -fixed -frames 120 -shot 119:F0` run and `build/headless/fwheel-hl` with the same options, compared with the harness's `imgcmp.py` | within conformance tolerances (RGB565 quantisation, tolerance 24, 0.5%, edges excluded) |
-| Sound | the DOS run with `-tone`, `--sound sb16 --wav`, and `wavcheck.py audio.wav --tone 440` | 440 Hz found |
+| Sound | `make suite CHECKS="sb16 sbpro"` (`tools/suite.sh`): `-soundtest` (each sound in turn) through an SB16 and an SB Pro 2 (8-bit) with `--wav` | every sound's tones are in the recording (`wavcheck.py`), and `HX-TEST audio`: no chunk was played as silence (SDL patch 0005) |
+| Sound, headless | `DGK_WAV=FILE build/headless/fwheel-hl -test -fixed -nodraw -soundtest`: the mixer's output in step with the virtual clock | the same samples every run; the tones are there |
 | Linux | `xvfb-run build/linux/fwheel -test -fixed -frames 120 -shot 119:F0L -nosound` in the dev container | the frame equals the headless one |
 | Autopilot | `-test -fixed -autopilot -laps 1 -hash` (DOS in Loop A with `--file build/data/YARD.PAK`, or headless) | a lap with no damage (`FW-LAP`, `HX-TEST laps`) |
 | World | `make data-check` | seed 1's pack hash equals `data/golden/world.sha`, built at -O0 and -O2 |

@@ -3,6 +3,7 @@
  *   FWHEEL [kit options, see dgk/app.h] [-world FILE] [-record FILE | -replay FILE] [-hash]
  *          [-trace N]                    the rig's pose every N ticks (FW-TRACE)
  *   FWHEEL -dockpose                     a trailer reversing into a bay, held still (pictures)
+ *   FWHEEL -soundtest                    each sound in turn, then quit (the SOUND suite)
  *   FWHEEL -autopilot [-laps N]          round the world's tour with a trailer
  *   FWHEEL -autojob [-job D:T:B]         the autopilot does the shortest job on offer at
  *                                        depot 0, or the job from depot D to depot T's bay B
@@ -14,8 +15,8 @@
  *                                        two depots, each saved as P<n> (DOS against Mesa)
  *
  * Keys: arrows or WASD (steer, accelerate, brake; hold the brake at a stop
- * to reverse), Space the handbrake, 1-3 take a job from the board,
- * Backspace cancel it (before coupling), Esc to quit. */
+ * to reverse), Space the handbrake, H the horn, 1-3 take a job from the
+ * board, Backspace cancel it (before coupling), Esc to quit. */
 #include "game.h"
 #include "dgk/bench.h"
 #include "guides.h"
@@ -29,10 +30,11 @@
 
 extern const dgk_font_data fw_font;
 
-enum { SC_A = 4, SC_D = 7, SC_S = 22, SC_W = 26, SC_1 = 30, SC_BACKSPACE = 42 };
+enum { SC_A = 4, SC_D = 7, SC_H = 11, SC_S = 22, SC_W = 26, SC_1 = 30, SC_BACKSPACE = 42 };
 
 /* One tick of input, as recorded. Buttons: bit 0 the handbrake, bits 1-2
- * a job taken from the board (1-3), bit 3 the job cancelled. */
+ * a job taken from the board (1-3), bit 3 the job cancelled, bit 4 the
+ * horn held. */
 typedef struct input_frame {
     int8_t steer;               /* -127..127 */
     uint8_t accel, decel, buttons;
@@ -65,6 +67,8 @@ static void keyboard(game *g, input_frame *f)
             f->buttons |= (uint8_t)((i + 1) << 1);
     if (dgk_app.key_pressed[SC_BACKSPACE])
         f->buttons |= 8;
+    if (dgk_app.key_down[SC_H])
+        f->buttons |= 16;
 }
 
 /* -dockpose: a docking scene to look at (DOS against Mesa): a box trailer
@@ -245,6 +249,11 @@ static void tick(void *u)
         pose(g, (int)dgk_app.ticks);
         return;
     }
+    if (g->soundtest) {                              /* each sound in turn, nothing driven */
+        if (!sound_test_tick(dgk_app.ticks))
+            dgk_app.quit = 1;
+        return;
+    }
     if (dgk_app.key_pressed[DGK_KEY_ESCAPE])
         dgk_app.quit = 1;
     if (g->dockpose) {                               /* held still, the wheels turned */
@@ -293,7 +302,7 @@ static void tick(void *u)
         camera_tick(&g->cam, &g->r, 1.0f / DGK_TICK_HZ, focus ? &f : NULL);
         g->rearcam = focus && g->r.gear < 0;          /* the reversing camera's look and guides */
     }
-    sound_tick(&g->r);
+    sound_tick(&g->r, f.buttons & 16);
     if (g->mode == MODE_TOUR && g->replay_path) {
         rig_input unused;
         autopilot_drive(&g->ap, &g->r, &g->w, &unused);      /* keeps counting laps */
@@ -456,6 +465,8 @@ int main(int argc, char **argv)
             g.hash = 1;
         else if (!strcmp(a, "-dockpose"))
             g.dockpose = 1;
+        else if (!strcmp(a, "-soundtest"))
+            g.soundtest = 1;
         else if (!strcmp(a, "-trace") && v)
             g.trace = atoi(argv[++i]);
         else if (!strcmp(a, "-laps") && v)

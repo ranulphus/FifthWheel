@@ -5,11 +5,15 @@
 void plat_audio_lock(void);
 void plat_audio_unlock(void);
 
+#define RAMP 1024            /* volume change per output frame, 8.8 x 256: unity in 64 frames (3 ms) */
+
 typedef struct voice {
     const dgk_sound *s;
     uint32_t pos, frac;      /* sample index and 16-bit fraction */
     uint32_t step;           /* 16.16 samples per output frame */
-    int vol;                 /* 256 = unity */
+    int vol;                 /* the target: 256 = unity */
+    int cur;                 /* where the volume is, x 256 (ramps to vol: no clicks) */
+    int stopping;            /* fading out; the voice is free at silence */
     int flags;
 } voice;
 
@@ -51,6 +55,8 @@ int dgk_mix_play(const dgk_sound *s, int vol_q8, uint32_t pitch_q16, int flags)
         voices[v].pos = voices[v].frac = 0;
         voices[v].step = step_for(s, pitch_q16);
         voices[v].vol = vol_q8;
+        voices[v].cur = 0;
+        voices[v].stopping = 0;
         voices[v].flags = flags;
     }
     dgk_mix_unlock();
@@ -62,7 +68,7 @@ void dgk_mix_set(int v, int vol_q8, uint32_t pitch_q16)
     if (v < 0 || v >= DGK_MIX_VOICES)
         return;
     dgk_mix_lock();
-    if (voices[v].s) {
+    if (voices[v].s && !voices[v].stopping) {
         voices[v].vol = vol_q8;
         voices[v].step = step_for(voices[v].s, pitch_q16);
     }
@@ -74,7 +80,8 @@ void dgk_mix_stop(int v)
     if (v < 0 || v >= DGK_MIX_VOICES)
         return;
     dgk_mix_lock();
-    voices[v].s = NULL;
+    voices[v].vol = 0;                         /* fade out; render frees it */
+    voices[v].stopping = 1;
     dgk_mix_unlock();
 }
 
@@ -97,7 +104,15 @@ void dgk_mix_render(int16_t *out, int frames)
                     next = (v->flags & DGK_MIX_LOOP) ? 0 : v->pos;
                 b = p[next];
                 x = a + (int32_t)(((int64_t)(b - a) * (int32_t)v->frac) >> 16);   /* linear */
-                acc[f] += (x * v->vol) >> 8;
+                if (v->cur < v->vol << 8)
+                    v->cur = v->cur + RAMP < v->vol << 8 ? v->cur + RAMP : v->vol << 8;
+                else if (v->cur > v->vol << 8)
+                    v->cur = v->cur - RAMP > v->vol << 8 ? v->cur - RAMP : v->vol << 8;
+                acc[f] += (x * (v->cur >> 8)) >> 8;
+                if (v->stopping && v->cur == 0) {
+                    v->s = NULL;
+                    break;
+                }
                 v->frac += v->step;
                 v->pos += v->frac >> 16;
                 v->frac &= 0xFFFF;
