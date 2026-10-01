@@ -16,7 +16,11 @@ its own repository once a second game uses it.
 Minimum machine: Pentium II 266, Matrox G200, Sound Blaster 16 (or none),
 640x480. Faster machines and the G400/G450 get more detail.
 
-**Status:** milestone F4: the jobs loop. Take a job from a depot's board,
+**Status:** milestone F6: a career. Money earned is kept in CAREER.DAT and
+spent in the garage on paint jobs, horns, decals, licences for flatbeds
+and tankers, and a bigger cab; deliveries end in coins, confetti and a
+bouncing callout. Before that (F4, F5): the jobs loop, full sound, and
+joysticks and wheels. Take a job from a depot's board,
 back under its trailer (box, flatbed or tanker), follow the route on the
 minimap to another depot and reverse the trailer into a bay, watching a
 reversing camera's guide lines; the dock is graded and paid. The world is generated (`make data`: towns, depots with
@@ -54,7 +58,7 @@ Command line: `-mode WxH`, `-novsync`, `-nosound`, and for tests `-frames N`,
 `-fixed` (one tick per frame), `-shot F:NAME`, `-nodraw`, `-test` (see
 `kit/include/dgk/app.h`); the game adds `-world FILE` (default
 `WORLD.PAK`; the F1 test yard is `YARD.PAK`), `-autopilot` (`-laps N`),
-`-autojob` (`-job D:T:B`), `-dockpose`, `-soundtest`, `-calibrate`, `-joylog`, `-career FILE`, `-money N`,
+`-autojob` (`-job D:T:B`), `-dockpose`, `-soundtest`, `-calibrate`, `-joylog`, `-career FILE`, `-money N`, `-fxtest`,
 `-record FILE`, `-replay FILE`, `-hash`, `-trace N`, `-timedemo FILE -dbtest NAME`,
 `-probe [quick]` and `-tourshots N`.
 

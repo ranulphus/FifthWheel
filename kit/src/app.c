@@ -24,6 +24,8 @@ static struct {
     struct { uint32_t frame; char name[16]; } shots[MAX_SHOTS];
 } opt;
 static uint64_t last_service_us, last_swap_us;
+static uint64_t sum_tris, sum_draws;          /* over the frames drawn: FW-STAT at the end */
+static uint32_t max_tris, max_draws, counted;
 static int bench_on;
 
 void dgk_app_bench_start(const char *test, int warmup_frames)
@@ -203,7 +205,15 @@ int dgk_app_run(const dgk_app_desc *d, void *u, int argc, char **argv)
             if (bench_on && last_swap_us)
                 dgk_bench_frame(now - last_swap_us, dgk_gfx_tris);
             last_swap_us = now;
+            if (dgk_gfx_tris || dgk_gfx_draws) {
+                sum_tris += dgk_gfx_tris;
+                sum_draws += dgk_gfx_draws;
+                max_tris = DGK_MAX(max_tris, dgk_gfx_tris);
+                max_draws = DGK_MAX(max_draws, dgk_gfx_draws);
+                counted++;
+            }
             dgk_gfx_tris = 0;
+            dgk_gfx_draws = 0;
         }
         dgk_app.frame++;
         if (opt.frames && dgk_app.frame >= (uint32_t)opt.frames)
@@ -212,6 +222,10 @@ int dgk_app_run(const dgk_app_desc *d, void *u, int argc, char **argv)
     plat_audio_close();                       /* before the game's own clean-up, which does not yield */
     if (d->quit)
         d->quit(u);
+    if (counted)
+        dgk_log("FW-STAT frames=%lu tris avg=%lu max=%lu draws avg=%lu max=%lu", (unsigned long)counted,
+                (unsigned long)(sum_tris / counted), (unsigned long)max_tris, (unsigned long)(sum_draws / counted),
+                (unsigned long)max_draws);
     dgk_log("FW-EXIT frames=%lu ticks=%lu", (unsigned long)dgk_app.frame, (unsigned long)dgk_app.ticks);
     if (opt.test) {
         int under, chunks;

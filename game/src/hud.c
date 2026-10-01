@@ -3,6 +3,7 @@
  * go; the job board at a depot; a round minimap of the roads with the
  * route; a docking gauge; big callouts. */
 #include "game.h"
+#include "dgk/gfx.h"
 #include <GL/gl.h>
 #include <math.h>
 #include <stdio.h>
@@ -21,6 +22,7 @@ static void bar(float x, float y, float w, float h, uint32_t rgba)
 {
     colour(rgba);
     glBegin(GL_QUADS);
+    dgk_gfx_draws++;
     glVertex2f(x, y);
     glVertex2f(x + w, y);
     glVertex2f(x + w, y + h);
@@ -58,6 +60,7 @@ static void arrow(float x, float y, float a, float size, uint32_t rgba)
         }
         colour(pass ? rgba : 0x000000FFu);
         glBegin(GL_TRIANGLES);
+        dgk_gfx_draws++;
         glVertex2f(p[0][0], p[0][1]);
         glVertex2f(p[2][0], p[2][1]);
         glVertex2f(p[1][0], p[1][1]);
@@ -153,6 +156,7 @@ static void minimap(const game *g)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     colour(0x1E3A28B0u);
     glBegin(GL_TRIANGLE_FAN);
+    dgk_gfx_draws++;
     glVertex2f(MM_X, MM_Y);
     for (i = 0; i <= 24; i++)
         glVertex2f(MM_X + MM_R * cosf(i * WG_PI / 12), MM_Y + MM_R * sinf(i * WG_PI / 12));
@@ -162,6 +166,7 @@ static void minimap(const game *g)
     glLineWidth(2.0f);
     colour(0xC8C8D0FFu);
     glBegin(GL_LINES);
+    dgk_gfx_draws++;
     for (i = 0; i < (int)gr->nedges; i++) {
         const float *q = p + e[i].first_point * 2;
         for (k = 0; k + 1 < (int)e[i].npoints; k += 3) {
@@ -178,6 +183,7 @@ static void minimap(const game *g)
         glLineWidth(3.0f);
         colour(0xFFD23FFFu);
         glBegin(GL_LINES);
+        dgk_gfx_draws++;
         for (k = j->route_next; k + 1 < j->nroute && k < j->route_next + 120; k += 2) {
             int m = DGK_MIN(k + 2, j->nroute - 1);
             mm_line(g, j->route[k][0], j->route[k][1], j->route[m][0], j->route[m][1]);
@@ -198,6 +204,7 @@ static void minimap(const game *g)
     glLineWidth(2.0f);
     colour(0xFFFFFFFFu);
     glBegin(GL_LINES);
+    dgk_gfx_draws++;
     for (i = 0; i < 24; i++) {
         glVertex2f(MM_X + MM_R * cosf(i * WG_PI / 12), MM_Y + MM_R * sinf(i * WG_PI / 12));
         glVertex2f(MM_X + MM_R * cosf((i + 1) * WG_PI / 12), MM_Y + MM_R * sinf((i + 1) * WG_PI / 12));
@@ -329,7 +336,9 @@ static void job_panel(game *g)
     int point = 1;
     switch (j->state) {
     case JOB_NONE:
-        if (j->at_depot >= 0 && j->offers_at == j->at_depot && j->trailers[j->at_depot].present) {
+        if (g->callout && dgk_app.ticks - g->callout_tick < 150) {
+            point = 0;                               /* the next board after the cheering */
+        } else if (j->at_depot >= 0 && j->offers_at == j->at_depot && j->trailers[j->at_depot].present) {
             job_board(g);
             point = 0;
         } else {
@@ -414,7 +423,7 @@ void hud_draw(game *g)
     } else if (g->mode == MODE_JOB)
         dgk_text(&g->font, 20, 16, 1.0f, 0xFFD23FFFu, "AUTOPILOT");
     if (g->has_jobs) {
-        snprintf(line, sizeof line, "$%d", g->jobs.money);
+        snprintf(line, sizeof line, "$%d", (int)(g->fxs.money_shown + 0.5f));
         dgk_text(&g->font, 620 - dgk_text_width(&g->font, 1.5f, line), 12, 1.5f, 0xFFD23FFFu, line);
         if (g->cal.step == CAL_OFF) {                /* the set-up has the screen to itself */
             job_panel(g);
@@ -424,12 +433,19 @@ void hud_draw(game *g)
     if (g->cal.step != CAL_OFF)
         calibration_panel(g);
     if (g->callout && dgk_app.ticks - g->callout_tick < 150) {
-        float t = (dgk_app.ticks - g->callout_tick) / 150.0f, s = 2.0f + 0.6f * sinf(t * 30.0f) * (1 - t) * (1 - t);
-        dgk_text(&g->font, 320 - dgk_text_width(&g->font, s, g->callout) / 2, 180, s, g->callout_rgba, g->callout);
+        /* Squash and stretch: wide and flat, then tall and thin, settling. */
+        float t = (dgk_app.ticks - g->callout_tick) / 150.0f, wob = sinf(t * 26.0f) * (1 - t) * (1 - t);
+        float s = 2.0f, w = dgk_text_width(&g->font, s, g->callout);
+        glPushMatrix();
+        glTranslatef(320, 190, 0);
+        glScalef(1.0f + 0.35f * wob, 1.0f - 0.3f * wob, 1);
+        dgk_text(&g->font, -w / 2, -10 * s, s, g->callout_rgba, g->callout);
+        glPopMatrix();
         if (g->callout2)
             dgk_text(&g->font, 320 - dgk_text_width(&g->font, 1.5f, g->callout2) / 2, 180 + 22 * s, 1.5f,
                      0xFFD23FFFu, g->callout2);
     }
+    fx_draw_screen(&g->fxs, 0.0f);
     if (!dgk_app.fixed) {
         now = dgk_now_us();
         if (++g->fps_frames >= 30 || now - g->fps_t0 > 1000000) {

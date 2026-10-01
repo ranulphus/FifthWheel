@@ -61,6 +61,18 @@ Box trailers come with the job; flatbeds and tankers need a licence, and
 their jobs show greyed on the board until then. Tests, replays and
 recordings leave the career alone (a test can name one with `-career`).
 
+## Flourishes (game/src/fx.c)
+
+Looks only, never fed back into the simulation: a delivery's pay flies to
+the wallet as coins (each lands with a ting) while the money counts up; a
+GREAT or PERFECT dock pops confetti from the screen's bottom corners, each
+piece flipping as it falls; dust puffs where the wheels brake hard or spin
+and where the rig couples, jackknifes or hits something; the cab rocks on
+its springs, leaning out of turns, squatting as it pulls away, diving as
+it brakes and jolting on knocks. Callouts squash and stretch as they land.
+Each kind lives in a fixed pool (16 coins, 64 confetti, 32 dust: a new one
+takes an old one's place), so a frame's cost has a ceiling (`-fxtest`).
+
 ## Controls (game/src/input.c)
 
 The keyboard's digital keys are smoothed so they steer like a wheel. A

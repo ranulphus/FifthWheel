@@ -8,6 +8,7 @@
 #include "autopilot.h"
 #include "camera.h"
 #include "career.h"
+#include "fx.h"
 #include "garage.h"
 #include "input.h"
 #include "jobpilot.h"
@@ -30,6 +31,8 @@ typedef struct game {
     calib cal;                      /* the calibration screen (cal.step CAL_OFF: closed) */
     career car;                     /* money and the garage's items, kept in CAREER.DAT */
     garage gar;                     /* the garage (gar.open) */
+    fx fxs;                         /* coins, confetti, dust, the cab's springs (looks only) */
+    int hits_seen, fxtest;          /* bumps already shaken; -fxtest */
     const char *career_path;        /* -career FILE, FW_CAREER, or the default */
     int careerful;                  /* the career is loaded and saved (play, or -career given) */
     int career_given, start_money;  /* -career; -money N (tests) */

@@ -4,6 +4,7 @@
 #include <math.h>
 
 uint32_t dgk_gfx_tris;
+uint32_t dgk_gfx_draws;
 
 void dgk_gfx_perspective(float fovy_deg, float aspect, float znear, float zfar)
 {
@@ -51,6 +52,7 @@ void dgk_gfx_draw_mesh(const dgk_mesh *m)
     glColorPointer(4, GL_UNSIGNED_BYTE, 0, m->rgba);
     glDrawElements(GL_TRIANGLES, m->ntris * 3, GL_UNSIGNED_SHORT, m->idx);
     dgk_gfx_tris += (uint32_t)m->ntris;
+    dgk_gfx_draws++;
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);
 }

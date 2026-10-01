@@ -116,6 +116,7 @@ static void colour(uint32_t rgba)
 static void rect(float x, float y, float w, float h, uint32_t top, uint32_t bottom)
 {
     glBegin(GL_QUADS);
+    dgk_gfx_draws++;
     colour(top);
     glVertex2f(x, y);
     glVertex2f(x + w, y);
@@ -149,12 +150,14 @@ void garage_draw(const garage *g, const career *c, const lorry_meshes *m, const 
     dgk_gfx_look_at(eye, at, up);
     glDisable(GL_CULL_FACE);
     glBegin(GL_TRIANGLE_FAN);
+    dgk_gfx_draws++;
     colour(0x6A6E78FFu);
     glVertex3f(0, 0.01f, 0);
     for (i = 0; i <= 32; i++)
         glVertex3f(9.0f * cosf(i * FW_PI / 16), 0.01f, 9.0f * sinf(i * FW_PI / 16));
     glEnd();
-    glBegin(GL_QUAD_STRIP);                          /* the platform's bright rim */
+    glBegin(GL_QUAD_STRIP);
+    dgk_gfx_draws++;                          /* the platform's bright rim */
     colour(rarity_rgba[it->rarity]);
     for (i = 0; i <= 32; i++) {
         glVertex3f(9.0f * cosf(i * FW_PI / 16), 0.02f, 9.0f * sinf(i * FW_PI / 16));

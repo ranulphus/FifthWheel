@@ -89,6 +89,7 @@ void dgk_text(const dgk_font *f, float x, float y, float scale, uint32_t rgba, c
     glColorPointer(4, GL_UNSIGNED_BYTE, 0, col);
     glDrawArrays(GL_QUADS, 0, n * 4);
     dgk_gfx_tris += (uint32_t)n * 2;
+    dgk_gfx_draws++;
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);

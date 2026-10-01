@@ -3,7 +3,7 @@
 # one line, exit status 0 when all pass. Needs MGAHAL and DEV (make suite
 # sets them) and build/dos/FWHEEL.EXE.
 #
-#   tools/suite.sh [CARD] [CHECK...]    checks: sb16 sbpro joy shop (default: all)
+#   tools/suite.sh [CARD] [CHECK...]    checks: sb16 sbpro joy shop fx (default: all)
 #
 #   sb16, sbpro   -soundtest through the Sound Blaster 16 and the Sound
 #                 Blaster Pro 2 (8-bit): every sound's tones are in the
@@ -18,10 +18,12 @@
 #   shop          keys typed in 86Box: the garage (G) buys Sky Blue paint and
 #                 the Big Air horn with $600, is left (Esc) and the game quit;
 #                 a second run loads CAREER.DAT with them fitted and $50 left
+#   fx            -fxtest: every flourish far past its pool, drawn through
+#                 DOS-GL; the pools hold (16 coins, 64 confetti, 32 dust)
 set -uo pipefail
 : "${MGAHAL:?}" "${DEV:?}"
 card=${1:-g450}; shift || true
-checks=${*:-sb16 sbpro joy shop}
+checks=${*:-sb16 sbpro joy shop fx}
 out=$PWD/out/suite-$card
 mkdir -p "$out"
 fail=0
@@ -80,6 +82,10 @@ for c in $checks; do
     case $c in
     joy) joy ;;
     shop) shop ;;
+    fx)
+        st=$(run fx --args="-test -fixed -nosound -fxtest")
+        r=$(log fx | grep -ao 'HX-TEST fx-caps [A-Z]* .*' | cut -d' ' -f3-)
+        if [ "$st" = PASS ] && [[ $r == PASS* ]]; then say fx "PASS (${r#PASS })"; else bad fx "($st; $r)"; fi ;;
     sb16) sound sb16 sb16 "A220 I5 D1 H5 T6" ;;
     sbpro) sound sbpro sbprov2 "A220 I7 D1 T4" ;;   # 86Box's SB Pro 2 is on IRQ 7
     *) bad "$c" "(no such check)" ;;

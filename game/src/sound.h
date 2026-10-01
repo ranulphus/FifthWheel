@@ -17,6 +17,7 @@ enum { HORN_TWO_TONE, HORN_BIG_AIR, HORN_JINGLE, HORN_QUACK, HORNS };
 void sound_set_horn(int horn);       /* which horn sounds while it is held (the career's) */
 void sound_horn_preview(void);       /* half a second of it (the garage) */
 void sound_clunk(void);
+void sound_coin(void);               /* a coin landing in the wallet */
 void sound_chime(int grade);         /* 1 (OK) .. 4 (PERFECT) */
 void sound_stop(void);
 

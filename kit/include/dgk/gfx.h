@@ -17,6 +17,7 @@ typedef struct dgk_mesh {
 } dgk_mesh;
 
 extern uint32_t dgk_gfx_tris;              /* triangles submitted this frame (the loop resets it) */
+extern uint32_t dgk_gfx_draws;             /* draw calls (glDrawElements/Arrays, glBegin blocks) this frame */
 
 void dgk_gfx_perspective(float fovy_deg, float aspect, float znear, float zfar);
 void dgk_gfx_look_at(dgk_v3 eye, dgk_v3 at, dgk_v3 up);

@@ -35,6 +35,8 @@ static int16_t air_pcm[AIR_FRAMES];
 static int16_t jingle_pcm[JINGLE_NOTE * 4];
 static int16_t quack_pcm[RATE * 34 / 100];
 static dgk_sound air, jingle, quack;
+static int16_t coin_pcm[RATE / 10];
+static dgk_sound coin;
 static const dgk_sound *horn_sound = NULL;
 static int preview_ticks;
 static dgk_sound engine_lo, engine_hi, hiss, beep, puff, clunk, chime, horn, thud, screech, ref;
@@ -163,6 +165,11 @@ void sound_init(void)
     sound_of(&thud, thud_pcm, DGK_ARRAY_LEN(thud_pcm));
     sound_of(&screech, screech_pcm, DGK_ARRAY_LEN(screech_pcm));
     sound_of(&ref, ref_pcm, DGK_ARRAY_LEN(ref_pcm));
+    for (i = 0; i < (int)DGK_ARRAY_LEN(coin_pcm); i++) {   /* coin: a bright ting, two partials */
+        double t = (double)i / RATE;
+        coin_pcm[i] = (int16_t)((sin(2 * FW_PI * 1976 * t) + 0.5 * sin(2 * FW_PI * 2960 * t)) * exp(-t * 30) * 6000.0);
+    }
+    sound_of(&coin, coin_pcm, DGK_ARRAY_LEN(coin_pcm));
     sound_of(&air, air_pcm, AIR_FRAMES);
     sound_of(&jingle, jingle_pcm, DGK_ARRAY_LEN(jingle_pcm));
     sound_of(&quack, quack_pcm, DGK_ARRAY_LEN(quack_pcm));
@@ -245,6 +252,11 @@ void sound_tick(const rig *r, int horn_down)
 void sound_clunk(void)
 {
     dgk_mix_play(&clunk, 200, 0x10000, 0);
+}
+
+void sound_coin(void)
+{
+    dgk_mix_play(&coin, 110, 0x10000, 0);
 }
 
 void sound_chime(int grade)

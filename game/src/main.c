@@ -4,6 +4,7 @@
  *          [-trace N]                    the rig's pose every N ticks (FW-TRACE)
  *   FWHEEL -dockpose                     a trailer reversing into a bay, held still (pictures)
  *   FWHEEL -soundtest                    each sound in turn, then quit (the SOUND suite)
+ *   FWHEEL -fxtest                       every flourish far past its cap for 2 s (HX-TEST fx-caps)
  *   FWHEEL -calibrate                    the joystick's calibration screen, saved, then quit
  *          [-joylog]                     the joystick's axes and mapped controls every 0.5 s (FW-JOY)
  *          [-career FILE] [-money N]     keep a career in FILE in a test run; start it with $N
@@ -244,6 +245,7 @@ static int init(void *u)
         g->replay = dgk_replay_record((int)sizeof(input_frame), 0);
     sound_init();
     career_style(g);
+    fx_init(&g->fxs, g->jobs.money);
     if (g->dbtest) {
         dgk_bench_run("FWHEEL", "F2");
         dgk_app_bench_start(g->dbtest, 30);
@@ -290,12 +292,19 @@ static void job_events(game *g)
     jobs *j = &g->jobs;
     jobs_tick(j, &g->r, &g->w, 1.0f / DGK_TICK_HZ);
     if (j->event == JOB_EVENT_COUPLED) {
+        float hx, hy;
         sound_clunk();
         hud_callout(g, "COUPLED!", NULL, 0x9FFFB0FFu);
+        rig_hitch(&g->r, &hx, &hy);
+        fx_dust_at(&g->fxs, &g->w, hx, hy, 6, 2.5f);
+        fx_bump(&g->fxs, -0.5f);
     } else if (j->event == JOB_EVENT_DELIVERED) {
         static const char *const cheer[] = { "", "DELIVERED", "GOOD PARK!", "GREAT PARK!", "PERFECT PARK!" };
         static const uint32_t cheer_rgba[] = { 0, 0xFFFFFFFFu, 0x9FFFB0FFu, 0x5FD8FFFFu, 0xFFD23FFFu };
         sound_chime(j->grade);
+        fx_coins(&g->fxs, DGK_CLAMP(j->earned / 40, 4, FX_COINS));
+        if (j->grade >= GRADE_GREAT)
+            fx_confetti(&g->fxs, j->grade == GRADE_PERFECT ? 56 : 32);
         g->car.delivered++;
         g->car.perfect += j->grade == GRADE_PERFECT;
         g->car.metres += (uint32_t)j->current.distance;
@@ -394,6 +403,15 @@ static void tick(void *u)
                     dgk_app.joy_axis[1], dgk_app.joy_axis[2], dgk_app.joy_axis[3], dgk_app.joy_down[0],
                     dgk_app.joy_down[1], js, ja, jb);
     }
+    if (g->fxtest) {                                 /* every flourish, far past its cap */
+        fx_coins(&g->fxs, 4);
+        fx_confetti(&g->fxs, 8);
+        fx_dust_at(&g->fxs, &g->w, g->r.x, g->r.y, 4, 6.0f);
+        fx_tick(&g->fxs, &g->r, &g->w, g->jobs.money + (int)dgk_app.ticks * 10);
+        if (dgk_app.ticks >= 120)
+            dgk_app.quit = 1;
+        return;
+    }
     if (g->soundtest) {                              /* each sound in turn, nothing driven */
         if (!sound_test_tick(dgk_app.ticks))
             dgk_app.quit = 1;
@@ -448,6 +466,14 @@ static void tick(void *u)
         g->rearcam = focus && g->r.gear < 0;          /* the reversing camera's look and guides */
     }
     sound_tick(&g->r, f.buttons & 16);
+    fx_tick(&g->fxs, &g->r, &g->w, g->jobs.money);
+    if (g->fxs.coins_landed)
+        sound_coin();
+    if (g->r.hits != g->hits_seen) {                 /* a knock: the cab jolts, dust flies */
+        g->hits_seen = g->r.hits;
+        fx_bump(&g->fxs, 0.9f);
+        fx_dust_at(&g->fxs, &g->w, g->r.x + 4.5f * cosf(g->r.heading), g->r.y + 4.5f * sinf(g->r.heading), 3, 2.0f);
+    }
     if (g->mode == MODE_TOUR && g->replay_path) {
         rig_input unused;
         autopilot_drive(&g->ap, &g->r, &g->w, &unused);      /* keeps counting laps */
@@ -455,6 +481,12 @@ static void tick(void *u)
     if (g->r.jackknifes != g->jackknifes_seen) {
         g->jackknifes_seen = g->r.jackknifes;
         hud_callout(g, "JACKKNIFE!", NULL, 0xFF5030FFu);
+        {
+            float ax, ay;
+            rig_trailer_axle(&g->r, &ax, &ay);
+            fx_dust_at(&g->fxs, &g->w, ax, ay, 8, 3.0f);
+            fx_bump(&g->fxs, 0.6f);
+        }
         dgk_log("FW-EVENT jackknife tick=%lu speed=%.1f", (unsigned long)dgk_app.ticks, g->r.v);
     }
     h = rig_hash(&g->r, 2166136261u);
@@ -516,7 +548,7 @@ static void draw(void *u, float alpha)
         camera_apply(&g->cam, &g->cam_prev, alpha, (float)dgk_app.width / dgk_app.height, world_height(&g->w, tx, ty));
         world_draw(&g->w, tx, ty, 90.0f);
     }
-    lorry_draw(&g->lorry, &r, &g->w, NULL);
+    lorry_draw(&g->lorry, &r, &g->w, &g->fxs.sway);
     if (g->has_jobs) {
         int i;
         for (i = 0; i < g->w.ndepots; i++) {
@@ -530,6 +562,7 @@ static void draw(void *u, float alpha)
                 lorry_draw_trailer(&g->lorry, d->type, d->x, d->y, d->heading, &g->w);
         }
     }
+    fx_draw_world(&g->fxs, &g->cam);
     if (g->rearcam)
         guides_draw(&r, &g->w);
     if (g->tourshots) {
@@ -556,6 +589,10 @@ static void quit(void *u)
     dgk_log("FW-RESULT ticks=%lu laps=%d delivered=%d money=%d damage=%.1f hits=%d jackknifes=%d desync=%d x=%.2f "
             "y=%.2f", (unsigned long)dgk_app.ticks, g->ap.laps, g->jobs.delivered, g->jobs.money, g->r.damage,
             g->r.hits, g->r.jackknifes, g->desync, g->r.x, g->r.y);
+    if (g->fxtest)
+        dgk_test_check("fx-caps", g->fxs.max_coins == FX_COINS && g->fxs.max_confetti == FX_CONFETTI &&
+                       g->fxs.max_dust == FX_DUST, "at most %d coins, %d confetti, %d dust (caps %d, %d, %d)",
+                       g->fxs.max_coins, g->fxs.max_confetti, g->fxs.max_dust, FX_COINS, FX_CONFETTI, FX_DUST);
     if (g->mode == MODE_JOB)
         dgk_test_check("job", g->jobs.delivered > 0 && g->jobs.grade >= GRADE_OK, "%s, %s in %.0f s, damage %.1f",
                        g->jobs.delivered ? "delivered" : "not delivered", grade_name[g->jobs.grade],
@@ -633,6 +670,8 @@ int main(int argc, char **argv)
             g.dockpose = 1;
         else if (!strcmp(a, "-soundtest"))
             g.soundtest = 1;
+        else if (!strcmp(a, "-fxtest"))
+            g.fxtest = 1;
         else if (!strcmp(a, "-calibrate"))
             g.calibrate_only = 1;
         else if (!strcmp(a, "-joylog"))

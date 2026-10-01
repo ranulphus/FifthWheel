@@ -1,5 +1,6 @@
 /* guides.c - reversing guide lines (see guides.h). */
 #include "guides.h"
+#include "dgk/gfx.h"
 #include <GL/gl.h>
 #include <math.h>
 
@@ -56,6 +57,7 @@ void guides_draw(const rig *r, const world *w)
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBegin(GL_QUADS);
+    dgk_gfx_draws++;
     line((const float (*)[2])left, w, HALF + EDGE, 1);
     line((const float (*)[2])right, w, HALF + EDGE, 1);
     line((const float (*)[2])left, w, HALF, 0);

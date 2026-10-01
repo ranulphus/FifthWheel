@@ -33,7 +33,7 @@ the machinery works.
 
 | Test | What it measures |
 |---|---|
-| `FW1` | an autopilot lap of the test yard at one tick per frame with vsync off: the game as it is, frame times and triangles per frame |
+| `FW1` | 3,000 frames of the autopilot touring the generated world at one tick per frame with vsync off: the game as it is, frame times and triangles per frame |
 | `FWP-<tris>-arr`, `-list`, `-imm` | 1,000 to 8,000 triangles of a ground grid under the game's camera through vertex arrays, display lists, immediate mode |
 | `FWP-<tris>-arr-tex` | the same, textured (nearest, RGB565) |
 | `FWP-2000-d<draws>` | 2,000 triangles split into 50 to 400 draw calls |
@@ -43,3 +43,20 @@ draws + d x textured triangles, is fitted per machine and sets the presets'
 limits (with 15% headroom); FW1 checks the game against it. Changes to
 DOS-GL's hot paths (DOSGL `src/gl/vertex.c`, `emit.c`) are made only when
 the model points at them.
+
+## What the game draws (counted, 2026-10-01)
+
+The kit counts the triangles and draw calls each frame submits (each mesh,
+world chunk, text string and immediate-mode block is a draw) and logs the
+mean and the most at the end (`FW-STAT`). Headless, identical on every
+target:
+
+| Run | Triangles a frame (mean, most) | Draws a frame (mean, most) |
+|---|---|---|
+| FW1 (`-autopilot -frames 3000`) | 2,144, 3,336 | 14, 18 |
+| A whole job (`-autojob`): HUD, minimap, reversing camera, flourishes | 2,123, 3,720 | 36, 58 |
+
+The mean sits within the working Low preset (about 2,700 triangles); the
+peaks, in towns, do not, so F7's presets need the draw distance or a lower
+level of detail there. The flourishes are capped (16 coins, 64 confetti,
+32 dust: `-fxtest`), so they add at most about 230 triangles.

@@ -210,6 +210,7 @@ void world_draw(world *w, float x, float y, float r)
             glDrawElements(GL_TRIANGLES, (GLsizei)c->ntris * 3, GL_UNSIGNED_SHORT, w->tris + c->first_index);
             glPopMatrix();
             dgk_gfx_tris += c->ntris;
+            dgk_gfx_draws++;
             w->drawn_chunks++;
             dgk_service_if_due();                    /* the audio thread's turn on a slow frame (DOS) */
         }
