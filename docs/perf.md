@@ -56,7 +56,17 @@ target:
 | FW1 (`-autopilot -frames 3000`) | 2,144, 3,336 | 14, 18 |
 | A whole job (`-autojob`): HUD, minimap, reversing camera, flourishes | 2,123, 3,720 | 36, 58 |
 
-The mean sits within the working Low preset (about 2,700 triangles); the
-peaks, in towns, do not, so F7's presets need the draw distance or a lower
-level of detail there. The flourishes are capped (16 coins, 64 confetti,
-32 dust: `-fxtest`), so they add at most about 230 triangles.
+The mean sat within the working Low preset (about 2,700 triangles); the
+peaks, in towns, did not. Most of that was out of view: `world_draw` drew
+every 128 m chunk within 90 m of the camera's target. It now tests each
+chunk's box (with its height range, 8 m of margin for triangles that reach
+over) against the view's six planes and skips those wholly outside one;
+the pictures are byte for byte the same:
+
+| Run | Triangles a frame (mean, most) | Draws a frame (mean, most) |
+|---|---|---|
+| FW1, chunks culled | 1,466, 1,972 | 12, 13 |
+| A whole job, chunks culled | 1,422, 2,132 | 33, 55 |
+
+The flourishes are capped (16 coins, 64 confetti, 32 dust: `-fxtest`), so
+they add at most about 230 triangles.

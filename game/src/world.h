@@ -40,7 +40,7 @@ typedef struct world {
     const float *path;
     int npath;
     float spawn_x, spawn_y, spawn_heading;
-    int drawn_chunks;                    /* last frame */
+    int drawn_chunks, culled_chunks;     /* last frame: drawn, and in reach but out of view */
 } world;
 
 #define FW_FOURCC_MESH DGK_FOURCC('F', 'W', 'M', 'S')
@@ -57,7 +57,8 @@ int  world_boxes_near(const world *w, float x, float y, float r, const obb **out
 /* The road graph of a generated world (NULL for the yard): header, nodes,
  * edges, points (x, y pairs). */
 const wg_graph *world_graph(const world *w, const wg_node **n, const wg_edge **e, const float **p);
-/* Draw what can be seen around the camera's target (x, y), radius r. */
+/* Draw what can be seen around the camera's target (x, y), radius r: the
+ * chunks in reach whose boxes (with their height range) meet the view. */
 void world_draw(world *w, float x, float y, float r);
 
 /* Separating axes: 0 when a and b do not overlap; otherwise 1, with the

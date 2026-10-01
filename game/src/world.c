@@ -182,8 +182,49 @@ const wg_graph *world_graph(const world *w, const wg_node **n, const wg_edge **e
     return g;
 }
 
+/* The view's six planes (a x + b h + c z + d >= 0 inside), in GL's world
+ * coordinates, from projection x modelview (Gribb and Hartmann). */
+static void frustum(float plane[6][4])
+{
+    float p[16], mv[16], m[16];
+    int i, j, k;
+    glGetFloatv(GL_PROJECTION_MATRIX, p);
+    glGetFloatv(GL_MODELVIEW_MATRIX, mv);
+    for (j = 0; j < 4; j++)                          /* column-major: m = p mv */
+        for (i = 0; i < 4; i++) {
+            float sum = 0;
+            for (k = 0; k < 4; k++)
+                sum += p[k * 4 + i] * mv[j * 4 + k];
+            m[j * 4 + i] = sum;
+        }
+    for (k = 0; k < 6; k++) {                        /* left, right, bottom, top, near, far */
+        int row = k / 2;
+        float sgn = (k & 1) ? -1.0f : 1.0f;
+        for (j = 0; j < 4; j++)
+            plane[k][j] = m[j * 4 + 3] + sgn * m[j * 4 + row];
+    }
+}
+
+/* A box wholly outside one of the planes cannot be seen. */
+static int box_hidden(const float plane[6][4], float x0, float h0, float z0, float x1, float h1, float z1)
+{
+    int k, i;
+    for (k = 0; k < 6; k++) {
+        for (i = 0; i < 8; i++) {
+            float x = i & 1 ? x1 : x0, h = i & 2 ? h1 : h0, z = i & 4 ? z1 : z0;
+            if (plane[k][0] * x + plane[k][1] * h + plane[k][2] * z + plane[k][3] >= 0)
+                break;
+        }
+        if (i == 8)
+            return 1;
+    }
+    return 0;
+}
+
 void world_draw(world *w, float x, float y, float r)
 {
+    const float margin = 8.0f;                       /* triangles go to chunks by centroid: some reach over */
+    float plane[6][4];
     int cx0, cx1, cy0, cy1, cx, cy;
     w->drawn_chunks = 0;
     if (!w->chunked) {
@@ -194,6 +235,8 @@ void world_draw(world *w, float x, float y, float r)
     cx1 = DGK_MIN((int)floorf((x + r) / WG_CHUNK), WG_CHUNKS - 1);
     cy0 = DGK_MAX((int)floorf((y - r) / WG_CHUNK), 0);
     cy1 = DGK_MIN((int)floorf((y + r) / WG_CHUNK), WG_CHUNKS - 1);
+    frustum(plane);
+    w->culled_chunks = 0;
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_COLOR_ARRAY);
     for (cy = cy0; cy <= cy1; cy++)
@@ -202,6 +245,11 @@ void world_draw(world *w, float x, float y, float r)
             const wg_vertex *v = w->verts + c->first_vertex;
             if (!c->ntris)
                 continue;
+            if (box_hidden(plane, cx * WG_CHUNK - margin, c->hmin / 10.0f - 1.0f, -((cy + 1) * WG_CHUNK + margin),
+                           (cx + 1) * WG_CHUNK + margin, c->hmax / 10.0f + 1.0f, -(cy * WG_CHUNK - margin))) {
+                w->culled_chunks++;
+                continue;
+            }
             glPushMatrix();
             glTranslatef(cx * WG_CHUNK, 0, -cy * WG_CHUNK);
             glScalef(1.0f / WG_UNIT, 1.0f / WG_UNIT, 1.0f / WG_UNIT);
