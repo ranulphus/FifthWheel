@@ -18,6 +18,7 @@ typedef struct obb {
 
 #define WORLD_GRID 64.0f                 /* collision box buckets */
 #define WORLD_NEAR_MAX 128
+#define WORLD_PROPS 16                   /* boxes that come and go (parked trailers) */
 
 typedef struct world {
     dgk_pak pak;
@@ -34,6 +35,8 @@ typedef struct world {
     int nboxes;
     int grid_n;                          /* buckets per side */
     int *bucket_first, *bucket_items;    /* box indices by bucket */
+    obb props[WORLD_PROPS];              /* set by the game; collide like the pack's boxes */
+    int nprops;
     const float *path;
     int npath;
     float spawn_x, spawn_y, spawn_heading;
@@ -48,8 +51,12 @@ typedef struct world {
 int  world_load(world *w, const char *path);
 void world_free(world *w);
 float world_height(const world *w, float x, float y);
-/* Boxes whose buckets lie within r metres of (x, y); up to max. */
+/* Boxes whose buckets lie within r metres of (x, y), and props that near;
+ * up to max. */
 int  world_boxes_near(const world *w, float x, float y, float r, const obb **out, int max);
+/* The road graph of a generated world (NULL for the yard): header, nodes,
+ * edges, points (x, y pairs). */
+const wg_graph *world_graph(const world *w, const wg_node **n, const wg_edge **e, const float **p);
 /* Draw what can be seen around the camera's target (x, y), radius r. */
 void world_draw(world *w, float x, float y, float r);
 

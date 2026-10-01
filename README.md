@@ -16,12 +16,15 @@ its own repository once a second game uses it.
 Minimum machine: Pentium II 266, Matrox G200, Sound Blaster 16 (or none),
 640x480. Faster machines and the G400/G450 get more detail.
 
-**Status:** milestone F3: a generated 4 x 4 km world (`make data`:
-towns, depots with loading bays, a road network levelled into gentle hills,
-patchwork fields, woods), drawn chunk by chunk, the lorry riding its slopes.
-The articulated lorry drives it on DOS, Linux and headless (kinematic
-tractor and trailer, a six-speed automatic, collisions, synthesised sounds,
-an autopilot, checked replays), and DOSBench times it (FW1, FWP).
+**Status:** milestone F4: the jobs loop. Take a job from a depot's board,
+back under its trailer (box, flatbed or tanker), follow the route on the
+minimap to another depot and reverse the trailer into a bay; the dock is
+graded and paid. The world is generated (`make data`: towns, depots with
+loading bays, a road network levelled into gentle hills, patchwork fields,
+woods) and drawn chunk by chunk, the lorry riding its slopes. The game
+runs on DOS, Linux and headless (kinematic tractor and trailer, a six-speed
+automatic, collisions, synthesised sounds, autopilots, checked replays),
+and DOSBench times it (FW1, FWP).
 
 ## Building
 
@@ -34,19 +37,22 @@ make dos          # build/dos/FWHEEL.EXE (ship CWSDPMI.EXE beside it)
 make linux        # build/linux/fwheel (SDL3 + desktop OpenGL; built in the dev container)
 make headless     # build/headless/fwheel-hl (OSMesa, for tests)
 make loopa CARD=g450              # FWHEEL.EXE in 86Box (DOSGL's harness)
+make jobsweep                     # the job autopilot on every job, headless
 ```
 
 Keys: arrows or WASD to steer, accelerate and brake (hold the brake at a
-standstill to reverse), Space for the handbrake, Esc to quit.
+standstill to reverse), Space for the handbrake, 1-3 to take a job from a
+depot's board, Backspace to cancel it before coupling, Esc to quit.
 
 The world comes from a seed: `make data WORLD_SEED=n` (default 1;
 `make data-check` checks seed 1 against `data/golden/world.sha`).
 
 Command line: `-mode WxH`, `-novsync`, `-nosound`, and for tests `-frames N`,
-`-fixed` (one tick per frame), `-shot F:NAME`, `-test` (see
+`-fixed` (one tick per frame), `-shot F:NAME`, `-nodraw`, `-test` (see
 `kit/include/dgk/app.h`); the game adds `-world FILE` (default
 `WORLD.PAK`; the F1 test yard is `YARD.PAK`), `-autopilot` (`-laps N`),
-`-record FILE`, `-replay FILE`, `-hash`, `-timedemo FILE -dbtest NAME`,
+`-autojob` (`-job D:T:B`),
+`-record FILE`, `-replay FILE`, `-hash`, `-trace N`, `-timedemo FILE -dbtest NAME`,
 `-probe [quick]` and `-tourshots N`.
 
 ## Licence

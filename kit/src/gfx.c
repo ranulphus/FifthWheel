@@ -55,8 +55,11 @@ void dgk_gfx_draw_mesh(const dgk_mesh *m)
     glDisableClientState(GL_VERTEX_ARRAY);
 }
 
+static GLboolean overlay_cull;
+
 void dgk_gfx_overlay_begin(void)
 {
+    overlay_cull = glIsEnabled(GL_CULL_FACE);
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();
@@ -76,4 +79,6 @@ void dgk_gfx_overlay_end(void)
     glMatrixMode(GL_MODELVIEW);
     glPopMatrix();
     glEnable(GL_DEPTH_TEST);
+    if (overlay_cull)
+        glEnable(GL_CULL_FACE);
 }

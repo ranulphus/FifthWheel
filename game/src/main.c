@@ -1,7 +1,11 @@
-/* Fifth Wheel - F1: drive the lorry round the test yard.
+/* Fifth Wheel: deliveries with an articulated lorry.
  *
- *   FWHEEL [kit options, see dgk/app.h] [-world FILE] [-autopilot [-laps N]]
- *          [-record FILE | -replay FILE] [-hash]
+ *   FWHEEL [kit options, see dgk/app.h] [-world FILE] [-record FILE | -replay FILE] [-hash]
+ *          [-trace N]                    the rig's pose every N ticks (FW-TRACE)
+ *   FWHEEL -autopilot [-laps N]          round the world's tour with a trailer
+ *   FWHEEL -autojob [-job D:T:B]         the autopilot does the shortest job on offer at
+ *                                        depot 0, or the job from depot D to depot T's bay B
+ *                                        (from 0; FW-JOB lines; the test: graded OK or better)
  *   FWHEEL -timedemo FILE -dbtest NAME   a replay as fast as it will go, timed
  *                                        as DOSBench test NAME (RESULTS.TXT)
  *   FWHEEL -probe [quick]                the performance probe (probe.h)
@@ -9,17 +13,12 @@
  *                                        two depots, each saved as P<n> (DOS against Mesa)
  *
  * Keys: arrows or WASD (steer, accelerate, brake; hold the brake at a stop
- * to reverse), Space the handbrake, Esc to quit. */
-#include "dgk/dgk.h"
+ * to reverse), Space the handbrake, 1-3 take a job from the board,
+ * Backspace cancel it (before coupling), Esc to quit. */
+#include "game.h"
 #include "dgk/bench.h"
-#include "dgk/replay.h"
-#include "autopilot.h"
 #include "probe.h"
-#include "camera.h"
-#include "lorry.h"
 #include "sound.h"
-#include "vehicle.h"
-#include "world.h"
 #include <GL/gl.h>
 #include <math.h>
 #include <stdio.h>
@@ -28,31 +27,14 @@
 
 extern const dgk_font_data fw_font;
 
-enum { SC_A = 4, SC_D = 7, SC_S = 22, SC_W = 26 };
+enum { SC_A = 4, SC_D = 7, SC_S = 22, SC_W = 26, SC_1 = 30, SC_BACKSPACE = 42 };
 
-/* One tick of input, as recorded. */
+/* One tick of input, as recorded. Buttons: bit 0 the handbrake, bits 1-2
+ * a job taken from the board (1-3), bit 3 the job cancelled. */
 typedef struct input_frame {
     int8_t steer;               /* -127..127 */
     uint8_t accel, decel, buttons;
 } input_frame;
-
-typedef struct game {
-    const char *world_path, *record_path, *replay_path, *dbtest;
-    int use_autopilot, laps_wanted, hash, desync, last_laps, tourshots;
-    world w;
-    rig r, r_prev;
-    camera cam, cam_prev;
-    autopilot ap;
-    lorry_meshes lorry;
-    dgk_font font;
-    dgk_replay *replay;
-    float steer, accel, decel;  /* keyboard, smoothed */
-    uint32_t jackknife_shown;   /* tick of the last jackknife callout */
-    int jackknifes_seen;
-    uint64_t fps_t0;
-    uint32_t fps_frames;
-    float fps;
-} game;
 
 static float approach(float v, float target, float rate)
 {
@@ -68,6 +50,7 @@ static void keyboard(game *g, input_frame *f)
     int up = dgk_app.key_down[DGK_KEY_UP] || dgk_app.key_down[SC_W];
     int down = dgk_app.key_down[DGK_KEY_DOWN] || dgk_app.key_down[SC_S];
     float target = (float)(left - right);
+    int i;
     g->steer = approach(g->steer, target, (target == 0 ? 3.5f : 2.5f) * dt);
     g->accel = approach(g->accel, up ? 1.0f : 0.0f, 4.0f * dt);
     g->decel = approach(g->decel, down ? 1.0f : 0.0f, 5.0f * dt);
@@ -75,6 +58,11 @@ static void keyboard(game *g, input_frame *f)
     f->accel = (uint8_t)(g->accel * 255.0f);
     f->decel = (uint8_t)(g->decel * 255.0f);
     f->buttons = (uint8_t)(dgk_app.key_down[DGK_KEY_SPACE] ? 1 : 0);
+    for (i = 0; i < JOB_OFFERS; i++)
+        if (dgk_app.key_pressed[SC_1 + i])
+            f->buttons |= (uint8_t)((i + 1) << 1);
+    if (dgk_app.key_pressed[SC_BACKSPACE])
+        f->buttons |= 8;
 }
 
 static int init(void *u)
@@ -83,6 +71,32 @@ static int init(void *u)
     if (world_load(&g->w, g->world_path) != 0)
         return -1;
     rig_init(&g->r, g->w.spawn_x, g->w.spawn_y, g->w.spawn_heading);
+    g->has_jobs = g->w.ndepots > 0 && g->mode != MODE_TOUR && !g->tourshots;
+    if (g->has_jobs) {
+        /* A lone tractor, lined up in front of depot 0's waiting trailer. */
+        float x, y, heading;
+        int from = 0;
+        jobs_init(&g->jobs, &g->w, 1);
+        if (g->job_to >= 0 && g->job_from < g->w.ndepots && g->job_to < g->w.ndepots && g->job_from != g->job_to) {
+            from = g->job_from;
+            jobs_set_offer(&g->jobs, &g->w, 0, from, g->job_to, g->job_bay % WG_BAYS);
+            g->jobs.offers[1] = g->jobs.offers[2] = g->jobs.offers[0];
+        }
+        jobpilot_start(&g->jobs, from, &x, &y, &heading);
+        rig_init(&g->r, x, y, heading);
+        g->r.has_trailer = 0;
+        if (g->mode == MODE_JOB) {                   /* taken in the first tick, as a key press (recorded) */
+            int i, best = 0;
+            for (i = 1; i < JOB_OFFERS; i++)
+                if (g->jobs.offers[i].distance < g->jobs.offers[best].distance)
+                    best = i;
+            g->autotake = best + 1;
+            jobpilot_reset(&g->jp, &g->jobs);
+        }
+    } else if (g->mode == MODE_JOB) {
+        dgk_log("FW-ERROR -autojob needs a world with depots");
+        return -1;
+    }
     g->r_prev = g->r;
     camera_reset(&g->cam, &g->r);
     g->cam_prev = g->cam;
@@ -137,6 +151,59 @@ static void pose(game *g, int k)
     g->cam_prev = g->cam;
 }
 
+/* Coupling, delivery: sounds, callouts; the autojob's end. */
+static void job_events(game *g)
+{
+    jobs *j = &g->jobs;
+    jobs_tick(j, &g->r, &g->w, 1.0f / DGK_TICK_HZ);
+    if (j->event == JOB_EVENT_COUPLED) {
+        sound_clunk();
+        hud_callout(g, "COUPLED!", NULL, 0x9FFFB0FFu);
+    } else if (j->event == JOB_EVENT_DELIVERED) {
+        static const char *const cheer[] = { "", "DELIVERED", "GOOD PARK!", "GREAT PARK!", "PERFECT PARK!" };
+        static const uint32_t cheer_rgba[] = { 0, 0xFFFFFFFFu, 0x9FFFB0FFu, 0x5FD8FFFFu, 0xFFD23FFFu };
+        sound_chime(j->grade);
+        snprintf(g->callout_buf, sizeof g->callout_buf, "+$%d", j->earned);
+        hud_callout(g, cheer[j->grade], g->callout_buf, cheer_rgba[j->grade]);
+        if (g->mode == MODE_JOB)
+            g->done_tick = dgk_app.ticks;
+    }
+}
+
+/* Coupling: the camera looks along the waiting trailer from beyond its
+ * nose, at the gap between the fifth wheel and the kingpin. Docking: into
+ * the bay, at the trailer's back (drawn on towards the dock). Otherwise it
+ * follows (0). */
+static int camera_focus_for(const game *g, camera_focus *f)
+{
+    const jobs *j = &g->jobs;
+    if (j->state == JOB_TO_PICKUP) {
+        const parked *t = &j->trailers[j->current.from];
+        float hx, hy;
+        rig_hitch(&g->r, &hx, &hy);
+        if ((t->x - hx) * (t->x - hx) + (t->y - hy) * (t->y - hy) > 30.0f * 30.0f)
+            return 0;
+        f->x = (t->x + hx) * 0.5f;
+        f->y = (t->y + hy) * 0.5f;
+        f->yaw = t->heading + WG_PI;
+        return 1;
+    }
+    if (j->state == JOB_DOCKING && j->gap < 45.0f) {
+        float bx, by, bh, rx, ry, dx, dy, d;
+        jobs_bay(j, &g->w, &bx, &by, &bh);
+        rig_trailer_rear(&g->r, &rx, &ry);
+        dx = bx - rx;
+        dy = by - ry;
+        d = sqrtf(dx * dx + dy * dy);
+        d = d > 10.0f ? 10.0f / d : 1.0f;
+        f->x = rx + dx * d * 0.6f;
+        f->y = ry + dy * d * 0.6f;
+        f->yaw = bh + WG_PI;
+        return 1;
+    }
+    return 0;
+}
+
 static void tick(void *u)
 {
     game *g = (game *)u;
@@ -159,13 +226,17 @@ static void tick(void *u)
             dgk_app.quit = 1;
             return;
         }
-    } else if (g->use_autopilot) {
+    } else if (g->mode == MODE_TOUR || g->mode == MODE_JOB) {
         rig_input a;
-        autopilot_drive(&g->ap, &g->r, &g->w, &a);
+        if (g->mode == MODE_TOUR)
+            autopilot_drive(&g->ap, &g->r, &g->w, &a);
+        else
+            jobpilot_drive(&g->jp, &g->jobs, &g->r, &g->w, &a);
         f.steer = (int8_t)(a.steer * 127.0f);
         f.accel = (uint8_t)(a.accel * 255.0f);
         f.decel = (uint8_t)(a.decel * 255.0f);
-        f.buttons = 0;
+        f.buttons = (uint8_t)(g->autotake << 1);
+        g->autotake = 0;
     } else
         keyboard(g, &f);
     if (g->record_path && !g->replay_path)
@@ -176,25 +247,48 @@ static void tick(void *u)
     in.handbrake = f.buttons & 1;
     g->r_prev = g->r;
     g->cam_prev = g->cam;
+    if (g->has_jobs) {
+        if ((f.buttons >> 1) & 3)
+            jobs_take(&g->jobs, &g->w, &g->r, ((f.buttons >> 1) & 3) - 1);
+        if (f.buttons & 8)
+            jobs_cancel(&g->jobs);
+        jobs_props(&g->jobs, &g->w, g->r.x, g->r.y);
+    }
     rig_step(&g->r, &in, 1.0f / DGK_TICK_HZ, &g->w);
-    camera_tick(&g->cam, &g->r, 1.0f / DGK_TICK_HZ);
+    if (g->has_jobs)
+        job_events(g);
+    {
+        camera_focus f;
+        camera_tick(&g->cam, &g->r, 1.0f / DGK_TICK_HZ, g->has_jobs && camera_focus_for(g, &f) ? &f : NULL);
+    }
     sound_tick(&g->r);
-    if (g->use_autopilot && g->replay_path) {
+    if (g->mode == MODE_TOUR && g->replay_path) {
         rig_input unused;
         autopilot_drive(&g->ap, &g->r, &g->w, &unused);      /* keeps counting laps */
     }
     if (g->r.jackknifes != g->jackknifes_seen) {
         g->jackknifes_seen = g->r.jackknifes;
-        g->jackknife_shown = dgk_app.ticks;
+        hud_callout(g, "JACKKNIFE!", NULL, 0xFF5030FFu);
         dgk_log("FW-EVENT jackknife tick=%lu speed=%.1f", (unsigned long)dgk_app.ticks, g->r.v);
     }
     h = rig_hash(&g->r, 2166136261u);
+    if (g->has_jobs) {
+        h = dgk_fnv1a(h, &g->jobs.state, sizeof g->jobs.state);
+        h = dgk_fnv1a(h, &g->jobs.money, sizeof g->jobs.money);
+    }
     if (g->replay && !dgk_replay_hash(g->replay, dgk_app.ticks, h))
         g->desync = 1;
+    if (g->trace && (dgk_app.ticks + 1) % g->trace == 0) {
+        float ax, ay;
+        rig_trailer_axle(&g->r, &ax, &ay);
+        dgk_log("FW-TRACE t=%lu x=%.2f y=%.2f h=%.3f th=%.3f v=%.2f ax=%.2f ay=%.2f hits=%d",
+                (unsigned long)dgk_app.ticks + 1, g->r.x, g->r.y, g->r.heading, g->r.trailer_heading, g->r.v, ax, ay,
+                g->r.hits);
+    }
     if (g->hash && (dgk_app.ticks + 1) % 60 == 0)
         dgk_log("FW-HASH t=%lu h=%08lx x=%.2f y=%.2f v=%.2f gear=%d", (unsigned long)dgk_app.ticks + 1,
                 (unsigned long)h, g->r.x, g->r.y, g->r.v, g->r.gear);
-    if (g->use_autopilot) {
+    if (g->mode == MODE_TOUR) {
         if (g->ap.laps != g->last_laps) {
             g->last_laps = g->ap.laps;
             dgk_log("FW-LAP %d tick=%lu damage=%.1f hits=%d", g->ap.laps, (unsigned long)dgk_app.ticks,
@@ -203,6 +297,8 @@ static void tick(void *u)
         if (g->laps_wanted && g->ap.laps >= g->laps_wanted)
             dgk_app.quit = 1;
     }
+    if (g->mode == MODE_JOB && g->done_tick && dgk_app.ticks - g->done_tick >= 150)
+        dgk_app.quit = 1;                            /* after the callout */
 }
 
 static float lerp_angle(float a, float b, float t)
@@ -213,61 +309,6 @@ static float lerp_angle(float a, float b, float t)
     while (d < -3.14159265f)
         d += 6.2831853f;
     return a + d * t;
-}
-
-static void bar(float x, float y, float w, float h, uint32_t rgba)
-{
-    glColor4ub((GLubyte)(rgba >> 24), (GLubyte)(rgba >> 16), (GLubyte)(rgba >> 8), (GLubyte)rgba);
-    glBegin(GL_QUADS);
-    glVertex2f(x, y);
-    glVertex2f(x + w, y);
-    glVertex2f(x + w, y + h);
-    glVertex2f(x, y + h);
-    glEnd();
-}
-
-static void hud(game *g)
-{
-    char line[64], gbuf[12];
-    const char *gear = gbuf;
-    uint64_t now;
-    if (g->r.gear < 0)
-        gear = "R";
-    else
-        snprintf(gbuf, sizeof gbuf, "%d", g->r.gear);
-    dgk_gfx_overlay_begin();
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    bar(18, 424, 204, 40, 0x00000080u);
-    glDisable(GL_BLEND);
-    bar(22, 452, 196 * DGK_CLAMP((g->r.rpm - 600.0f) / 1600.0f, 0.0f, 1.0f), 8,
-        g->r.rpm > 1900 ? 0xFF5030FFu : 0x9FFFB0FFu);
-    snprintf(line, sizeof line, "%3.0f KM/H  GEAR %s", fabsf(g->r.v) * 3.6f, gear);
-    dgk_text(&g->font, 24, 428, 1.0f, 0xFFFFFFFFu, line);
-    snprintf(line, sizeof line, "DAMAGE %3.0f%%", g->r.damage);
-    dgk_text(&g->font, 470, 440, 1.0f, g->r.damage > 50 ? 0xFF6040FFu : 0xFFFFFFFFu, line);
-    if (g->use_autopilot) {
-        snprintf(line, sizeof line, "AUTOPILOT  LAP %d", g->ap.laps + 1);
-        dgk_text(&g->font, 20, 16, 1.0f, 0xFFD23FFFu, line);
-    }
-    if (g->jackknife_shown && dgk_app.ticks - g->jackknife_shown < 90) {
-        float t = (dgk_app.ticks - g->jackknife_shown) / 90.0f, s = 2.0f + 0.6f * sinf(t * 18.0f) * (1 - t);
-        dgk_text(&g->font, 320 - dgk_text_width(&g->font, s, "JACKKNIFE!") / 2, 180, s, 0xFF5030FFu, "JACKKNIFE!");
-    }
-    if (!dgk_app.fixed) {
-        now = dgk_now_us();
-        if (++g->fps_frames >= 30 || now - g->fps_t0 > 1000000) {
-            g->fps = g->fps_frames * 1e6f / (float)(now - g->fps_t0 ? now - g->fps_t0 : 1);
-            g->fps_frames = 0;
-            g->fps_t0 = now;
-        }
-        snprintf(line, sizeof line, "%.1f FPS", g->fps);
-        dgk_text(&g->font, 540, 16, 1.0f, 0x9FFFB0FFu, line);
-    } else {
-        snprintf(line, sizeof line, "TICK %lu", (unsigned long)dgk_app.ticks);
-        dgk_text(&g->font, 500, 16, 1.0f, 0x9FFFB0FFu, line);
-    }
-    dgk_gfx_overlay_end();
 }
 
 static void draw(void *u, float alpha)
@@ -286,6 +327,19 @@ static void draw(void *u, float alpha)
         world_draw(&g->w, tx, ty, 90.0f);
     }
     lorry_draw(&g->lorry, &r, &g->w);
+    if (g->has_jobs) {
+        int i;
+        for (i = 0; i < g->w.ndepots; i++) {
+            const parked *t = &g->jobs.trailers[i], *d = &g->jobs.docked[i];
+            float dx = g->w.depots[i].x - r.x, dy = g->w.depots[i].y - r.y;
+            if (dx * dx + dy * dy > 160.0f * 160.0f)
+                continue;
+            if (t->present)
+                lorry_draw_trailer(&g->lorry, t->type, t->x, t->y, t->heading, &g->w);
+            if (d->present)
+                lorry_draw_trailer(&g->lorry, d->type, d->x, d->y, d->heading, &g->w);
+        }
+    }
     if (g->tourshots) {
         char name[16];
         snprintf(name, sizeof name, "P%d", (int)dgk_app.ticks - 1);
@@ -293,7 +347,7 @@ static void draw(void *u, float alpha)
             dgk_test_snapshot(name);                    /* the world and the lorry, no HUD */
         return;
     }
-    hud(g);
+    hud_draw(g);
 }
 
 static void quit(void *u)
@@ -306,9 +360,13 @@ static void quit(void *u)
         else
             dgk_log("FW-ERROR cannot write %s", g->record_path);
     }
-    dgk_log("FW-RESULT ticks=%lu laps=%d damage=%.1f hits=%d jackknifes=%d desync=%d x=%.2f y=%.2f",
-            (unsigned long)dgk_app.ticks, g->ap.laps, g->r.damage, g->r.hits, g->r.jackknifes, g->desync, g->r.x,
-            g->r.y);
+    dgk_log("FW-RESULT ticks=%lu laps=%d delivered=%d money=%d damage=%.1f hits=%d jackknifes=%d desync=%d x=%.2f "
+            "y=%.2f", (unsigned long)dgk_app.ticks, g->ap.laps, g->jobs.delivered, g->jobs.money, g->r.damage,
+            g->r.hits, g->r.jackknifes, g->desync, g->r.x, g->r.y);
+    if (g->mode == MODE_JOB)
+        dgk_test_check("job", g->jobs.delivered > 0 && g->jobs.grade >= GRADE_OK, "%s, %s in %.0f s, damage %.1f",
+                       g->jobs.delivered ? "delivered" : "not delivered", grade_name[g->jobs.grade],
+                       g->jobs.elapsed, g->r.damage);
     if (g->laps_wanted)
         dgk_test_check("laps", g->ap.laps >= g->laps_wanted, "%d of %d, damage %.1f, %d hits", g->ap.laps,
                        g->laps_wanted, g->r.damage, g->r.hits);
@@ -316,7 +374,8 @@ static void quit(void *u)
         dgk_test_check("replay", !g->desync, "%s", g->desync ? "went elsewhere" : "the recorded state throughout");
     if (g->dbtest) {
         char notes[64];
-        snprintf(notes, sizeof notes, "drive=%s ticks=%lu", g->replay_path ? "replay" : g->use_autopilot ? "autopilot" : "keys",
+        snprintf(notes, sizeof notes, "drive=%s ticks=%lu",
+                 g->replay_path ? "replay" : g->mode != MODE_DRIVE ? "autopilot" : "keys",
                  (unsigned long)dgk_app.ticks);
         dgk_app_bench_stop(g->desync ? "fail" : "ok", notes);
     }
@@ -345,6 +404,7 @@ int main(int argc, char **argv)
     static const dgk_app_desc desc = { "Fifth Wheel", init, tick, draw, quit };
     static const dgk_app_desc probe = { "Fifth Wheel probe", init_probe, NULL, draw_probe, NULL };
     int i;
+    g.job_to = -1;
 #ifdef DGK_DOS
     g.world_path = "WORLD.PAK";
 #else
@@ -353,9 +413,15 @@ int main(int argc, char **argv)
     for (i = 1; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!strcmp(a, "-autopilot"))
-            g.use_autopilot = 1;
+            g.mode = MODE_TOUR;
+        else if (!strcmp(a, "-autojob"))
+            g.mode = MODE_JOB;
+        else if (!strcmp(a, "-job") && v)
+            sscanf(argv[++i], "%d:%d:%d", &g.job_from, &g.job_to, &g.job_bay);
         else if (!strcmp(a, "-hash"))
             g.hash = 1;
+        else if (!strcmp(a, "-trace") && v)
+            g.trace = atoi(argv[++i]);
         else if (!strcmp(a, "-laps") && v)
             g.laps_wanted = atoi(argv[++i]);
         else if (!strcmp(a, "-world") && v)

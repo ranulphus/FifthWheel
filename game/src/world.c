@@ -160,7 +160,25 @@ int world_boxes_near(const world *w, float x, float y, float r, const obb **out,
                     out[n++] = b;                  /* each box once */
             }
         }
+    for (i = 0; i < w->nprops && n < max; i++) {
+        const obb *b = &w->props[i];
+        float d = r + b->hl + b->hw;
+        if ((b->cx - x) * (b->cx - x) + (b->cy - y) * (b->cy - y) < d * d)
+            out[n++] = b;
+    }
     return n;
+}
+
+const wg_graph *world_graph(const world *w, const wg_node **n, const wg_edge **e, const float **p)
+{
+    const uint8_t *b = w->chunked ? (const uint8_t *)dgk_pak_section(&w->pak, WG_GRAPH, NULL) : NULL;
+    const wg_graph *g = (const wg_graph *)b;
+    if (!g)
+        return NULL;
+    *n = (const wg_node *)(b + sizeof(wg_graph));
+    *e = (const wg_edge *)(b + sizeof(wg_graph) + sizeof(wg_node) * g->nnodes);
+    *p = (const float *)(b + sizeof(wg_graph) + sizeof(wg_node) * g->nnodes + sizeof(wg_edge) * g->nedges);
+    return g;
 }
 
 void world_draw(world *w, float x, float y, float r)

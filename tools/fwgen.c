@@ -276,34 +276,98 @@ static float dist2(int a, int b)
     return dx * dx + dy * dy;
 }
 
-/* A road from node a to b: a Catmull-Rom curve through jittered points,
- * sampled about every 8 m; its height profile the ground's, smoothed. */
+/* Inside a depot's yard (the apron and the warehouse, with a margin for
+ * the road's width)? */
+static int in_depot(float x, float y)
+{
+    int i;
+    for (i = 0; i < nplaces; i++) {
+        const place *d = &places[i];
+        float c = cosf(d->heading), s = sinf(d->heading), dx = x - d->x, dy = y - d->y;
+        float u = dx * c + dy * s, v = -dx * s + dy * c;
+        if (d->kind == WG_DEPOT && fabsf(u) < 56.0f && v > -44.0f && v < 62.0f)
+            return 1;
+    }
+    return 0;
+}
+
+/* Where a road leaves a depot: 50 m straight out from its gate. */
+static void depot_stub(int node, float *x, float *y)
+{
+    const place *d = &places[node];
+    *x = d->x + sinf(d->heading) * 102.0f;
+    *y = d->y - cosf(d->heading) * 102.0f;
+}
+
+static int road_attempt(int a, int b, int attempt);
+
+/* A road from node a to b that keeps out of every depot's yard: tried with
+ * fresh, wider jitter until it does. */
+static int crossing_roads;
+
 static void add_road(int a, int b)
 {
+    int attempt;
+    for (attempt = 0; attempt < 24; attempt++)
+        if (road_attempt(a, b, attempt))
+            return;
+    road_attempt(a, b, -1);
+    fprintf(stderr, "fwgen: the road from place %d to place %d crosses a depot\n", a, b);
+    crossing_roads++;
+}
+
+/* One try at a road from node a to b: a curve through jittered points (out
+ * of a depot along its stub), sampled about every 8 m; its
+ * height profile the ground's, smoothed. Returns 0 (and takes it back) if
+ * it crosses a depot, unless attempt is -1 (keep it anyway). */
+static int road_attempt(int a, int b, int attempt)
+{
     float cp[7][2], len = sqrtf(dist2(a, b)), nx, ny, raw[4096];
+    float spread = 1.0f + (attempt < 0 ? 0 : attempt) * 0.2f;
     int n = 0, i, k, seg, first = npts, count;
     wg_edge *e = &edges[nedges];
     if (nedges == MAX_EDGES)
-        return;
+        return 1;
     nx = -(nodes[b].y - nodes[a].y) / len;
     ny = (nodes[b].x - nodes[a].x) / len;
     cp[0][0] = nodes[a].x; cp[0][1] = nodes[a].y;
     for (i = 1; i <= 4; i++) {
-        float t = i / 5.0f, j = (frand() - 0.5f) * DGK_MIN(0.22f * len, 260.0f);
+        float t = i / 5.0f, j = (frand() - 0.5f) * DGK_MIN(0.22f * len, 260.0f) * spread;
         cp[i][0] = DGK_CLAMP(nodes[a].x + (nodes[b].x - nodes[a].x) * t + nx * j, 60.0f, WG_SIZE - 60.0f);
         cp[i][1] = DGK_CLAMP(nodes[a].y + (nodes[b].y - nodes[a].y) * t + ny * j, 60.0f, WG_SIZE - 60.0f);
     }
     cp[5][0] = nodes[b].x; cp[5][1] = nodes[b].y;
+    if (nodes[a].kind == WG_DEPOT)
+        depot_stub(a, &cp[1][0], &cp[1][1]);
+    if (nodes[b].kind == WG_DEPOT)
+        depot_stub(b, &cp[4][0], &cp[4][1]);
     for (seg = 0; seg < 5; seg++) {
+        /* Hermite segments with Catmull-Rom tangents, except at a depot:
+         * the stub is straight, and the curve meets it in line. */
         const float *p0 = cp[seg > 0 ? seg - 1 : 0], *p1 = cp[seg], *p2 = cp[seg + 1], *p3 = cp[seg < 4 ? seg + 2 : 5];
         float sl = sqrtf((p2[0] - p1[0]) * (p2[0] - p1[0]) + (p2[1] - p1[1]) * (p2[1] - p1[1]));
+        float m1[2] = { (p2[0] - p0[0]) * 0.5f, (p2[1] - p0[1]) * 0.5f };
+        float m2[2] = { (p3[0] - p1[0]) * 0.5f, (p3[1] - p1[1]) * 0.5f };
         int steps = (int)(sl / 8.0f) + 1;
+        if ((seg == 0 && nodes[a].kind == WG_DEPOT) || (seg == 4 && nodes[b].kind == WG_DEPOT)) {
+            m1[0] = m2[0] = p2[0] - p1[0];
+            m1[1] = m2[1] = p2[1] - p1[1];
+        }
+        if (seg == 1 && nodes[a].kind == WG_DEPOT) {        /* leave the stub in line */
+            float dx = cp[1][0] - cp[0][0], dy = cp[1][1] - cp[0][1], dl = sqrtf(dx * dx + dy * dy);
+            m1[0] = (cp[1][0] - cp[0][0]) / dl * sl;
+            m1[1] = (cp[1][1] - cp[0][1]) / dl * sl;
+        }
+        if (seg == 3 && nodes[b].kind == WG_DEPOT) {        /* reach it in line */
+            float dx = cp[5][0] - cp[4][0], dy = cp[5][1] - cp[4][1], dl = sqrtf(dx * dx + dy * dy);
+            m2[0] = (cp[5][0] - cp[4][0]) / dl * sl;
+            m2[1] = (cp[5][1] - cp[4][1]) / dl * sl;
+        }
         for (k = 0; k < steps && npts < MAX_POINTS && n < 4096; k++) {
             float t = (float)k / steps, t2 = t * t, t3 = t2 * t;
-            float x = 0.5f * (2 * p1[0] + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 +
-                              (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
-            float y = 0.5f * (2 * p1[1] + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 +
-                              (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
+            float h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2, h11 = t3 - t2;
+            float x = h00 * p1[0] + h10 * m1[0] + h01 * p2[0] + h11 * m2[0];
+            float y = h00 * p1[1] + h10 * m1[1] + h01 * p2[1] + h11 * m2[1];
             pts[npts][0] = x;
             pts[npts][1] = y;
             raw[n++] = ground(x, y);
@@ -317,6 +381,12 @@ static void add_road(int a, int b)
         npts++;
     }
     count = npts - first;
+    if (attempt >= 0)
+        for (i = 0; i < count; i++)
+            if (in_depot(pts[first + i][0], pts[first + i][1])) {
+                npts = first;
+                return 0;
+            }
     for (k = 0; k < 3; k++) {                    /* smooth the profile: gentle grades */
         float tmp[4096];
         for (i = 0; i < count; i++) {
@@ -343,6 +413,7 @@ static void add_road(int a, int b)
                                (pts[first + i][1] - pts[first + i - 1][1]) * (pts[first + i][1] - pts[first + i - 1][1]));
     }
     nedges++;
+    return 1;
 }
 
 /* Level the ground to a height along a segment: full weight within `flat`
@@ -519,7 +590,7 @@ static void build_depot(const place *d, wg_depot *out)
 {
     float h = ground(d->x, d->y), c[4][2], x, y;
     static const float cu[4] = { -48, 48, 48, -48 }, cv[4] = { -35, -35, 35, 35 };
-    int i;
+    int i, k;
     for (i = 0; i < 4; i++)
         depot_frame(d, cu[i], cv[i], &c[i][0], &c[i][1]);
     {
@@ -539,21 +610,22 @@ static void build_depot(const place *d, wg_depot *out)
         block(bx, by, 2.0f, 0.4f, d->heading, 4.2f, 0x2A2A33u, 0x2A2A33u, 0, 0);
         depot_frame(d, u - 7.5f, 31, &px, &py);             /* the dock between bays */
         block(px, py, 4.0f, 3.0f, d->heading, 1.3f, 0xC8C8D0u, 0xB0B0B8u, 0, 1);
-        {                                                    /* bold bay lines */
-            float lx0, ly0, lx1, ly1;
-            depot_frame(d, u - 1.6f, 34, &lx0, &ly0);
-            depot_frame(d, u - 1.6f, 14, &lx1, &ly1);
-            ground_quad(lx0 - 0.15f, ly0, lx1 - 0.15f, ly1, lx1 + 0.15f, ly1, lx0 + 0.15f, ly0, 0.2f, 0xFFD23Fu, 1.0f);
-            depot_frame(d, u + 1.6f, 34, &lx0, &ly0);
-            depot_frame(d, u + 1.6f, 14, &lx1, &ly1);
-            ground_quad(lx0 - 0.15f, ly0, lx1 - 0.15f, ly1, lx1 + 0.15f, ly1, lx0 + 0.15f, ly0, 0.2f, 0xFFD23Fu, 1.0f);
+        for (k = -1; k <= 1; k += 2) {                       /* bold bay lines, in the depot's frame */
+            float q[4][2], lu = u + k * 1.6f;
+            depot_frame(d, lu - 0.15f, 14, &q[0][0], &q[0][1]);
+            depot_frame(d, lu + 0.15f, 14, &q[1][0], &q[1][1]);
+            depot_frame(d, lu + 0.15f, 34, &q[2][0], &q[2][1]);
+            depot_frame(d, lu - 0.15f, 34, &q[3][0], &q[3][1]);
+            ground_quad(q[0][0], q[0][1], q[1][0], q[1][1], q[2][0], q[2][1], q[3][0], q[3][1], 0.2f, 0xFFD23Fu, 1.0f);
         }
         /* Docked: the trailer's rear at the dock face, pointing out of the bay. */
         depot_frame(d, u, 33.5f, &out->bay[i][0], &out->bay[i][1]);
         out->bay[i][2] = d->heading - WG_PI / 2;
     }
-    depot_frame(d, 30, -12, &out->pickup[0], &out->pickup[1]);       /* a trailer waiting, nose to the west */
-    out->pickup[2] = d->heading + WG_PI;
+    /* A trailer waiting at the apron's left edge, nose to the right (+u):
+     * the rest of the apron stays clear for turning round to a bay. */
+    depot_frame(d, -30, -22, &out->pickup[0], &out->pickup[1]);
+    out->pickup[2] = d->heading;
     out->x = d->x;
     out->y = d->y;
     out->heading = d->heading;
@@ -650,6 +722,34 @@ static void build_trees(void)
 
 /* ---- the road network, the tour ------------------------------------------------ */
 
+/* Each depot's gate faces the nearest town, where its road will go. */
+static void face_depots(void)
+{
+    int i, j, k;
+    for (i = 0; i < nplaces; i++) {
+        int near = -1;
+        float bd = 1e30f, best = -2;
+        if (places[i].kind != WG_DEPOT)
+            continue;
+        for (j = 0; j < ntowns; j++) {
+            float d = (places[j].x - places[i].x) * (places[j].x - places[i].x) +
+                      (places[j].y - places[i].y) * (places[j].y - places[i].y);
+            if (d < bd) {
+                bd = d;
+                near = j;
+            }
+        }
+        for (k = 0; k < 4 && near >= 0; k++) {
+            float h = k * WG_PI / 2, dx = places[near].x - places[i].x, dy = places[near].y - places[i].y;
+            float along = (dx * sinf(h) - dy * cosf(h)) / sqrtf(bd);     /* the gate's way: -v */
+            if (along > best) {
+                best = along;
+                places[i].heading = h;
+            }
+        }
+    }
+}
+
 static void build_network(void)
 {
     int in_tree[WG_MAX_PLACES] = { 0 }, i, j, k;
@@ -664,12 +764,12 @@ static void build_network(void)
         nodes[i].place = (uint32_t)i;
     }
     nnodes = nplaces;
-    in_tree[0] = 1;                                  /* Prim's minimum spanning tree */
-    for (k = 1; k < nnodes; k++) {
+    in_tree[0] = 1;                                  /* Prim's minimum spanning tree of the towns */
+    for (k = 1; k < ntowns; k++) {
         int ba = -1, bb = -1;
         float bd = 1e30f;
-        for (i = 0; i < nnodes; i++)
-            for (j = 0; in_tree[i] && j < nnodes; j++)
+        for (i = 0; i < ntowns; i++)
+            for (j = 0; in_tree[i] && j < ntowns; j++)
                 if (!in_tree[j] && dist2(i, j) < bd) {
                     bd = dist2(i, j);
                     ba = i;
@@ -677,6 +777,13 @@ static void build_network(void)
                 }
         in_tree[bb] = 1;
         add_road(ba, bb);
+    }
+    for (i = ntowns; i < nnodes; i++) {              /* each depot a dead end off its nearest town */
+        int bt = 0;
+        for (j = 1; j < ntowns; j++)
+            if (dist2(i, j) < dist2(i, bt))
+                bt = j;
+        add_road(bt, i);
     }
     for (i = 0; i < nnodes; i++) {                   /* towns reach their two nearest towns: loops */
         int n1 = -1, n2 = -1;
@@ -891,6 +998,7 @@ int main(int argc, char **argv)
     ntowns = nplaces;
     place_kind(WG_DEPOT, 8, 560.0f, 320.0f, 60.0f, 60.0f);
     ndepots = nplaces - ntowns;
+    face_depots();
     for (i = 0; i < nplaces; i++)                    /* flat ground for towns and depots */
         if (places[i].kind == WG_TOWN)
             level_town(&places[i]);
@@ -899,6 +1007,10 @@ int main(int argc, char **argv)
     apply_levelling();
     memset(road_weight, 0, sizeof road_weight);
     build_network();
+    if (crossing_roads) {
+        fprintf(stderr, "fwgen: %d roads cross a depot\n", crossing_roads);
+        return 1;
+    }
     for (e = 0; e < nedges; e++)                     /* the roads, levelled into the hills */
         for (i = (int)edges[e].first_point; i + 1 < (int)(edges[e].first_point + edges[e].npoints); i++)
             level_segment(pts[i][0], pts[i][1], pts[i][2], pts[i + 1][0], pts[i + 1][1], pts[i + 1][2], 12.0f, 28.0f);

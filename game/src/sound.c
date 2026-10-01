@@ -14,7 +14,9 @@ static int16_t engine_pcm[ENGINE_FRAMES];
 static int16_t hiss_pcm[RATE / 2];
 static int16_t beep_pcm[RATE * 6 / 10];
 static int16_t puff_pcm[RATE / 8];
-static dgk_sound engine, hiss, beep, puff;
+static int16_t clunk_pcm[RATE / 5];
+static int16_t chime_pcm[RATE * 7 / 10];
+static dgk_sound engine, hiss, beep, puff, clunk, chime;
 static int engine_voice = -1, beep_voice = -1;
 static uint32_t noise = 12345;
 
@@ -48,10 +50,24 @@ void sound_init(void)
         beep_pcm[i] = (int16_t)(i < RATE * 3 / 10 ? ((i / 11) & 1 ? 6000 : -6000) : 0);
     for (i = 0; i < (int)DGK_ARRAY_LEN(puff_pcm); i++)
         puff_pcm[i] = (int16_t)(noise16() * 0.35 * exp(-(double)i / (RATE * 0.03)));
+    for (i = 0; i < (int)DGK_ARRAY_LEN(clunk_pcm); i++) {  /* a thump and a metallic knock */
+        double t = (double)i / RATE;
+        clunk_pcm[i] = (int16_t)((sin(2 * FW_PI * 70 * t) * 0.8 + sin(2 * FW_PI * 410 * t) * 0.3 +
+                                  noise16() / 32768.0 * 0.25 * exp(-t * 60)) * exp(-t * 18) * 14000.0);
+    }
+    for (i = 0; i < (int)DGK_ARRAY_LEN(chime_pcm); i++) {  /* two bell notes, a fifth apart */
+        double t = (double)i / RATE, t2 = t - 0.14;
+        double s = sin(2 * FW_PI * 784 * t) * exp(-t * 6) + 0.4 * sin(2 * FW_PI * 1568 * t) * exp(-t * 9);
+        if (t2 > 0)
+            s += sin(2 * FW_PI * 1175 * t2) * exp(-t2 * 5) + 0.4 * sin(2 * FW_PI * 2350 * t2) * exp(-t2 * 8);
+        chime_pcm[i] = (int16_t)(s * 7000.0);
+    }
     engine.pcm = engine_pcm; engine.frames = ENGINE_FRAMES; engine.rate = RATE;
     hiss.pcm = hiss_pcm; hiss.frames = DGK_ARRAY_LEN(hiss_pcm); hiss.rate = RATE;
     beep.pcm = beep_pcm; beep.frames = DGK_ARRAY_LEN(beep_pcm); beep.rate = RATE;
     puff.pcm = puff_pcm; puff.frames = DGK_ARRAY_LEN(puff_pcm); puff.rate = RATE;
+    clunk.pcm = clunk_pcm; clunk.frames = DGK_ARRAY_LEN(clunk_pcm); clunk.rate = RATE;
+    chime.pcm = chime_pcm; chime.frames = DGK_ARRAY_LEN(chime_pcm); chime.rate = RATE;
     engine_voice = dgk_mix_play(&engine, 120, 0x10000 * 6 / 10, DGK_MIX_LOOP);
 }
 
@@ -70,6 +86,17 @@ void sound_tick(const rig *r)
         dgk_mix_stop(beep_voice);
         beep_voice = -1;
     }
+}
+
+void sound_clunk(void)
+{
+    dgk_mix_play(&clunk, 200, 0x10000, 0);
+}
+
+void sound_chime(int grade)
+{
+    static const uint32_t pitch[] = { 0x10000, 0xE000, 0x10000, 0x11F00, 0x14000 };   /* a step up a grade */
+    dgk_mix_play(&chime, 170, pitch[DGK_CLAMP(grade, 0, 4)], 0);
 }
 
 void sound_stop(void)

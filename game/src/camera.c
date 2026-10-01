@@ -30,17 +30,24 @@ void camera_reset(camera *c, const rig *r)
 {
     c->yaw = r->heading;
     c->yaw_rate = 0;
+    c->pitch = 64.0f * FW_PI / 180.0f;
     target(r, &c->tx, &c->ty, &c->dist);
 }
 
-void camera_tick(camera *c, const rig *r, float dt)
+void camera_tick(camera *c, const rig *r, float dt, const camera_focus *f)
 {
     const float w = 2.5f;                      /* critically damped, about 0.4 s */
     float tx, ty, dist, k = 1.0f - expf(-4.0f * dt);
-    float err = wrap(r->heading - c->yaw);
+    float err = wrap((f ? f->yaw : r->heading) - c->yaw);
     c->yaw_rate += (w * w * err - 2 * w * c->yaw_rate) * dt;
     c->yaw = wrap(c->yaw + c->yaw_rate * dt);
     target(r, &tx, &ty, &dist);
+    if (f) {
+        tx = f->x;
+        ty = f->y;
+        dist = 36.0f;
+    }
+    c->pitch += ((f ? 75.0f : 64.0f) * FW_PI / 180.0f - c->pitch) * (1.0f - expf(-1.5f * dt));
     c->tx += (tx - c->tx) * k;
     c->ty += (ty - c->ty) * k;
     c->dist += (dist - c->dist) * k;
@@ -48,7 +55,7 @@ void camera_tick(camera *c, const rig *r, float dt)
 
 void camera_apply(const camera *c, const camera *prev, float alpha, float aspect, float ground)
 {
-    const float pitch = 64.0f * FW_PI / 180.0f;
+    float pitch = prev->pitch + (c->pitch - prev->pitch) * alpha;
     float yaw = prev->yaw + wrap(c->yaw - prev->yaw) * alpha;
     float tx = prev->tx + (c->tx - prev->tx) * alpha, ty = prev->ty + (c->ty - prev->ty) * alpha;
     float dist = prev->dist + (c->dist - prev->dist) * alpha;

@@ -5,7 +5,7 @@
 
 #define FW_PI 3.14159265f
 #define G 9.81f
-#define MASS 20000.0f           /* tractor 8 t, trailer half loaded */
+#define MASS(r) (RIG_TRACTOR_MASS + ((r)->has_trailer ? (r)->trailer_mass : 0.0f))
 #define DRIVE_LOAD 6500.0f      /* kg on the drive axle */
 #define WHEEL_R 0.52f
 #define IDLE 600.0f
@@ -46,6 +46,33 @@ void rig_init(rig *r, float x, float y, float heading)
     r->heading = r->trailer_heading = heading;
     r->gear = 1;
     r->rpm = IDLE;
+    r->has_trailer = 1;
+    r->trailer_type = TRAILER_BOX;
+    r->trailer_mass = 12000.0f;
+}
+
+void rig_couple(rig *r, int type, float mass, float heading)
+{
+    r->has_trailer = 1;
+    r->trailer_type = type;
+    r->trailer_mass = mass;
+    r->trailer_heading = heading;
+    r->jackknifed = 0;
+}
+
+void rig_uncouple(rig *r, float *kx, float *ky, float *heading)
+{
+    rig_hitch(r, kx, ky);
+    *heading = r->trailer_heading;
+    r->has_trailer = 0;
+}
+
+void rig_trailer_rear(const rig *r, float *rx, float *ry)
+{
+    float hx, hy;
+    rig_hitch(r, &hx, &hy);
+    *rx = hx - RIG_TRAILER_REAR * cosf(r->trailer_heading);
+    *ry = hy - RIG_TRAILER_REAR * sinf(r->trailer_heading);
 }
 
 void rig_hitch(const rig *r, float *hx, float *hy)
@@ -85,6 +112,15 @@ static void trailer_box(const rig *r, obb *b)
     b->hw = 1.28f;
     b->cx = hx - 5.8f * cosf(r->trailer_heading); /* nose 1.0 m ahead of the kingpin, 13.6 m long */
     b->cy = hy - 5.8f * sinf(r->trailer_heading);
+}
+
+void rig_parked_box(float kx, float ky, float heading, obb *b)
+{
+    b->angle = heading;
+    b->hl = (RIG_TRAILER_REAR - 2.0f) / 2;
+    b->hw = 1.28f;
+    b->cx = kx - (2.0f + b->hl) * cosf(heading);
+    b->cy = ky - (2.0f + b->hl) * sinf(heading);
 }
 
 /* Pedals to throttle and brake, choosing forward or reverse (arcade). */
@@ -147,7 +183,7 @@ static void drivetrain(rig *r, float dt, float *force)
     f = r->shift_timer > 0 ? 0 : torque(r->rpm) * ratio * 0.9f / WHEEL_R * r->throttle;
     if (r->rpm >= REDLINE)
         f = 0;
-    f = DGK_MIN(f, 0.8f * DRIVE_LOAD * G);               /* traction */
+    f = DGK_MIN(f, 0.8f * (r->has_trailer ? DRIVE_LOAD : DRIVE_LOAD * 0.6f) * G);   /* traction */
     *force = r->gear < 0 ? -f : f;
 }
 
@@ -173,7 +209,7 @@ static void collide(rig *r, const world *w)
             }
             tractor_box(r, &t);
         }
-        if (obb_overlap(&tr, near[i], &mx, &my)) {
+        if (r->has_trailer && obb_overlap(&tr, near[i], &mx, &my)) {
             /* The trailer is pushed around its kingpin: turn it the way that
              * moves its middle along the push, and stop a rig backing into it. */
             float hx, hy, ox, oy, turn;
@@ -212,17 +248,17 @@ void rig_step(rig *r, const rig_input *in, float dt, const world *w)
     target = DGK_CLAMP(in->steer, -1.0f, 1.0f) * max_steer;
     r->steer += DGK_CLAMP(target - r->steer, -1.2f * dt, 1.2f * dt);
     for (s = 0; s < substeps; s++) {
-        float brake_f = r->brake * 0.6f * MASS * G, dv;
-        resist = 0.007f * MASS * G + 0.5f * 1.2f * 6.0f * r->v * r->v;
-        dv = force / MASS * h;
+        float m = MASS(r), brake_f = r->brake * 0.6f * m * G, dv;
+        resist = 0.007f * m * G + 0.5f * 1.2f * 6.0f * r->v * r->v;
+        dv = force / m * h;
         /* Resistance and brakes oppose the motion and cannot reverse it. */
         {
-            float stop = (resist + brake_f) / MASS * h;
+            float stop = (resist + brake_f) / m * h;
             if (r->v > 0)
                 r->v = DGK_MAX(0.0f, r->v + dv - stop);
             else if (r->v < 0)
                 r->v = DGK_MIN(0.0f, r->v + dv + stop);
-            else if (fabsf(dv) * MASS / h > resist + brake_f)
+            else if (fabsf(dv) * m / h > resist + brake_f)
                 r->v = dv > 0 ? dv - stop : dv + stop;
         }
         r->yaw_rate = r->v * tanf(r->steer) / RIG_WHEELBASE;
@@ -231,7 +267,7 @@ void rig_step(rig *r, const rig_input *in, float dt, const world *w)
         /* The trailer: its axle cannot slide sideways (kingpin kinematics).
          * Hard braking at speed locks its wheels and lets it swing. */
         phi = rig_articulation(r);
-        omega_t = (r->v * sinf(phi) - RIG_HITCH * r->yaw_rate * cosf(phi)) / RIG_TRAILER_LEN;
+        omega_t = r->has_trailer ? (r->v * sinf(phi) + RIG_HITCH * r->yaw_rate * cosf(phi)) / RIG_TRAILER_LEN : 0;
         if (r->brake > 0.85f && fabsf(r->v) > 12.0f)
             omega_t *= 0.3f;
         r->heading = wrap(r->heading + r->yaw_rate * h);
@@ -239,7 +275,9 @@ void rig_step(rig *r, const rig_input *in, float dt, const world *w)
         r->x += r->v * cosf(r->heading) * h;
         r->y += r->v * sinf(r->heading) * h;
         phi = rig_articulation(r);
-        if (fabsf(phi) > JACKKNIFE) {                   /* cab against the trailer */
+        if (!r->has_trailer)
+            r->trailer_heading = r->heading;
+        else if (fabsf(phi) > JACKKNIFE) {              /* cab against the trailer */
             r->trailer_heading = wrap(r->heading - (phi > 0 ? JACKKNIFE : -JACKKNIFE));
             if (!r->jackknifed) {
                 r->jackknifes++;
@@ -260,5 +298,6 @@ uint32_t rig_hash(const rig *r, uint32_t h)
     f[0] = r->x; f[1] = r->y; f[2] = r->heading; f[3] = r->v;
     f[4] = r->trailer_heading; f[5] = r->steer; f[6] = r->rpm; f[7] = r->damage;
     h = dgk_fnv1a(h, f, sizeof f);
+    h = dgk_fnv1a(h, &r->has_trailer, sizeof r->has_trailer);
     return dgk_fnv1a(h, &r->gear, sizeof r->gear);
 }

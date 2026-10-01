@@ -4,7 +4,8 @@
 #   make linux          build/linux/fwheel (SDL3, desktop OpenGL; built in the dev container)
 #   make headless       build/headless/fwheel-hl (OSMesa, virtual clock; dev container)
 #   make loopa [CARD=g450] [ARGS="-frames 60"]   run FWHEEL.EXE in 86Box: out/loopa-CARD/
-#   make shots          F0 frames from DOS (Loop A) and OSMesa, compared (tools/shots.sh)
+#   make shots [CARD=g450]   the same frames from DOS (Loop A) and OSMesa, compared (tools/shots.sh)
+#   make jobsweep       the job autopilot on every depot pair and bay, headless (tools/jobsweep.sh)
 #   make check-deps     DOSGL at or after deps.mk's pin
 include config.mk
 -include config.local.mk
@@ -24,7 +25,7 @@ WARN      := -std=gnu99 -Wall -Wextra -Werror
 # Every target compiles its GL against DOS-GL's own <GL/gl.h>: the subset is enforced.
 COMMON    := $(WARN) -O2 -ffp-contract=off -Ikit/include -Ikit/src
 
-.PHONY: all dos linux headless loopa shots check-deps deps clean help
+.PHONY: all dos linux headless loopa shots jobsweep check-deps deps clean help
 all: dos
 
 check-deps:
@@ -112,16 +113,20 @@ headless: build/deps/stamp $(GEN_SRCS) build/data/WORLD.PAK
 # ---- Loop A ----------------------------------------------------------------
 CARD ?= g450
 ARGS ?= -test -fixed -autopilot -laps 1 -hash
+LOOPA_TIMEOUT ?= 600
 loopa: dos
 	$(Q)$(MGAHAL)/tools/dev python3 $(MGAHAL)/tools/loopa/run.py --name fwheel --card $(CARD) \
 	  --exe build/dos/FWHEEL.EXE --file build/data/WORLD.PAK --args="$(ARGS)" --out $(CURDIR)/out/loopa-$(CARD) --sound sb16 \
-	  --pre "SET BLASTER=A220 I5 D1 H5 T6" --idle 90 --timeout 600; cat out/loopa-$(CARD)/status
+	  --pre "SET BLASTER=A220 I5 D1 H5 T6" --idle 90 --timeout $(LOOPA_TIMEOUT); cat out/loopa-$(CARD)/status
 
 shots: dos headless
-	$(Q)tools/shots.sh
+	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) sh tools/shots.sh $(CARD)
+
+jobsweep: headless
+	$(Q)$(DEV) sh tools/jobsweep.sh $(or $(PAR),8)
 
 clean:
 	rm -rf build out
 
 help:
-	@sed -n '3,9p' Makefile
+	@sed -n '3,10p' Makefile

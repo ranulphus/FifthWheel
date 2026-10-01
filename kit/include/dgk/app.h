@@ -12,6 +12,7 @@
  *   -shot F:NAME    save frame F as NAME (DOS: C:\OUT\NAME.PPM; else out/NAME.ppm)
  *   -test           report on COM1 with the HX- protocol (DOS; Loop A)
  *   -nosound        no audio device
+ *   -nodraw         draw only the frames -shot saves (long simulation tests)
  */
 #ifndef DGK_APP_H
 #define DGK_APP_H

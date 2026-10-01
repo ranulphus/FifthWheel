@@ -19,7 +19,7 @@ void dgk_test_begin(const char *name);   /* test.c */
 int  dgk_test_end(void);
 
 static struct {
-    int width, height, vsync, frames, test, sound;
+    int width, height, vsync, frames, test, sound, nodraw;
     int nshots;
     struct { uint32_t frame; char name[16]; } shots[MAX_SHOTS];
 } opt;
@@ -65,6 +65,8 @@ static void parse(int argc, char **argv)
             opt.test = 1;
         else if (!strcmp(a, "-nosound"))
             opt.sound = 0;
+        else if (!strcmp(a, "-nodraw"))
+            opt.nodraw = 1;
         else if (!strcmp(a, "-shot") && v && opt.nshots < MAX_SHOTS) {
             const char *colon = strchr(v, ':');
             if (colon && colon[1]) {
@@ -169,7 +171,9 @@ int dgk_app_run(const dgk_app_desc *d, void *u, int argc, char **argv)
             if (n == 4 && acc >= TICK_US)
                 acc = 0;
         }
-        if (d->draw)
+        for (s = 0; s < opt.nshots && opt.shots[s].frame != dgk_app.frame; s++)
+            continue;
+        if (d->draw && (!opt.nodraw || s < opt.nshots))
             d->draw(u, dgk_app.fixed ? 1.0f : (float)acc / TICK_US);
         for (s = 0; s < opt.nshots; s++)
             if (opt.shots[s].frame == dgk_app.frame && dgk_test_snapshot(opt.shots[s].name) != 0)
