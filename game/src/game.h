@@ -8,6 +8,8 @@
 #include "autopilot.h"
 #include "camera.h"
 #include "career.h"
+#include "menu.h"
+#include "detail.h"
 #include "fx.h"
 #include "garage.h"
 #include "input.h"
@@ -32,6 +34,14 @@ typedef struct game {
     career car;                     /* money and the garage's items, kept in CAREER.DAT */
     garage gar;                     /* the garage (gar.open) */
     fx fxs;                         /* coins, confetti, dust, the cab's springs (looks only) */
+    detail presets[DETAILS];        /* from BUDGET.CFG over the built-in ones */
+    int detail_chosen;              /* -detail, FWHEEL.CFG's detail, or MEDIUM */
+    governor gov;                   /* steps below it while frames run slow (not in tests) */
+    detail det;                     /* in force now */
+    const char *budget_path;
+    menu men;                       /* the title, pause and options screens */
+    int title_wanted;               /* -title (tests: the title even with -test) */
+    int zoom_wanted;                /* -zoom N (-1: normal) */
     int hits_seen, fxtest;          /* bumps already shaken; -fxtest */
     const char *career_path;        /* -career FILE, FW_CAREER, or the default */
     int careerful;                  /* the career is loaded and saved (play, or -career given) */

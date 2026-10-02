@@ -6,6 +6,7 @@
 #   make loopa [CARD=g450] [ARGS="-frames 60"]   run FWHEEL.EXE in 86Box: out/loopa-CARD/
 #   make shots [CARD=g450]   the same frames from DOS (Loop A) and OSMesa, compared (tools/shots.sh)
 #   make suite [CARD=g450] [CHECKS="sb16 sbpro"]   Loop A suites (tools/suite.sh)
+#   make tests-host     unit tests on the host: governor, presets, settings, saves, the shop
 #   make jobsweep       the job autopilot on every depot pair and bay, headless (tools/jobsweep.sh)
 #   make check-deps     DOSGL at or after deps.mk's pin
 include config.mk
@@ -26,7 +27,7 @@ WARN      := -std=gnu99 -Wall -Wextra -Werror
 # Every target compiles its GL against DOS-GL's own <GL/gl.h>: the subset is enforced.
 COMMON    := $(WARN) -O2 -ffp-contract=off -Ikit/include -Ikit/src
 
-.PHONY: all dos linux headless loopa shots suite jobsweep check-deps deps clean help
+.PHONY: all dos linux headless loopa shots suite tests-host jobsweep check-deps deps clean help
 all: dos
 
 check-deps:
@@ -52,7 +53,10 @@ WORLD_SEED ?= 1
 build/data/WORLD.PAK: build/tools/fwgen
 	@mkdir -p $(dir $@)
 	$(Q)build/tools/fwgen $(WORLD_SEED) $@
-data: build/data/YARD.PAK build/data/WORLD.PAK
+data: build/data/YARD.PAK build/data/WORLD.PAK build/data/budget.cfg
+build/data/budget.cfg: data/budget.cfg
+	@mkdir -p $(dir $@)
+	$(Q)cp $< $@
 # The generator is deterministic: seed 1 must give data/golden/world.sha's
 # hash when built at -O0 and at -O2. Change the golden file only on purpose.
 data-check:
@@ -79,7 +83,7 @@ build/dos/FWHEEL.EXE: build/data/WORLD.PAK $(KIT_SRCS) kit/src/plat_sdl.c $(GAME
 	$(Q)$(DJCC) $(DOS_CFLAGS) -o $@ $(KIT_SRCS) kit/src/plat_sdl.c $(GAME_SRCS) $(GEN_SRCS) \
 	  $(MGAHAL)/tests/shim/hx.c $(DOS_LIBS)
 	@if [ -e "$(@:.EXE=.exe)" ] && ! [ "$(@:.EXE=.exe)" -ef "$@" ]; then rm -f "$(@:.EXE=.exe)"; fi
-dos: build/dos/FWHEEL.EXE build/data/WORLD.PAK build/data/YARD.PAK
+dos: build/dos/FWHEEL.EXE build/data/WORLD.PAK build/data/YARD.PAK build/data/budget.cfg
 
 # ---- Linux and headless: built in the dev container ------------------------
 # The container sees this repository, not DOSGL: stage what it needs first.
@@ -126,6 +130,16 @@ shots: dos headless
 suite: dos
 	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) tools/suite.sh $(CARD) $(CHECKS)
 
+# Unit tests that need no screen: the host's compiler, the kit's and the game's pure parts.
+build/tests/test_host: game/tests/test_host.c game/src/career.c game/src/detail.c kit/src/cfg.c kit/src/save.c \
+                       kit/src/base.c kit/src/log.c $(HDRS)
+	@mkdir -p $(dir $@)
+	$(Q)echo "  CC      $@"
+	$(Q)$(CC) $(TOOL_CFLAGS) -o $@ game/tests/test_host.c game/src/career.c game/src/detail.c kit/src/cfg.c \
+	  kit/src/save.c kit/src/base.c kit/src/log.c -lm
+tests-host: build/tests/test_host
+	$(Q)mkdir -p out && build/tests/test_host
+
 jobsweep: headless
 	$(Q)$(DEV) sh tools/jobsweep.sh $(or $(PAR),8)
 
@@ -133,4 +147,4 @@ clean:
 	rm -rf build out
 
 help:
-	@sed -n '3,11p' Makefile
+	@sed -n '3,12p' Makefile

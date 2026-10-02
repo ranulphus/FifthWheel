@@ -48,6 +48,26 @@ cleans up: neither yields, and the Sound Blaster's ring holds about 90 ms.
 On DOS the kit routes SDL's log through its own, and the driver's count
 of chunks played as silence becomes a test check (`HX-TEST audio`).
 
+## Screens (game/src/menu.c)
+
+Playing starts at the title screen: the tractor turning in the showroom
+under the name, with DRIVE, GARAGE, OPTIONS, JOYSTICK SET-UP and QUIT.
+Esc while driving pauses (RESUME, OPTIONS, JOYSTICK SET-UP, QUIT); the
+world waits under every screen. The options set the detail preset, the
+screen size (from the next start: the game hands it to the kit as
+`-mode`), vsync, the volume and the governor, and keep them in
+`FWHEEL.CFG`. Tests, replays and recordings start driving at once (a test
+can ask for `-title`); while recording or replaying, Esc still quits.
+
+## Detail (game/src/detail.c)
+
+LOW, MEDIUM and HIGH (`docs/perf.md`) set the far plane, the furthest zoom
+(Z cycles near, normal and far), the flourishes' caps, the minimap's road
+detail and the standing trailers' distance; `BUDGET.CFG` overrides the
+numbers. The governor watches the frame time and steps a preset down when
+frames run slow, back up when there is room again; it is off in tests and
+with `-fixed`.
+
 ## Career and garage (game/src/career.c, garage.c)
 
 A career (`CAREER.DAT`) keeps the money, the deliveries and the garage's

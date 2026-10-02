@@ -70,3 +70,27 @@ the pictures are byte for byte the same:
 
 The flourishes are capped (16 coins, 64 confetti, 32 dust: `-fxtest`), so
 they add at most about 230 triangles.
+
+## Detail presets (`data/budget.cfg`, `game/src/detail.c`)
+
+LOW, MEDIUM and HIGH set the far plane and the world's reach, the furthest
+camera zoom, the flourishes' caps, the minimap's road detail and how far
+away standing trailers are drawn; `BUDGET.CFG` beside the game overrides
+the built-in numbers, so a bench session can retune them without a build.
+The governor (not in tests) steps a preset down after 2 s averaging slower
+than 36 ms a frame, and back up after 6 s faster than 25 ms.
+
+FW1 (`-autopilot -frames 3000`), triangles a frame, mean / most:
+
+| Preset | Zoom near | Zoom normal | Zoom far |
+|---|---|---|---|
+| LOW (zoom stops at normal) | 1,382 / 1,972 | 1,423 / 1,972 | (normal) |
+| MEDIUM | 1,427 / 1,972 | 1,468 / 1,972 | 1,527 / 2,194 |
+| HIGH | 1,430 / 1,972 | 1,480 / 1,972 | 1,554 / 2,194 |
+
+The presets differ little: with the chunks culled, what the camera sees
+is the cost, and the world's own triangles dominate it. Everything is
+inside the working Low budget (about 2,700) already. If the bench says LOW
+must cost less, the lever is in the pack: each chunk's decoration (trees,
+hedges, props) last in its triangle list, so LOW can draw it only near the
+rig.

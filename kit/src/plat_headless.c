@@ -213,3 +213,19 @@ const char *plat_describe(void)
 {
     return "OSMesa (headless)";
 }
+
+int plat_modes(int (*wh)[2], int max)
+{
+    static const int sizes[3][2] = { { 512, 384 }, { 640, 480 }, { 800, 600 } };
+    int i;
+    for (i = 0; i < 3 && i < max; i++) {
+        wh[i][0] = sizes[i][0];
+        wh[i][1] = sizes[i][1];
+    }
+    return i;
+}
+
+void plat_vsync(int on)
+{
+    DGK_UNUSED(on);
+}

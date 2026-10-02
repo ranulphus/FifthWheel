@@ -261,3 +261,33 @@ const char *plat_describe(void)
 {
     return describe;
 }
+
+int plat_modes(int (*wh)[2], int max)
+{
+    int n = 0, i, j, count = 0;
+    SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(SDL_GetPrimaryDisplay(), &count);
+    for (i = 0; modes && i < count && n < max; i++) {
+        for (j = 0; j < n && !(wh[j][0] == modes[i]->w && wh[j][1] == modes[i]->h); j++)
+            continue;
+        if (j == n) {
+            wh[n][0] = modes[i]->w;
+            wh[n][1] = modes[i]->h;
+            n++;
+        }
+    }
+    SDL_free(modes);
+    for (i = 1; i < n; i++)                          /* smallest first */
+        for (j = i; j > 0 && wh[j][0] * wh[j][1] < wh[j - 1][0] * wh[j - 1][1]; j--) {
+            int t0 = wh[j][0], t1 = wh[j][1];
+            wh[j][0] = wh[j - 1][0];
+            wh[j][1] = wh[j - 1][1];
+            wh[j - 1][0] = t0;
+            wh[j - 1][1] = t1;
+        }
+    return n;
+}
+
+void plat_vsync(int on)
+{
+    SDL_GL_SetSwapInterval(on ? 1 : 0);
+}

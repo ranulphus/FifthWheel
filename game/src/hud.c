@@ -162,15 +162,15 @@ static void minimap(const game *g)
         glVertex2f(MM_X + MM_R * cosf(i * WG_PI / 12), MM_Y + MM_R * sinf(i * WG_PI / 12));
     glEnd();
     glDisable(GL_BLEND);
-    /* Roads, every third point (24 m), those near enough. */
+    /* Roads, every few points (the detail's step; 8 m apart), those near enough. */
     glLineWidth(2.0f);
     colour(0xC8C8D0FFu);
     glBegin(GL_LINES);
     dgk_gfx_draws++;
     for (i = 0; i < (int)gr->nedges; i++) {
         const float *q = p + e[i].first_point * 2;
-        for (k = 0; k + 1 < (int)e[i].npoints; k += 3) {
-            int m = DGK_MIN(k + 3, (int)e[i].npoints - 1);
+        for (k = 0; k + 1 < (int)e[i].npoints; k += g->det.minimap_step) {
+            int m = DGK_MIN(k + g->det.minimap_step, (int)e[i].npoints - 1);
             if (fabsf(q[k * 2] - g->r.x) > reach || fabsf(q[k * 2 + 1] - g->r.y) > reach)
                 continue;
             mm_line(g, q[k * 2], q[k * 2 + 1], q[m * 2], q[m * 2 + 1]);

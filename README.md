@@ -16,7 +16,9 @@ its own repository once a second game uses it.
 Minimum machine: Pentium II 266, Matrox G200, Sound Blaster 16 (or none),
 640x480. Faster machines and the G400/G450 get more detail.
 
-**Status:** milestone F6: a career. Money earned is kept in CAREER.DAT and
+**Status:** milestone F7: a title screen, a pause menu and options
+(detail, screen size, vsync, volume), three detail presets with a
+governor, and the world culled to what the camera sees. Before that, F6: a career. Money earned is kept in CAREER.DAT and
 spent in the garage on paint jobs, horns, decals, licences for flatbeds
 and tankers, and a bigger cab; deliveries end in coins, confetti and a
 bouncing callout. Before that (F4, F5): the jobs loop, full sound, and
@@ -42,12 +44,14 @@ make linux        # build/linux/fwheel (SDL3 + desktop OpenGL; built in the dev 
 make headless     # build/headless/fwheel-hl (OSMesa, for tests)
 make loopa CARD=g450              # FWHEEL.EXE in 86Box (DOSGL's harness)
 make jobsweep                     # the job autopilot on every job, headless
+make tests-host                   # unit tests (no screen)
+make suite CARD=g450              # Loop A: sound (SB16, SB Pro), joystick, shop, flourishes, menus
 ```
 
-Keys: arrows or WASD to steer, accelerate and brake (hold the brake at a
+Playing starts at the title screen; Esc pauses. Keys: arrows or WASD to steer, accelerate and brake (hold the brake at a
 standstill to reverse), Space for the handbrake, H for the horn, 1-3 to take a job from a
 depot's board, Backspace to cancel it before coupling, G for the garage
-(paint, horns, decals, licences, a bigger cab), J to set up a
+(paint, horns, decals, licences, a bigger cab), Z to zoom, J to set up a
 joystick or wheel, Esc to quit. With a joystick: its steering, accelerator
 and brake as set up, button 1 the handbrake, button 2 the horn.
 
@@ -59,6 +63,7 @@ Command line: `-mode WxH`, `-novsync`, `-nosound`, and for tests `-frames N`,
 `kit/include/dgk/app.h`); the game adds `-world FILE` (default
 `WORLD.PAK`; the F1 test yard is `YARD.PAK`), `-autopilot` (`-laps N`),
 `-autojob` (`-job D:T:B`), `-dockpose`, `-soundtest`, `-calibrate`, `-joylog`, `-career FILE`, `-money N`, `-fxtest`,
+`-detail low|medium|high`, `-zoom N`, `-title`,
 `-record FILE`, `-replay FILE`, `-hash`, `-trace N`, `-timedemo FILE -dbtest NAME`,
 `-probe [quick]` and `-tourshots N`.
 

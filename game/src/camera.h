@@ -13,6 +13,7 @@ typedef struct camera {
     float tx, ty;                    /* where it looks, on the ground */
     float dist;
     float pitch;                     /* radians down from level */
+    int zoom;                        /* 0 near, 1 normal, 2 far */
 } camera;
 
 typedef struct camera_focus {
@@ -21,6 +22,6 @@ typedef struct camera_focus {
 
 void camera_reset(camera *c, const rig *r);
 void camera_tick(camera *c, const rig *r, float dt, const camera_focus *f);   /* f: NULL to follow */
-void camera_apply(const camera *c, const camera *prev, float alpha, float aspect, float ground);
+void camera_apply(const camera *c, const camera *prev, float alpha, float aspect, float ground, float far);
 
 #endif

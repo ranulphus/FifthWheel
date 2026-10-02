@@ -59,6 +59,7 @@ typedef struct dgk_app_state {
     uint8_t joy_pressed[DGK_JOY_BUTTONS]; /* went down since the last tick */
     int quit;                             /* set to end the loop */
     int fixed;                            /* -fixed */
+    uint32_t frame_us;                    /* the last frame, swap to swap */
 } dgk_app_state;
 
 extern dgk_app_state dgk_app;
@@ -68,6 +69,8 @@ int  dgk_app_run(const dgk_app_desc *d, void *u, int argc, char **argv);
  * (dgk/bench.h), from the next frame until stopped. */
 void dgk_app_bench_start(const char *test, int warmup_frames);
 void dgk_app_bench_stop(const char *status, const char *notes);
+int  dgk_app_modes(int (*wh)[2], int max);   /* screen sizes on offer (DOS: DOS-GL's), smallest first */
+void dgk_app_vsync(int on);
 void dgk_service(void);                   /* give SDL (and its audio thread) a turn */
 void dgk_service_if_due(void);            /* the same, if 8 ms have passed since the last */
 uint64_t dgk_now_us(void);

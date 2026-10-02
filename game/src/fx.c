@@ -23,13 +23,29 @@ void fx_init(fx *f, int money)
     memset(f, 0, sizeof *f);
     f->money_shown = (float)money;
     f->rng = 2463534242u;
+    fx_caps(f, FX_COINS, FX_CONFETTI, FX_DUST);
+}
+
+void fx_caps(fx *f, int coins, int confetti, int dust)
+{
+    f->cap_coins = DGK_CLAMP(coins, 1, FX_COINS);
+    f->cap_confetti = DGK_CLAMP(confetti, 1, FX_CONFETTI);
+    f->cap_dust = DGK_CLAMP(dust, 1, FX_DUST);
+}
+
+/* A slot in a pool: a free one while under the cap, else an old one's. */
+static int slot(fx *f, int *used, int cap)
+{
+    if (*used < cap)
+        return (*used)++;
+    return (int)(rnd(f) * (cap - 1));
 }
 
 void fx_coins(fx *f, int n)
 {
     int i;
     for (i = 0; i < n; i++) {
-        fx_coin *c = &f->coins[f->ncoins < FX_COINS ? f->ncoins++ : (int)(rnd(f) * (FX_COINS - 1))];
+        fx_coin *c = &f->coins[slot(f, &f->ncoins, f->cap_coins)];
         c->delay = i * 0.06f;
         c->t = 0;
     }
@@ -42,7 +58,7 @@ void fx_confetti(fx *f, int n)
     int i;
     for (i = 0; i < n; i++) {
         int left = i & 1;
-        fx_bit *b = &f->confetti[f->nconfetti < FX_CONFETTI ? f->nconfetti++ : (int)(rnd(f) * (FX_CONFETTI - 1))];
+        fx_bit *b = &f->confetti[slot(f, &f->nconfetti, f->cap_confetti)];
         b->x = left ? 20.0f : 620.0f;                 /* popped from the bottom corners */
         b->y = 470.0f;
         b->vx = (left ? 1.0f : -1.0f) * (60.0f + 220.0f * rnd(f));
@@ -59,7 +75,7 @@ void fx_dust_at(fx *f, const world *w, float x, float y, int n, float spread)
 {
     int i;
     for (i = 0; i < n; i++) {
-        fx_dust *d = &f->dust[f->ndust < FX_DUST ? f->ndust++ : (int)(rnd(f) * (FX_DUST - 1))];
+        fx_dust *d = &f->dust[slot(f, &f->ndust, f->cap_dust)];
         d->x = x + (rnd(f) - 0.5f) * spread;
         d->y = y + (rnd(f) - 0.5f) * spread;
         d->h = world_height(w, d->x, d->y) + 0.3f;

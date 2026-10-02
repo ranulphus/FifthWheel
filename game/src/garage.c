@@ -131,12 +131,11 @@ static void centred(const dgk_font *f, float y, float scale, uint32_t rgba, cons
     dgk_text(f, 320 - dgk_text_width(f, scale, s) / 2, y, scale, rgba, s);
 }
 
-void garage_draw(const garage *g, const career *c, const lorry_meshes *m, const dgk_font *font, float alpha)
+/* The showroom: a sky, a platform with a coloured rim, and the tractor
+ * turning on it (with a trailer of the given type behind, or -1). */
+void showroom_draw(const lorry_meshes *m, float spin, uint32_t rim_rgba, int trailer)
 {
-    const item *it = &items[g->shown[g->kind]];
-    float spin = g->spin_prev + (g->spin - g->spin_prev) * alpha;
-    char line[64];
-    int k, i;
+    int i;
     rig r;
     dgk_v3 eye = { 13.0f, 6.5f, 9.0f }, at = { 0.5f, 1.6f, 0 }, up = { 0, 1, 0 };
     /* The sky: a gradient behind everything. */
@@ -158,7 +157,7 @@ void garage_draw(const garage *g, const career *c, const lorry_meshes *m, const 
     glEnd();
     glBegin(GL_QUAD_STRIP);
     dgk_gfx_draws++;                          /* the platform's bright rim */
-    colour(rarity_rgba[it->rarity]);
+    colour(rim_rgba);
     for (i = 0; i <= 32; i++) {
         glVertex3f(9.0f * cosf(i * FW_PI / 16), 0.02f, 9.0f * sinf(i * FW_PI / 16));
         glVertex3f(9.4f * cosf(i * FW_PI / 16), 0.02f, 9.4f * sinf(i * FW_PI / 16));
@@ -168,9 +167,18 @@ void garage_draw(const garage *g, const career *c, const lorry_meshes *m, const 
     rig_init(&r, 0, 0, spin);
     r.x = -1.9f * cosf(spin);                        /* turn about the cab's middle */
     r.y = -1.9f * sinf(spin);
-    r.has_trailer = it->kind == KIND_LICENCE;
-    r.trailer_type = (int)it->value;
+    r.has_trailer = trailer >= 0;
+    r.trailer_type = trailer >= 0 ? trailer : 0;
     lorry_draw(m, &r, NULL, NULL);
+}
+
+void garage_draw(const garage *g, const career *c, const lorry_meshes *m, const dgk_font *font, float alpha)
+{
+    const item *it = &items[g->shown[g->kind]];
+    float spin = g->spin_prev + (g->spin - g->spin_prev) * alpha;
+    char line[64];
+    int k;
+    showroom_draw(m, spin, rarity_rgba[it->rarity], it->kind == KIND_LICENCE ? (int)it->value : -1);
     /* The shop. */
     dgk_gfx_overlay_begin();
     glEnable(GL_BLEND);

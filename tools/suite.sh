@@ -3,7 +3,7 @@
 # one line, exit status 0 when all pass. Needs MGAHAL and DEV (make suite
 # sets them) and build/dos/FWHEEL.EXE.
 #
-#   tools/suite.sh [CARD] [CHECK...]    checks: sb16 sbpro joy shop fx (default: all)
+#   tools/suite.sh [CARD] [CHECK...]    checks: sb16 sbpro joy shop fx menus (default: all)
 #
 #   sb16, sbpro   -soundtest through the Sound Blaster 16 and the Sound
 #                 Blaster Pro 2 (8-bit): every sound's tones are in the
@@ -16,14 +16,18 @@
 #                 it maps half left, full forward and button 1 to steering
 #                 0.4-0.5, the accelerator and the handbrake (-joylog)
 #   shop          keys typed in 86Box: the garage (G) buys Sky Blue paint and
-#                 the Big Air horn with $600, is left (Esc) and the game quit;
+#                 the Big Air horn with $600, is left (Esc) and the game quit
+#                 from the pause menu;
 #                 a second run loads CAREER.DAT with them fitted and $50 left
 #   fx            -fxtest: every flourish far past its pool, drawn through
-#                 DOS-GL; the pools hold (16 coins, 64 confetti, 32 dust)
+#                 DOS-GL; the pools hold (the detail preset's caps)
+#   menus         keys typed in 86Box: the title's options set the detail to
+#                 high, the game is driven, paused and quit from the pause
+#                 menu; a second run starts with FWHEEL.CFG's detail high
 set -uo pipefail
 : "${MGAHAL:?}" "${DEV:?}"
 card=${1:-g450}; shift || true
-checks=${*:-sb16 sbpro joy shop fx}
+checks=${*:-sb16 sbpro joy shop fx menus}
 out=$PWD/out/suite-$card
 mkdir -p "$out"
 fail=0
@@ -67,8 +71,9 @@ joy() {
 
 shop() {
     local st keys l
-    # 86Box scancodes: G 0x22, Enter 0x1c, Esc 0x01; extended Right 0x14d, Down 0x150.
-    keys="@FW-PLAY ready,1:0x22,2.5:0x14d,3.5:0x1c,4.5:0x150,5.5:0x14d,6.5:0x1c,7.5:0x01,9:0x01"
+    # 86Box scancodes: G 0x22, Enter 0x1c, Esc 0x01; extended Right 0x14d, Down 0x150, Up 0x148.
+    # Esc leaves the garage; then Esc pauses, Up wraps to QUIT, Enter.
+    keys="@FW-PLAY ready,1:0x22,2.5:0x14d,3.5:0x1c,4.5:0x150,5.5:0x14d,6.5:0x1c,7.5:0x01,9:0x01,10:0x148,11:0x1c"
     st=$(run shop --cmd "FWHEEL -test -nosound -career CAREER.DAT -money 600 -noexit" \
          --cmd "FWHEEL -test -nosound -career CAREER.DAT -frames 30" --keys "$keys")
     l=$(log shop | grep -a 'FW-CAREER loaded' | tail -1)
@@ -82,6 +87,14 @@ for c in $checks; do
     case $c in
     joy) joy ;;
     shop) shop ;;
+    menus)
+        # Down 0x150, Up 0x148, Right 0x14d, Enter 0x1c, Esc 0x01.
+        k="@FW-MENU title,1:0x150,2:0x150,3:0x1c,4:0x14d,5:0x01,6:0x1c,8:0x01,9:0x148,10:0x1c"
+        st=$(run menus --cmd "FWHEEL -test -nosound -title -noexit" --cmd "FWHEEL -test -nosound -frames 30" --keys "$k")
+        if [ "$st" = PASS ] && log menus | grep -q "FW-MENU DETAIL high" && log menus | grep -q "FW-MENU pause" \
+           && log menus | grep -q "FW-MENU quit" && log menus | grep -q "FW-CFG detail high"; then
+            say menus "PASS (options saved, driven, paused, quit; the next run starts with detail high)"
+        else bad menus "($st; $(log menus | grep -a 'FW-MENU\|FW-CFG detail' | tr '\n' ' '))"; fi ;;
     fx)
         st=$(run fx --args="-test -fixed -nosound -fxtest")
         r=$(log fx | grep -ao 'HX-TEST fx-caps [A-Z]* .*' | cut -d' ' -f3-)

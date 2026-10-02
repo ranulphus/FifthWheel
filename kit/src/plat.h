@@ -39,5 +39,7 @@ int      plat_audio_underruns(int *underruns, int *chunks);
 void     plat_audio_lock(void);
 void     plat_audio_unlock(void);
 const char *plat_describe(void);            /* renderer and drivers, for the log */
+int      plat_modes(int (*wh)[2], int max);  /* the screen sizes on offer, smallest first */
+void     plat_vsync(int on);
 
 #endif

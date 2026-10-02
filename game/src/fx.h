@@ -23,6 +23,7 @@ typedef struct fx {
     fx_bit confetti[FX_CONFETTI];
     fx_dust dust[FX_DUST];
     int ncoins, nconfetti, ndust;    /* in use (the most since the start: max_*) */
+    int cap_coins, cap_confetti, cap_dust;   /* the detail preset's limits, within the pools */
     int max_coins, max_confetti, max_dust;
     float money_shown;               /* the wallet as drawn: counts up to the money */
     int coins_landed;                /* this tick (a coin sound each) */
@@ -31,7 +32,8 @@ typedef struct fx {
     uint32_t rng;
 } fx;
 
-void fx_init(fx *f, int money);
+void fx_init(fx *f, int money);     /* caps: the whole pools */
+void fx_caps(fx *f, int coins, int confetti, int dust);
 /* After each tick: the springs from the rig's accelerations, dust from
  * its brakes, wheelspin and knocks; everything moves on. */
 void fx_tick(fx *f, const rig *r, const world *w, int money);

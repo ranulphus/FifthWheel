@@ -98,6 +98,16 @@ void dgk_service_if_due(void)
         dgk_service();
 }
 
+int dgk_app_modes(int (*wh)[2], int max)
+{
+    return plat_modes(wh, max);
+}
+
+void dgk_app_vsync(int on)
+{
+    plat_vsync(on);
+}
+
 uint64_t dgk_now_us(void)
 {
     return plat_now_us();
@@ -204,6 +214,7 @@ int dgk_app_run(const dgk_app_desc *d, void *u, int argc, char **argv)
             uint64_t now = plat_now_us();
             if (bench_on && last_swap_us)
                 dgk_bench_frame(now - last_swap_us, dgk_gfx_tris);
+            dgk_app.frame_us = last_swap_us ? (uint32_t)(now - last_swap_us) : 0;
             last_swap_us = now;
             if (dgk_gfx_tris || dgk_gfx_draws) {
                 sum_tris += dgk_gfx_tris;

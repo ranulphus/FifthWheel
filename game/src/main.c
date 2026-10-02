@@ -5,6 +5,9 @@
  *   FWHEEL -dockpose                     a trailer reversing into a bay, held still (pictures)
  *   FWHEEL -soundtest                    each sound in turn, then quit (the SOUND suite)
  *   FWHEEL -fxtest                       every flourish far past its cap for 2 s (HX-TEST fx-caps)
+ *          [-detail low|medium|high]     the detail preset (else FWHEEL.CFG's, else medium)
+ *          [-zoom 0|1|2]                 the camera's zoom to start with (as the detail allows)
+ *          [-title]                      the title screen, in a test too (else only when playing)
  *   FWHEEL -calibrate                    the joystick's calibration screen, saved, then quit
  *          [-joylog]                     the joystick's axes and mapped controls every 0.5 s (FW-JOY)
  *          [-career FILE] [-money N]     keep a career in FILE in a test run; start it with $N
@@ -20,9 +23,10 @@
  *   FWHEEL -tourshots N                  N frames with the rig placed along the tour and at
  *                                        two depots, each saved as P<n> (DOS against Mesa)
  *
+ * Playing starts at the title screen; Esc pauses (and offers the options).
  * Keys: arrows or WASD (steer, accelerate, brake; hold the brake at a stop
  * to reverse), Space the handbrake, H the horn, 1-3 take a job from the
- * board, Backspace cancel it (before coupling), G the garage (stopped), J the joystick's set-up,
+ * board, Backspace cancel it (before coupling), G the garage (stopped), Z the zoom, J the joystick's set-up,
  * Esc to quit. A joystick or wheel: steering, accelerator and brake as
  * calibrated, button 1 the handbrake, button 2 the horn. */
 #include "game.h"
@@ -39,7 +43,7 @@
 
 extern const dgk_font_data fw_font;
 
-enum { SC_A = 4, SC_D = 7, SC_G = 10, SC_H = 11, SC_J = 13, SC_S = 22, SC_W = 26, SC_1 = 30, SC_BACKSPACE = 42 };
+enum { SC_A = 4, SC_D = 7, SC_G = 10, SC_H = 11, SC_J = 13, SC_Z = 29, SC_S = 22, SC_W = 26, SC_1 = 30, SC_BACKSPACE = 42 };
 
 /* One tick of input, as recorded. Buttons: bit 0 the handbrake, bits 1-2
  * a job taken from the board (1-3), bit 3 the job cancelled, bit 4 the
@@ -186,6 +190,26 @@ static void dock_pose(game *g)
     g->r.gear = -1;
 }
 
+/* The detail in force: the chosen preset, less the governor's notches. */
+static void detail_apply(game *g)
+{
+    g->det = detail_effective(g->presets, g->detail_chosen, g->gov.notch);
+    fx_caps(&g->fxs, g->det.coins, g->det.confetti, g->det.dust);
+    g->cam.zoom = DGK_MIN(g->cam.zoom, g->det.zoom_max);
+}
+
+static void detail_start(game *g)
+{
+    int d = detail_parse(dgk_cfg_get(&g->cfg, "detail"));
+    detail_load(g->presets, g->budget_path);
+    if (g->detail_chosen < 0)
+        g->detail_chosen = d >= 0 ? d : DETAIL_MEDIUM;
+    g->gov.on = !dgk_app.fixed && !dgk_test_active() && dgk_cfg_int(&g->cfg, "governor", 1);
+    g->cam.zoom = g->zoom_wanted >= 0 ? g->zoom_wanted : 1;
+    detail_apply(g);
+    dgk_log("FW-CFG detail %s, governor %s", detail_name[g->detail_chosen], g->gov.on ? "on" : "off");
+}
+
 static int init(void *u)
 {
     game *g = (game *)u;
@@ -231,6 +255,7 @@ static int init(void *u)
         return -1;
     }
     g->r_prev = g->r;
+    g->cam.zoom = 1;
     camera_reset(&g->cam, &g->r);
     g->cam_prev = g->cam;
     autopilot_reset(&g->ap, &g->r, &g->w);
@@ -246,6 +271,10 @@ static int init(void *u)
     sound_init();
     career_style(g);
     fx_init(&g->fxs, g->jobs.money);
+    detail_start(g);
+    menu_start(g, g->title_wanted || (g->mode == MODE_DRIVE && !dgk_test_active() && !g->replay_path &&
+                                      !g->record_path && !g->tourshots && !g->dockpose && !g->soundtest &&
+                                      !g->calibrate_only && !g->fxtest));
     if (g->dbtest) {
         dgk_bench_run("FWHEEL", "F2");
         dgk_app_bench_start(g->dbtest, 30);
@@ -302,7 +331,7 @@ static void job_events(game *g)
         static const char *const cheer[] = { "", "DELIVERED", "GOOD PARK!", "GREAT PARK!", "PERFECT PARK!" };
         static const uint32_t cheer_rgba[] = { 0, 0xFFFFFFFFu, 0x9FFFB0FFu, 0x5FD8FFFFu, 0xFFD23FFFu };
         sound_chime(j->grade);
-        fx_coins(&g->fxs, DGK_CLAMP(j->earned / 40, 4, FX_COINS));
+        fx_coins(&g->fxs, DGK_CLAMP(j->earned / 40, 4, g->det.coins));
         if (j->grade >= GRADE_GREAT)
             fx_confetti(&g->fxs, j->grade == GRADE_PERFECT ? 56 : 32);
         g->car.delivered++;
@@ -364,8 +393,6 @@ static void tick(void *u)
         pose(g, (int)dgk_app.ticks);
         return;
     }
-    if (dgk_app.ticks == 0 && g->mode == MODE_DRIVE)
-        dgk_log("FW-PLAY ready");                    /* scripted keys start from here */
     if (g->cal.step != CAL_OFF) {
         calibration(g);
         return;
@@ -382,6 +409,12 @@ static void tick(void *u)
         if (!g->gar.open)
             career_style(g);                         /* what is fitted, not what was tried on */
         return;
+    }
+    if (menu_tick(g))                                /* the title, pause or options: the world waits */
+        return;
+    if (dgk_app.key_pressed[SC_Z]) {                 /* zoom: near, normal, far (as the detail allows) */
+        g->cam.zoom = g->cam.zoom >= g->det.zoom_max ? 0 : g->cam.zoom + 1;
+        dgk_log("FW-VIEW zoom %d", g->cam.zoom);
     }
     if (dgk_app.key_pressed[SC_G] && fabsf(g->r.v) < 0.5f && g->has_jobs && !g->replay_path && !g->record_path &&
         g->mode == MODE_DRIVE) {
@@ -417,8 +450,13 @@ static void tick(void *u)
             dgk_app.quit = 1;
         return;
     }
-    if (dgk_app.key_pressed[DGK_KEY_ESCAPE])
+    if (dgk_app.key_pressed[DGK_KEY_ESCAPE]) {      /* a pause, unless recording or replaying */
+        if (g->mode == MODE_DRIVE && !g->replay_path && !g->record_path) {
+            menu_open(g, SCREEN_PAUSE);
+            return;
+        }
         dgk_app.quit = 1;
+    }
     if (g->dockpose) {                               /* held still, the wheels turned */
         f.steer = 60;
         f.accel = f.decel = f.buttons = 0;
@@ -532,10 +570,14 @@ static float lerp_angle(float a, float b, float t)
 static void draw(void *u, float alpha)
 {
     game *g = (game *)u;
+    if (dgk_app.frame_us && governor_frame(&g->gov, dgk_app.frame_us / 1000.0f))
+        detail_apply(g);                             /* looks only: never the simulation */
     if (g->gar.open) {
         garage_draw(&g->gar, &g->car, &g->lorry, &g->font, alpha);
         return;
     }
+    if (g->cal.step == CAL_OFF && menu_draw_scene(g, alpha))
+        return;
     rig r = g->r;
     r.x = g->r_prev.x + (g->r.x - g->r_prev.x) * alpha;
     r.y = g->r_prev.y + (g->r.y - g->r_prev.y) * alpha;
@@ -545,8 +587,9 @@ static void draw(void *u, float alpha)
     {
         float tx = g->cam_prev.tx + (g->cam.tx - g->cam_prev.tx) * alpha;
         float ty = g->cam_prev.ty + (g->cam.ty - g->cam_prev.ty) * alpha;
-        camera_apply(&g->cam, &g->cam_prev, alpha, (float)dgk_app.width / dgk_app.height, world_height(&g->w, tx, ty));
-        world_draw(&g->w, tx, ty, 90.0f);
+        camera_apply(&g->cam, &g->cam_prev, alpha, (float)dgk_app.width / dgk_app.height, world_height(&g->w, tx, ty),
+                     g->det.far);
+        world_draw(&g->w, tx, ty, g->det.far * 0.65f);
     }
     lorry_draw(&g->lorry, &r, &g->w, &g->fxs.sway);
     if (g->has_jobs) {
@@ -554,7 +597,7 @@ static void draw(void *u, float alpha)
         for (i = 0; i < g->w.ndepots; i++) {
             const parked *t = &g->jobs.trailers[i], *d = &g->jobs.docked[i];
             float dx = g->w.depots[i].x - r.x, dy = g->w.depots[i].y - r.y;
-            if (dx * dx + dy * dy > 160.0f * 160.0f)
+            if (dx * dx + dy * dy > g->det.trailers * g->det.trailers)
                 continue;
             if (t->present)
                 lorry_draw_trailer(&g->lorry, t->type, t->x, t->y, t->heading, &g->w);
@@ -573,6 +616,7 @@ static void draw(void *u, float alpha)
         return;
     }
     hud_draw(g);
+    menu_draw_overlay(g);
 }
 
 static void quit(void *u)
@@ -590,9 +634,10 @@ static void quit(void *u)
             "y=%.2f", (unsigned long)dgk_app.ticks, g->ap.laps, g->jobs.delivered, g->jobs.money, g->r.damage,
             g->r.hits, g->r.jackknifes, g->desync, g->r.x, g->r.y);
     if (g->fxtest)
-        dgk_test_check("fx-caps", g->fxs.max_coins == FX_COINS && g->fxs.max_confetti == FX_CONFETTI &&
-                       g->fxs.max_dust == FX_DUST, "at most %d coins, %d confetti, %d dust (caps %d, %d, %d)",
-                       g->fxs.max_coins, g->fxs.max_confetti, g->fxs.max_dust, FX_COINS, FX_CONFETTI, FX_DUST);
+        dgk_test_check("fx-caps", g->fxs.max_coins == g->det.coins && g->fxs.max_confetti == g->det.confetti &&
+                       g->fxs.max_dust == g->det.dust, "at most %d coins, %d confetti, %d dust (%s: %d, %d, %d)",
+                       g->fxs.max_coins, g->fxs.max_confetti, g->fxs.max_dust, detail_name[g->detail_chosen],
+                       g->det.coins, g->det.confetti, g->det.dust);
     if (g->mode == MODE_JOB)
         dgk_test_check("job", g->jobs.delivered > 0 && g->jobs.grade >= GRADE_OK, "%s, %s in %.0f s, damage %.1f",
                        g->jobs.delivered ? "delivered" : "not delivered", grade_name[g->jobs.grade],
@@ -636,6 +681,13 @@ int main(int argc, char **argv)
     int i;
     g.job_to = -1;
     g.start_money = -1;
+    g.detail_chosen = -1;
+    g.zoom_wanted = -1;
+#ifdef DGK_DOS
+    g.budget_path = "BUDGET.CFG";
+#else
+    g.budget_path = "build/data/budget.cfg";
+#endif
     g.career_path = getenv("FW_CAREER");
     g.career_given = g.career_path != NULL;
     if (!g.career_path)
@@ -672,6 +724,12 @@ int main(int argc, char **argv)
             g.soundtest = 1;
         else if (!strcmp(a, "-fxtest"))
             g.fxtest = 1;
+        else if (!strcmp(a, "-detail") && v)
+            g.detail_chosen = detail_parse(argv[++i]);
+        else if (!strcmp(a, "-zoom") && v)
+            g.zoom_wanted = atoi(argv[++i]);
+        else if (!strcmp(a, "-title"))
+            g.title_wanted = 1;
         else if (!strcmp(a, "-calibrate"))
             g.calibrate_only = 1;
         else if (!strcmp(a, "-joylog"))
@@ -702,5 +760,27 @@ int main(int argc, char **argv)
             return dgk_app_run(&probe, NULL, argc, argv);
         }
     }
-    return dgk_app_run(&desc, &g, argc, argv);
+    {
+        /* The screen size and vsync from the settings, unless the command line says. */
+        static char *args[64], mode[16];
+        static dgk_cfg early;
+        int n = 0, has_mode = 0, has_vsync = 0;
+        for (i = 0; i < argc && n < 60; i++) {
+            has_mode |= !strcmp(argv[i], "-mode");
+            has_vsync |= !strcmp(argv[i], "-novsync");
+            args[n++] = argv[i];
+        }
+        if (dgk_cfg_load(&early, g.cfg_path) == 0) {
+            const char *m = dgk_cfg_get(&early, "video.mode");
+            if (m && !has_mode) {
+                snprintf(mode, sizeof mode, "%s", m);
+                args[n++] = (char *)"-mode";
+                args[n++] = mode;
+            }
+            if (!dgk_cfg_int(&early, "video.vsync", 1) && !has_vsync)
+                args[n++] = (char *)"-novsync";
+        }
+        args[n] = NULL;
+        return dgk_app_run(&desc, &g, n, args);
+    }
 }
