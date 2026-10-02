@@ -5,6 +5,20 @@ Pentium II 266 with a Matrox G200, an ISA Sound Blaster 16 or AWE, a
 gameport joystick), then the G400 and the G450. Run from the release ZIP
 (`make release`), unpacked alone in a directory.
 
+## Before the bench: the G200's edge registers
+
+On devserver's G200eR2 (2026-10-02, MGA-Glide `docs/loop-c-results.md`) the
+G200's edge registers (AR0-AR6, 18 bits) overflow for triangles more than
+about 768 rows tall: they draw short. 86Box keeps 32 bits, so Loop A cannot
+show it. Fifth Wheel has such triangles: the HUD's full-height panels (the
+pause menu's dimming, the reversing camera's frame, the showroom's sky) at
+1024x768 and 1280x1024, and, at any size, ground near the camera that
+reaches far off the screen (DOS-GL clips only at its 2,000-pixel guard
+band; the depots' aprons are single 96 x 70 m quads). The fix belongs in
+the HAL's triangle setup (the triangle-path work is on it); check the G200
+again once it lands, before trusting pictures or timings there. The G400's
+registers are 22 bits, so it should be clear of this at these sizes.
+
 ## Speed (DOSBench, `tools/run.py games --tests FW1,FW1L,FW1H,FWP`)
 
 - [ ] `FW1L` (LOW) averages 30 fps or more with p99 at or under 45 ms on
