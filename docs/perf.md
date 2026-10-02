@@ -94,3 +94,44 @@ inside the working Low budget (about 2,700) already. If the bench says LOW
 must cost less, the lever is in the pack: each chunk's decoration (trees,
 hedges, props) last in its triangle list, so LOW can draw it only near the
 rig.
+
+## The CPU's share (Part C2, 2026-10-02)
+
+DOS-GL built with its stage timers (`make PROF=1` in DOSGL; `DGL_STATS=2`)
+and the tour (`-fixed -novsync -nosound -autopilot -frames 1500`) on the
+emulated G200 (a Pentium II), summed with the HAL's `tools/perf/profsum.py`.
+The cycles are the emulated CPU's, so this is a model, not a measurement:
+
+| Stage | Cycles a triangle (LOW; MEDIUM the same within 2%) |
+|---|---|
+| the game (`app`: simulation, HUD, everything outside GL) | 138 |
+| transform (`xform`) | 1,737 |
+| projection, clipping, validation | 1,487 |
+| set-up (DOS-GL's, and the HAL's plane, increments, trapezoid) | 1,886 |
+| the swap, less its waits | 178 |
+| **DOS-GL without waits** | **5,289** |
+
+13 register writes a triangle. On devserver's G200eR2 a register write took
+212 ns (MGA-Glide `docs/loop-c-results.md`); if none overlapped the CPU
+that would add up to about 730 cycles at 266 MHz.
+
+**Estimate for a Pentium II 266 with a G200:** 5,400 to 6,150 cycles a
+triangle, about 43,000 to 49,000 triangles a second, CPU-bound (the chip
+needs 3-4 us for a small triangle on the G200eR2; the CPU about 20). FW1 at
+LOW (1,207 triangles a frame on average, 1,532 at most, in the first 1,500
+frames) would then run at about 36-41 fps on average and 28-32 fps in its
+heaviest frames: the 30 fps line is met on average and is close at the
+peaks. Not yet cross-checked (C2's callgrind count) and 86Box's Pentium II
+timing is approximate, so the bench still decides.
+
+**Where the cycles go, and the levers:**
+- Transform is a third. Every world quad has its own four vertices (each
+  face lit flat: the faceted look), so each triangle transforms two; the
+  64-slot cache (`vertex.c`) finds nothing to share between quads. Terrain
+  with shared vertices (about 0.6 transforms a triangle) would save about
+  1,100 cycles on its triangles, but shades the ground smoothly: a change
+  of look, to decide.
+- DOS-GL's array path (fetching `GL_SHORT` positions and `GL_UNSIGNED_BYTE`
+  colours) is the triangle-path work's next target; it gains every game.
+- LOW's numbers in `BUDGET.CFG` (the far plane above all) are the lever
+  that needs no build.
