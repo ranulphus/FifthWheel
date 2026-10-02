@@ -262,9 +262,28 @@ const char *plat_describe(void)
     return describe;
 }
 
+/* The screen sizes on offer. On DOS, DOS-GL's own list, those with room
+ * for a Z buffer and a back buffer: SDL's also has the VESA modes only its
+ * software renderer can use (640x400, say), and an OpenGL window asked for
+ * one of those gets another size. */
 int plat_modes(int (*wh)[2], int max)
 {
     int n = 0, i, j, count = 0;
+#ifdef DGK_DOS
+    DGLMode modes[32];
+    count = dglEnumModes(modes, (int)DGK_ARRAY_LEN(modes));
+    for (i = 0; i < count && n < max; i++) {
+        if (modes[i].max_depth_bits < 16 || !modes[i].can_double_buffer)
+            continue;                                /* the game needs both: not in this VRAM */
+        for (j = 0; j < n && !(wh[j][0] == modes[i].width && wh[j][1] == modes[i].height); j++)
+            continue;
+        if (j == n) {
+            wh[n][0] = modes[i].width;
+            wh[n][1] = modes[i].height;
+            n++;
+        }
+    }
+#else
     SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(SDL_GetPrimaryDisplay(), &count);
     for (i = 0; modes && i < count && n < max; i++) {
         for (j = 0; j < n && !(wh[j][0] == modes[i]->w && wh[j][1] == modes[i]->h); j++)
@@ -276,6 +295,7 @@ int plat_modes(int (*wh)[2], int max)
         }
     }
     SDL_free(modes);
+#endif
     for (i = 1; i < n; i++)                          /* smallest first */
         for (j = i; j > 0 && wh[j][0] * wh[j][1] < wh[j - 1][0] * wh[j - 1][1]; j--) {
             int t0 = wh[j][0], t1 = wh[j][1];

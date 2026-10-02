@@ -41,6 +41,7 @@ typedef struct game {
     const char *budget_path;
     menu men;                       /* the title, pause and options screens */
     int title_wanted;               /* -title (tests: the title even with -test) */
+    uint32_t crash_at;              /* FW_CRASH=N: a deliberate fault at tick N */
     int zoom_wanted;                /* -zoom N (-1: normal) */
     int hits_seen, fxtest;          /* bumps already shaken; -fxtest */
     const char *career_path;        /* -career FILE, FW_CAREER, or the default */

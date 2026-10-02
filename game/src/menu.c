@@ -34,6 +34,12 @@ void menu_start(game *g, int title)
     char want[16];
     const char *m = dgk_cfg_get(&g->cfg, "video.mode");
     g->men.nmodes = dgk_app_modes(g->men.modes, MENU_MODES);
+    {
+        char list[MENU_MODES * 10 + 1] = "";
+        for (i = 0; i < g->men.nmodes; i++)
+            snprintf(list + strlen(list), sizeof list - strlen(list), " %dx%d", g->men.modes[i][0], g->men.modes[i][1]);
+        dgk_log("FW-MODES%s", list);
+    }
     snprintf(want, sizeof want, "%dx%d", dgk_app.width, dgk_app.height);
     for (i = 0; i < g->men.nmodes; i++) {           /* the size in the file, else the one in use */
         char s[16];

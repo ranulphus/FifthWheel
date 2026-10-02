@@ -1,0 +1,22 @@
+THE LIBRARIES IN FWHEEL.EXE, AND CWSDPMI
+=========================================
+
+FWHEEL.EXE contains code from the libraries below; their notices follow.
+
+* DOS-GL: OpenGL 1.1 for Matrox cards under DOS (MIT licence).
+  https://github.com/ranulphus/DOSGL
+* The MGA-Glide HAL: DOS-GL's driver for the Matrox chips (MIT licence).
+  https://github.com/ranulphus/MGA-Glide
+* SDL 3 (zlib licence), with DOS-GL's patches for DOS (OpenGL through
+  DOS-GL, and fixes to the DOS port; in DOS-GL's tools/sdl/patches).
+  https://libsdl.org
+* DJGPP's C library and GCC's run-time library: FWHEEL.EXE is built with
+  DJGPP (GCC 12.2). DJGPP is copyright DJ Delorie and others; its terms
+  (copying.dj) and sources are at http://www.delorie.com/djgpp/
+
+CWSDPMI.EXE is CWSDPMI release 7 by Charles W. Sandmann, distributed
+unmodified. You have the right to receive its source code and binary
+updates: they are at http://www.delorie.com/pub/djgpp/current/v2misc/
+(csdpmi7s.zip for the source, csdpmi7b.zip for the binaries). See
+CWSDPMI.DOC.
+

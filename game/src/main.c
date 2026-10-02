@@ -11,6 +11,7 @@
  *   FWHEEL -calibrate                    the joystick's calibration screen, saved, then quit
  *          [-joylog]                     the joystick's axes and mapped controls every 0.5 s (FW-JOY)
  *          [-career FILE] [-money N]     keep a career in FILE in a test run; start it with $N
+ * FW_CRASH=N faults (#UD) at tick N: the crash test.
  * Settings: FWHEEL.CFG beside the game (fwheel.cfg on Linux; FW_CFG overrides). The career:
  * CAREER.DAT (career.dat; FW_CAREER), kept when playing (not in tests, replays or recordings).
  *   FWHEEL -autopilot [-laps N]          round the world's tour with a trailer
@@ -393,6 +394,14 @@ static void tick(void *u)
         pose(g, (int)dgk_app.ticks);
         return;
     }
+    if (g->crash_at && dgk_app.ticks == g->crash_at) {   /* FW_CRASH=N: a fault at tick N (the crash test) */
+        dgk_log("FW-CRASH at tick %lu", (unsigned long)dgk_app.ticks);
+#if defined(__i386__) || defined(__x86_64__)
+        __asm__ volatile("ud2");
+#else
+        abort();
+#endif
+    }
     if (g->cal.step != CAL_OFF) {
         calibration(g);
         return;
@@ -696,6 +705,8 @@ int main(int argc, char **argv)
 #else
         g.career_path = "career.dat";
 #endif
+    if (getenv("FW_CRASH"))
+        g.crash_at = (uint32_t)DGK_MAX(atoi(getenv("FW_CRASH")), 1);
     g.cfg_path = getenv("FW_CFG");
     if (!g.cfg_path)
 #ifdef DGK_DOS

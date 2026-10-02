@@ -6,7 +6,8 @@
 #   make loopa [CARD=g450] [ARGS="-frames 60"]   run FWHEEL.EXE in 86Box: out/loopa-CARD/
 #   make shots [CARD=g450]   the same frames from DOS (Loop A) and OSMesa, compared (tools/shots.sh)
 #   make suite [CARD=g450] [CHECKS="sb16 sbpro"]   Loop A suites (tools/suite.sh)
-#   make tests-host     unit tests on the host: governor, presets, settings, saves, the shop
+#   make tests-host     unit tests on the host (governor, presets, settings, saves, the shop) and glcheck
+#   make release        dist/fwheel-ID.zip: the game, CWSDPMI and the text files (tools/release.sh)
 #   make jobsweep       the job autopilot on every depot pair and bay, headless (tools/jobsweep.sh)
 #   make check-deps     DOSGL at or after deps.mk's pin
 include config.mk
@@ -27,7 +28,7 @@ WARN      := -std=gnu99 -Wall -Wextra -Werror
 # Every target compiles its GL against DOS-GL's own <GL/gl.h>: the subset is enforced.
 COMMON    := $(WARN) -O2 -ffp-contract=off -Ikit/include -Ikit/src
 
-.PHONY: all dos linux headless loopa shots suite tests-host jobsweep check-deps deps clean help
+.PHONY: all dos linux headless loopa shots suite tests-host glcheck release jobsweep check-deps deps clean help
 all: dos
 
 check-deps:
@@ -137,14 +138,23 @@ build/tests/test_host: game/tests/test_host.c game/src/career.c game/src/detail.
 	$(Q)echo "  CC      $@"
 	$(Q)$(CC) $(TOOL_CFLAGS) -o $@ game/tests/test_host.c game/src/career.c game/src/detail.c kit/src/cfg.c \
 	  kit/src/save.c kit/src/base.c kit/src/log.c -lm
-tests-host: build/tests/test_host
+tests-host: build/tests/test_host glcheck
 	$(Q)mkdir -p out && build/tests/test_host
+
+# Every GL function the game and the kit call is one DOS-GL implements.
+glcheck:
+	$(Q)python3 tools/glcheck.py $(DOSGL)
+
+# The DOS release: dist/fwheel-ID.zip (tools/release.sh).
+CWSDPMI_ZIP ?= $(HOME)/.cache/mga-glide/dl/csdpmi7b.zip
+release: dos tests-host
+	$(Q)DOSGL=$(DOSGL) DJGPP_PREFIX=$(DJGPP_PREFIX) CWSDPMI_ZIP=$(CWSDPMI_ZIP) sh tools/release.sh
 
 jobsweep: headless
 	$(Q)$(DEV) sh tools/jobsweep.sh $(or $(PAR),8)
 
 clean:
-	rm -rf build out
+	rm -rf build out dist
 
 help:
-	@sed -n '3,12p' Makefile
+	@sed -n '3,13p' Makefile

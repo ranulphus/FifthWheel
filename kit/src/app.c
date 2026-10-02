@@ -7,6 +7,10 @@
 #include "dgk/test.h"
 #include "plat.h"
 #include <stdio.h>
+#include <unistd.h>
+#ifdef DGK_DOS
+#include <dpmi.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -24,6 +28,7 @@ static struct {
     struct { uint32_t frame; char name[16]; } shots[MAX_SHOTS];
 } opt;
 static uint64_t last_service_us, last_swap_us;
+static char *heap_base;                       /* sbrk(0) at the start: FW-MEM at the end */
 static uint64_t sum_tris, sum_draws;          /* over the frames drawn: FW-STAT at the end */
 static uint32_t max_tris, max_draws, counted;
 static int bench_on;
@@ -113,6 +118,31 @@ uint64_t dgk_now_us(void)
     return plat_now_us();
 }
 
+/* FW-MEM: how much the heap grew (all a DJGPP program's own memory comes
+ * through sbrk: the high-water mark), and on DOS what the DPMI host has
+ * left; Linux reports its peak resident size instead. */
+static void memory_report(void)
+{
+    unsigned long heap_kb = (unsigned long)(((char *)sbrk(0) - heap_base) / 1024);
+#ifdef DGK_DOS
+    __dpmi_free_mem_info info;
+    unsigned long free_kb = 0;
+    if (__dpmi_get_free_memory_information(&info) == 0 && info.total_number_of_free_pages != 0xFFFFFFFFul)
+        free_kb = info.total_number_of_free_pages * 4ul;
+    dgk_log("FW-MEM heap=%lu KB free=%lu KB", heap_kb, free_kb);
+#else
+    char line[128];
+    unsigned long hwm = 0;
+    FILE *f = fopen("/proc/self/status", "r");
+    while (f && fgets(line, sizeof line, f))
+        if (sscanf(line, "VmHWM: %lu", &hwm) == 1)
+            break;
+    if (f)
+        fclose(f);
+    dgk_log("FW-MEM heap=%lu KB peak-resident=%lu KB", heap_kb, hwm);
+#endif
+}
+
 static void events(void)
 {
     plat_event e;
@@ -157,6 +187,7 @@ int dgk_app_run(const dgk_app_desc *d, void *u, int argc, char **argv)
     uint64_t prev, acc = 0;
     int s, failed = 0;
 
+    heap_base = (char *)sbrk(0);
     parse(argc, argv);
     if (opt.test)
         dgk_test_begin(d->title, opt.noexit);
@@ -237,6 +268,7 @@ int dgk_app_run(const dgk_app_desc *d, void *u, int argc, char **argv)
         dgk_log("FW-STAT frames=%lu tris avg=%lu max=%lu draws avg=%lu max=%lu", (unsigned long)counted,
                 (unsigned long)(sum_tris / counted), (unsigned long)max_tris, (unsigned long)(sum_draws / counted),
                 (unsigned long)max_draws);
+    memory_report();
     dgk_log("FW-EXIT frames=%lu ticks=%lu", (unsigned long)dgk_app.frame, (unsigned long)dgk_app.ticks);
     if (opt.test) {
         int under, chunks;
