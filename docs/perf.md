@@ -129,8 +129,9 @@ timing is approximate, so the bench still decides.
   face lit flat: the faceted look), so each triangle transforms two; the
   64-slot cache (`vertex.c`) finds nothing to share between quads. Terrain
   with shared vertices (about 0.6 transforms a triangle) would save about
-  1,100 cycles on its triangles, but shades the ground smoothly: a change
-  of look, to decide.
+  1,100 cycles on its triangles but shade the ground smoothly. Decided
+  (2026-10-03): the faceted look stays; the visuals are plain enough
+  already for games of the era, so speed comes from the other levers.
 - DOS-GL's array path (fetching `GL_SHORT` positions and `GL_UNSIGNED_BYTE`
   colours) is the triangle-path work's next target; it gains every game.
 - LOW's numbers in `BUDGET.CFG` (the far plane above all) are the lever
