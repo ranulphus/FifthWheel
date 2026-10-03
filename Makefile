@@ -8,6 +8,7 @@
 #   make suite [CARD=g450] [CHECKS="sb16 sbpro"]   Loop A suites (tools/suite.sh)
 #   make tests-host     unit tests on the host (governor, presets, settings, saves, the shop) and glcheck
 #   make release        dist/fwheel-ID.zip: the game, CWSDPMI and the text files (tools/release.sh)
+#   make winvm [CARD=g450]   dist/fwheel-CARD-vm.zip: an 86Box machine with the release on it
 #   make jobsweep       the job autopilot on every depot pair and bay, headless (tools/jobsweep.sh)
 #   make check-deps     DOSGL at or after deps.mk's pin
 include config.mk
@@ -28,7 +29,7 @@ WARN      := -std=gnu99 -Wall -Wextra -Werror
 # Every target compiles its GL against DOS-GL's own <GL/gl.h>: the subset is enforced.
 COMMON    := $(WARN) -O2 -ffp-contract=off -Ikit/include -Ikit/src
 
-.PHONY: all dos linux headless loopa shots suite tests-host glcheck release jobsweep check-deps deps clean help
+.PHONY: all dos linux headless loopa shots suite tests-host glcheck release winvm jobsweep check-deps deps clean help
 all: dos
 
 check-deps:
@@ -147,6 +148,10 @@ glcheck:
 
 # The DOS release: dist/fwheel-ID.zip (tools/release.sh).
 CWSDPMI_ZIP ?= $(HOME)/.cache/mga-glide/dl/csdpmi7b.zip
+# A ready-to-boot 86Box machine with the release installed (tools/winvm.sh).
+winvm:
+	$(Q)MGAHAL=$(MGAHAL) tools/winvm.sh $(CARD)
+
 release: dos tests-host
 	$(Q)DOSGL=$(DOSGL) DJGPP_PREFIX=$(DJGPP_PREFIX) CWSDPMI_ZIP=$(CWSDPMI_ZIP) sh tools/release.sh
 
@@ -157,4 +162,4 @@ clean:
 	rm -rf build out dist
 
 help:
-	@sed -n '3,13p' Makefile
+	@sed -n '3,14p' Makefile
