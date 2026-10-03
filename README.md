@@ -49,6 +49,8 @@ make tests-host                   # unit tests (no screen) and the GL-subset che
 make suite CARD=g450              # Loop A: sound, joystick, shop, menus, exits and crashes, memory,
                                   # screen sizes, cards agreeing, the release ZIP
 make release                      # dist/fwheel-ID.zip: the game, CWSDPMI, README.TXT
+make winvm CARD=g450              # dist/fwheel-g450-vm.zip: a ready-to-boot 86Box machine with it installed
+                                  # (MGA-Glide's patched 86Box; type FW at the prompt)
 ```
 
 Playing starts at the title screen; Esc pauses. Keys: arrows or WASD to steer, accelerate and brake (hold the brake at a
