@@ -5,19 +5,19 @@ Pentium II 266 with a Matrox G200, an ISA Sound Blaster 16 or AWE, a
 gameport joystick), then the G400 and the G450. Run from the release ZIP
 (`make release`), unpacked alone in a directory.
 
-## Before the bench: the G200's edge registers
+## The G200's edge registers (fixed in DOS-GL 06def8b)
 
 On devserver's G200eR2 (2026-10-02, MGA-Glide `docs/loop-c-results.md`) the
-G200's edge registers (AR0-AR6, 18 bits) overflow for triangles more than
-about 768 rows tall: they draw short. 86Box keeps 32 bits, so Loop A cannot
-show it. Fifth Wheel has such triangles: the HUD's full-height panels (the
-pause menu's dimming, the reversing camera's frame, the showroom's sky) at
-1024x768 and 1280x1024, and, at any size, ground near the camera that
-reaches far off the screen (DOS-GL clips only at its 2,000-pixel guard
-band; the depots' aprons are single 96 x 70 m quads). The fix belongs in
-the HAL's triangle setup (the triangle-path work is on it); check the G200
-again once it lands, before trusting pictures or timings there. The G400's
-registers are 22 bits, so it should be clear of this at these sizes.
+G200's edge registers (AR0-AR6, 18 bits) overflowed for triangles more than
+about 768 rows tall, which drew short. Fifth Wheel has such triangles: the
+HUD's full-height panels at 1024x768 and 1280x1024, and ground near the
+camera that reaches far off the screen (DOS-GL clips only at its
+2,000-pixel guard band). The HAL now divides the edge terms' common factor
+of 16 out, so edges up to 8,191 pixels fit with the same pixels (MGA-Glide
+`d4c289a`, synced into DOS-GL `06def8b`, which `deps.mk` pins), and 86Box
+models the 18-bit fields on the G100 and G200 (MGA-Glide's patch 0012), so
+Loop A shows the overflow if it comes back. Bench with a build at or after
+that pin.
 
 ## Speed (DOSBench, `tools/run.py games --tests FW1,FW1L,FW1H,FWP`)
 

@@ -42,7 +42,7 @@
 #                 within 20 MB
 #   modes         every screen size the game offers (FW-MODES): a frame each,
 #                 compared with the headless build's at the same size
-#   release       dist/fwheel-*.zip (the newest; make release) unpacked alone in
+#   release       dist/fwheel-*.zip (the newest release, not a VM; make release) unpacked alone in
 #                 C:\FW and run from there with C:\HX (the harness's
 #                 CWSDPMI) off the PATH: the ZIP's own CWSDPMI starts it
 #   auto          the tour's state hashes (FW-HASH, 1,800 ticks): the same on
@@ -209,7 +209,7 @@ for c in $checks; do
     modes) modes ;;
     auto) auto ;;
     release)
-        z=$(ls -t dist/fwheel-*.zip 2>/dev/null | head -1)
+        z=$(ls -t dist/fwheel-*.zip 2>/dev/null | grep -v -- '-vm\.zip$' | head -1)   # not make winvm's
         [ -n "$z" ] || { bad release "(no dist/fwheel-*.zip: make release)"; continue; }
         rm -rf "$out/release-files"; mkdir -p "$out/release-files"
         unzip -q "$z" -d "$out/release-files"
