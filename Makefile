@@ -10,7 +10,8 @@
 #   make release        dist/fwheel-ID.zip: the game, CWSDPMI and the text files (tools/release.sh)
 #   make winvm [CARD=g450]   dist/fwheel-CARD-vm.zip: an 86Box machine with the release on it
 #   make jobsweep       the job autopilot on every depot pair and bay, headless (tools/jobsweep.sh)
-#   make check-deps     DOSGL at or after deps.mk's pin
+#   make check-deps     DOSGL at or after deps.mk's pin (every build checks; says if DOSGL moved past it)
+#   make regress [CARD=g450]   the quick regression set for a new DOSGL; then make pin
 include config.mk
 -include config.local.mk
 include deps.mk
@@ -29,12 +30,28 @@ WARN      := -std=gnu99 -Wall -Wextra -Werror
 # Every target compiles its GL against DOS-GL's own <GL/gl.h>: the subset is enforced.
 COMMON    := $(WARN) -O2 -ffp-contract=off -Ikit/include -Ikit/src
 
-.PHONY: all dos linux headless loopa shots suite tests-host glcheck release winvm jobsweep check-deps deps clean help
+.PHONY: all dos linux headless loopa shots suite tests-host glcheck release winvm jobsweep check-deps regress pin deps clean help
 all: dos
 
 check-deps:
 	@git -C "$(DOSGL)" merge-base --is-ancestor "$(DOSGL_PIN)" HEAD 2>/dev/null \
 	  || { echo "$(DOSGL) is not at or after $(DOSGL_PIN) (deps.mk)"; exit 1; }
+	@n=$$(git -C "$(DOSGL)" rev-list --count "$(DOSGL_PIN)..HEAD"); [ "$$n" = 0 ] \
+	  || echo "check-deps: $(DOSGL) is $$n commit(s) past the pin: make regress, then make pin"
+
+# The quick regression set for a new DOSGL: unit tests, every job headless,
+# DOS against Mesa, and the suite's sound, exit, crash, screen-size and
+# agreement checks on one card. The full `make suite` on g200, g400 and
+# g450 before a release.
+regress: tests-host jobsweep shots
+	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) tools/suite.sh $(CARD) sb16 exit crash modes auto
+
+# Move the pin to DOSGL's current commit (after `make regress` passed on it).
+pin:
+	@[ -z "$$(git -C "$(DOSGL)" status --porcelain --untracked-files=no)" ] \
+	  || { echo "pin: $(DOSGL) has uncommitted changes"; exit 1; }
+	$(Q)sed -i "s/^DOSGL_PIN := .*/DOSGL_PIN := $$(git -C "$(DOSGL)" rev-parse HEAD)/" deps.mk
+	$(Q)echo "pin: DOSGL $$(git -C "$(DOSGL)" log --oneline -1)"
 
 build/gen/font_gen.c: data/font5x7.txt kit/tools/fontbake.py
 	@mkdir -p $(dir $@)
@@ -85,7 +102,7 @@ build/dos/FWHEEL.EXE: build/data/WORLD.PAK $(KIT_SRCS) kit/src/plat_sdl.c $(GAME
 	$(Q)$(DJCC) $(DOS_CFLAGS) -o $@ $(KIT_SRCS) kit/src/plat_sdl.c $(GAME_SRCS) $(GEN_SRCS) \
 	  $(MGAHAL)/tests/shim/hx.c $(DOS_LIBS)
 	@if [ -e "$(@:.EXE=.exe)" ] && ! [ "$(@:.EXE=.exe)" -ef "$@" ]; then rm -f "$(@:.EXE=.exe)"; fi
-dos: build/dos/FWHEEL.EXE build/data/WORLD.PAK build/data/YARD.PAK build/data/budget.cfg
+dos: check-deps build/dos/FWHEEL.EXE build/data/WORLD.PAK build/data/YARD.PAK build/data/budget.cfg
 
 # ---- Linux and headless: built in the dev container ------------------------
 # The container sees this repository, not DOSGL: stage what it needs first.
@@ -112,9 +129,9 @@ build/headless/fwheel-hl: build/data/WORLD.PAK $(KIT_SRCS) kit/src/plat_headless
 	$(Q)echo "  CC      $@"
 	$(Q)$(HOST_CC) $(HOST_CFLAGS) -o $@ $(KIT_SRCS) kit/src/plat_headless.c $(GAME_SRCS) $(GEN_SRCS) \
 	  -lOSMesa -lm
-linux: build/deps/stamp $(GEN_SRCS) build/data/WORLD.PAK
+linux: check-deps build/deps/stamp $(GEN_SRCS) build/data/WORLD.PAK
 	$(Q)$(DEV) $(MAKE) -s IN_DEV=1 build/linux/fwheel
-headless: build/deps/stamp $(GEN_SRCS) build/data/WORLD.PAK
+headless: check-deps build/deps/stamp $(GEN_SRCS) build/data/WORLD.PAK
 	$(Q)$(DEV) $(MAKE) -s IN_DEV=1 build/headless/fwheel-hl
 
 # ---- Loop A ----------------------------------------------------------------
@@ -162,4 +179,4 @@ clean:
 	rm -rf build out dist
 
 help:
-	@sed -n '3,14p' Makefile
+	@sed -n '3,15p' Makefile

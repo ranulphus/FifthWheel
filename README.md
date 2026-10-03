@@ -35,9 +35,11 @@ and DOSBench times it (FW1, FWP).
 
 ## Building
 
-Needs a DOSGL checkout with SDL3 built (`make sdl sdl-host` there; its path in
-`config.mk` or `config.local.mk`) and the DJGPP kit (`make setup-djgpp` in
-DOSGL).
+Needs DOSGL in `~/DOSGL` (`config.mk`; `config.local.mk` overrides it) with
+SDL3 built (`make sdl sdl-host` there), and the DJGPP kit (`make setup-djgpp`
+in DOSGL). `deps.mk` pins DOSGL's latest tested commit: every build refuses
+an older DOSGL and says when DOSGL has moved past the pin; then
+`make regress` and `make pin`.
 
 ```
 make dos          # build/dos/FWHEEL.EXE (ship CWSDPMI.EXE beside it)
