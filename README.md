@@ -11,8 +11,8 @@ It runs on [DOS-GL](https://github.com/ranulphus/DOSGL) (OpenGL 1.1 on
 Matrox cards under DJGPP) through SDL3, and was the first game on **dgk**,
 the DOS-GL Kit: the game-agnostic layer (main loop, platform, drawing within
 DOS-GL's subset, text, mixer, test hooks). dgk grew here as `kit/` and now
-has its own repository, `~/dgk`, which a second game (Echoes of the Void)
-uses too.
+has its own repository, [dgk](https://github.com/ranulphus/dgk) (in `~/dgk`),
+which a second game (Echoes of the Void) uses too.
 
 Minimum machine: Pentium II 266, Matrox G200, Sound Blaster 16 (or none),
 640x480. Faster machines and the G400/G450 get more detail.
