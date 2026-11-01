@@ -1,5 +1,6 @@
-# Fifth Wheel's pixel font: 5x7 glyphs, '#' ink, '.' paper. tools/fwfont.py
-# bakes it (plus a 1-pixel outline and a drop shadow) into kit/src/font_gen.c.
+# Fifth Wheel's pixel font: 5x7 glyphs, '#' ink, '.' paper. dgk's
+# tools/fontbake.py bakes it (plus a 1-pixel outline and a drop shadow) into
+# build/gen/font_gen.c.
 # Lower case letters are drawn with the capitals. Each glyph: a line
 # "char X" (X the character, or "space"), then 7 rows.
 char space

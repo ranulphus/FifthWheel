@@ -1,4 +1,4 @@
-# Fifth Wheel ("Juggernaut 3D for DOS-GL") and the dgk kit.
+# Fifth Wheel ("Juggernaut 3D for DOS-GL"), on the dgk kit (~/dgk, deps.mk's pin).
 #
 #   make dos            build/dos/FWHEEL.EXE (DJGPP, DOS-GL, DOSGL's SDL3)
 #   make linux          build/linux/fwheel (SDL3, desktop OpenGL; built in the dev container)
@@ -10,64 +10,67 @@
 #   make release        dist/fwheel-ID.zip: the game, CWSDPMI and the text files (tools/release.sh)
 #   make winvm [CARD=g450]   dist/fwheel-CARD-vm.zip: an 86Box machine with the release on it
 #   make jobsweep       the job autopilot on every depot pair and bay, headless (tools/jobsweep.sh)
-#   make check-deps     DOSGL at or after deps.mk's pin (every build checks; says if DOSGL moved past it)
-#   make regress [CARD=g450]   the quick regression set for a new DOSGL; then make pin
+#   make check-deps     DOSGL and dgk at or after deps.mk's pins (every build checks; says if one moved past)
+#   make regress [CARD=g450]   the quick regression set for a new DOSGL or dgk; then make pin
 include config.mk
 -include config.local.mk
 include deps.mk
+include $(DGK)/dgk.mk
 
 MGAHAL   := $(DOSGL)/third_party/mgahal
 DEV      := $(MGAHAL)/tools/dev
 BUILD_ID := $(shell git describe --always --dirty 2>/dev/null || echo unknown)
 Q ?= @
 
-KIT_SRCS  := kit/src/base.c kit/src/cfg.c kit/src/log.c kit/src/app.c kit/src/gfx.c kit/src/text.c kit/src/mix.c kit/src/test.c \
-             kit/src/pak.c kit/src/replay.c kit/src/bench.c kit/src/save.c
+KIT_SRCS  := $(DGK_SRCS)
 GAME_SRCS := $(wildcard game/src/*.c)
 GEN_SRCS  := build/gen/font_gen.c
-HDRS      := $(wildcard kit/include/dgk/*.h kit/src/*.h game/src/*.h)
+HDRS      := $(DGK_HDRS) $(wildcard game/src/*.h)
 WARN      := -std=gnu99 -Wall -Wextra -Werror
 # Every target compiles its GL against DOS-GL's own <GL/gl.h>: the subset is enforced.
-COMMON    := $(WARN) -O2 -ffp-contract=off -Ikit/include -Ikit/src
+COMMON    := $(WARN) -O2 -ffp-contract=off $(DGK_CFLAGS)
 
 .PHONY: all dos linux headless loopa shots suite tests-host glcheck release winvm jobsweep check-deps regress pin deps clean help
 all: dos
 
 check-deps:
-	@git -C "$(DOSGL)" merge-base --is-ancestor "$(DOSGL_PIN)" HEAD 2>/dev/null \
-	  || { echo "$(DOSGL) is not at or after $(DOSGL_PIN) (deps.mk)"; exit 1; }
-	@n=$$(git -C "$(DOSGL)" rev-list --count "$(DOSGL_PIN)..HEAD"); [ "$$n" = 0 ] \
-	  || echo "check-deps: $(DOSGL) is $$n commit(s) past the pin: make regress, then make pin"
+	@for d in "$(DOSGL):$(DOSGL_PIN)" "$(DGK):$(DGK_PIN)"; do dir=$${d%%:*}; pin=$${d##*:}; \
+	  git -C "$$dir" merge-base --is-ancestor "$$pin" HEAD 2>/dev/null \
+	    || { echo "$$dir is not at or after $$pin (deps.mk)"; exit 1; }; \
+	  n=$$(git -C "$$dir" rev-list --count "$$pin..HEAD"); [ "$$n" = 0 ] \
+	    || echo "check-deps: $$dir is $$n commit(s) past the pin: make regress, then make pin"; done
 
-# The quick regression set for a new DOSGL: unit tests, every job headless,
+# The quick regression set for a new DOSGL or dgk: unit tests, every job headless,
 # DOS against Mesa, and the suite's sound, exit, crash, screen-size and
 # agreement checks on one card. The full `make suite` on g200, g400 and
 # g450 before a release.
 regress: tests-host jobsweep shots
 	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) tools/suite.sh $(CARD) sb16 exit crash modes auto
 
-# Move the pin to DOSGL's current commit (after `make regress` passed on it).
+# Move both pins to DOSGL's and dgk's current commits (after `make regress` passed on them).
 pin:
-	@[ -z "$$(git -C "$(DOSGL)" status --porcelain --untracked-files=no)" ] \
-	  || { echo "pin: $(DOSGL) has uncommitted changes"; exit 1; }
+	@for d in $(DOSGL) $(DGK); do [ -z "$$(git -C "$$d" status --porcelain --untracked-files=no)" ] \
+	  || { echo "pin: $$d has uncommitted changes"; exit 1; }; done
 	$(Q)sed -i "s/^DOSGL_PIN := .*/DOSGL_PIN := $$(git -C "$(DOSGL)" rev-parse HEAD)/" deps.mk
+	$(Q)sed -i "s/^DGK_PIN   := .*/DGK_PIN   := $$(git -C "$(DGK)" rev-parse HEAD)/" deps.mk
 	$(Q)echo "pin: DOSGL $$(git -C "$(DOSGL)" log --oneline -1)"
+	$(Q)echo "pin: dgk $$(git -C "$(DGK)" log --oneline -1)"
 
-build/gen/font_gen.c: data/font5x7.txt kit/tools/fontbake.py
+build/gen/font_gen.c: data/font5x7.txt $(DGK_FONTBAKE)
 	@mkdir -p $(dir $@)
-	$(Q)python3 kit/tools/fontbake.py $< $@ fw_font
+	$(Q)python3 $(DGK_FONTBAKE) $< $@ fw_font
 
 # ---- Data: packs made by host tools (the same files on every target) ------
-TOOL_CFLAGS := $(WARN) -O2 -ffp-contract=off -Ikit/include -Ikit/tools -Igame/src
-build/tools/fwyard: tools/fwyard.c game/src/mesh.c kit/tools/pakw.c kit/src/base.c $(HDRS) kit/tools/pakw.h
+TOOL_CFLAGS := $(WARN) -O2 -ffp-contract=off $(DGK_CFLAGS) -I$(DGK)/tools -Igame/src
+build/tools/fwyard: tools/fwyard.c game/src/mesh.c $(DGK_PAKW) $(DGK)/src/base.c $(HDRS) $(DGK)/tools/pakw.h
 	@mkdir -p $(dir $@)
-	$(Q)$(HOST_CC) $(TOOL_CFLAGS) -o $@ tools/fwyard.c game/src/mesh.c kit/tools/pakw.c kit/src/base.c -lm
+	$(Q)$(HOST_CC) $(TOOL_CFLAGS) -o $@ tools/fwyard.c game/src/mesh.c $(DGK_PAKW) $(DGK)/src/base.c -lm
 build/data/YARD.PAK: build/tools/fwyard
 	@mkdir -p $(dir $@)
 	$(Q)build/tools/fwyard $@
-build/tools/fwgen: tools/fwgen.c game/src/mesh.c kit/tools/pakw.c kit/src/base.c game/src/wgen.h $(HDRS) kit/tools/pakw.h
+build/tools/fwgen: tools/fwgen.c game/src/mesh.c $(DGK_PAKW) $(DGK)/src/base.c game/src/wgen.h $(HDRS) $(DGK)/tools/pakw.h
 	@mkdir -p $(dir $@)
-	$(Q)$(HOST_CC) $(TOOL_CFLAGS) -o $@ tools/fwgen.c game/src/mesh.c kit/tools/pakw.c kit/src/base.c -lm
+	$(Q)$(HOST_CC) $(TOOL_CFLAGS) -o $@ tools/fwgen.c game/src/mesh.c $(DGK_PAKW) $(DGK)/src/base.c -lm
 WORLD_SEED ?= 1
 build/data/WORLD.PAK: build/tools/fwgen
 	@mkdir -p $(dir $@)
@@ -81,8 +84,8 @@ build/data/budget.cfg: data/budget.cfg
 data-check:
 	$(Q)mkdir -p build/check
 	$(Q)$(HOST_CC) $(filter-out -O2,$(TOOL_CFLAGS)) -O0 -o build/check/fwgen-O0 tools/fwgen.c game/src/mesh.c \
-	  kit/tools/pakw.c kit/src/base.c -lm
-	$(Q)$(HOST_CC) $(TOOL_CFLAGS) -o build/check/fwgen-O2 tools/fwgen.c game/src/mesh.c kit/tools/pakw.c kit/src/base.c -lm
+	  $(DGK_PAKW) $(DGK)/src/base.c -lm
+	$(Q)$(HOST_CC) $(TOOL_CFLAGS) -o build/check/fwgen-O2 tools/fwgen.c game/src/mesh.c $(DGK_PAKW) $(DGK)/src/base.c -lm
 	$(Q)for o in O0 O2; do build/check/fwgen-$$o 1 build/check/w-$$o.pak | sed -n 's/.*hash //p' > build/check/$$o.sha; done
 	$(Q)cmp -s build/check/O0.sha build/check/O2.sha || { echo "data-check: -O0 and -O2 differ"; exit 1; }
 	$(Q)cmp -s build/check/O2.sha data/golden/world.sha \
@@ -95,17 +98,18 @@ DJCC := env LD_LIBRARY_PATH=$(DJGPP_PREFIX)/hostlib $(DJGPP_PREFIX)/bin/i586-pc-
 DOS_CFLAGS := $(COMMON) -march=i586 -fexcess-precision=standard -I$(DOSGL)/include \
               -I$(DOSGL)/build/sdl/dos/include -I$(MGAHAL)/tests/shim -I$(MGAHAL)/hal/include -DHX_BUILD_ID='"$(BUILD_ID)"'
 DOS_LIBS := $(DOSGL)/build/sdl/dos/lib/libSDL3.a $(DOSGL)/build/lib/libGL.a -lm
-build/dos/FWHEEL.EXE: build/data/WORLD.PAK $(KIT_SRCS) kit/src/plat_sdl.c $(GAME_SRCS) $(GEN_SRCS) $(HDRS) $(MGAHAL)/tests/shim/hx.c \
+build/dos/FWHEEL.EXE: build/data/WORLD.PAK $(KIT_SRCS) $(DGK_SDL) $(GAME_SRCS) $(GEN_SRCS) $(HDRS) $(MGAHAL)/tests/shim/hx.c \
                       $(DOSGL)/build/sdl/dos/lib/libSDL3.a $(DOSGL)/build/lib/libGL.a
 	@mkdir -p $(dir $@)
 	$(Q)echo "  DJLD    $@"
-	$(Q)$(DJCC) $(DOS_CFLAGS) -o $@ $(KIT_SRCS) kit/src/plat_sdl.c $(GAME_SRCS) $(GEN_SRCS) \
+	$(Q)$(DJCC) $(DOS_CFLAGS) -o $@ $(KIT_SRCS) $(DGK_SDL) $(GAME_SRCS) $(GEN_SRCS) \
 	  $(MGAHAL)/tests/shim/hx.c $(DOS_LIBS)
 	@if [ -e "$(@:.EXE=.exe)" ] && ! [ "$(@:.EXE=.exe)" -ef "$@" ]; then rm -f "$(@:.EXE=.exe)"; fi
 dos: check-deps build/dos/FWHEEL.EXE build/data/WORLD.PAK build/data/YARD.PAK build/data/budget.cfg
 
 # ---- Linux and headless: built in the dev container ------------------------
-# The container sees this repository, not DOSGL: stage what it needs first.
+# The container sees this repository and (MGA_EXTRA_DIR) dgk, not DOSGL:
+# stage what it needs from DOSGL first.
 ifdef IN_DEV
 build/deps/stamp: ;                     # staged outside, where DOSGL is visible
 else
@@ -119,20 +123,20 @@ endif
 deps: build/deps/stamp
 
 HOST_CFLAGS := $(COMMON) -g -Ibuild/deps/include
-build/linux/fwheel: build/data/WORLD.PAK $(KIT_SRCS) kit/src/plat_sdl.c $(GAME_SRCS) $(GEN_SRCS) $(HDRS) build/deps/stamp
+build/linux/fwheel: build/data/WORLD.PAK $(KIT_SRCS) $(DGK_SDL) $(GAME_SRCS) $(GEN_SRCS) $(HDRS) build/deps/stamp
 	@mkdir -p $(dir $@)
 	$(Q)echo "  CC      $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) -o $@ $(KIT_SRCS) kit/src/plat_sdl.c $(GAME_SRCS) $(GEN_SRCS) \
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) -o $@ $(KIT_SRCS) $(DGK_SDL) $(GAME_SRCS) $(GEN_SRCS) \
 	  build/deps/lib/libSDL3.a -lGL -lm -ldl -lpthread
-build/headless/fwheel-hl: build/data/WORLD.PAK $(KIT_SRCS) kit/src/plat_headless.c $(GAME_SRCS) $(GEN_SRCS) $(HDRS) build/deps/stamp
+build/headless/fwheel-hl: build/data/WORLD.PAK $(KIT_SRCS) $(DGK_HEADLESS) $(GAME_SRCS) $(GEN_SRCS) $(HDRS) build/deps/stamp
 	@mkdir -p $(dir $@)
 	$(Q)echo "  CC      $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) -o $@ $(KIT_SRCS) kit/src/plat_headless.c $(GAME_SRCS) $(GEN_SRCS) \
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) -o $@ $(KIT_SRCS) $(DGK_HEADLESS) $(GAME_SRCS) $(GEN_SRCS) \
 	  -lOSMesa -lm
 linux: check-deps build/deps/stamp $(GEN_SRCS) build/data/WORLD.PAK
-	$(Q)$(DEV) $(MAKE) -s IN_DEV=1 build/linux/fwheel
+	$(Q)MGA_EXTRA_DIR=$(DGK) $(DEV) $(MAKE) -s IN_DEV=1 DGK=$(DGK) build/linux/fwheel
 headless: check-deps build/deps/stamp $(GEN_SRCS) build/data/WORLD.PAK
-	$(Q)$(DEV) $(MAKE) -s IN_DEV=1 build/headless/fwheel-hl
+	$(Q)MGA_EXTRA_DIR=$(DGK) $(DEV) $(MAKE) -s IN_DEV=1 DGK=$(DGK) build/headless/fwheel-hl
 
 # ---- Loop A ----------------------------------------------------------------
 CARD ?= g450
@@ -150,18 +154,18 @@ suite: dos
 	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) tools/suite.sh $(CARD) $(CHECKS)
 
 # Unit tests that need no screen: the host's compiler, the kit's and the game's pure parts.
-build/tests/test_host: game/tests/test_host.c game/src/career.c game/src/detail.c kit/src/cfg.c kit/src/save.c \
-                       kit/src/base.c kit/src/log.c $(HDRS)
+build/tests/test_host: game/tests/test_host.c game/src/career.c game/src/detail.c $(DGK)/src/cfg.c $(DGK)/src/save.c \
+                       $(DGK)/src/base.c $(DGK)/src/log.c $(HDRS)
 	@mkdir -p $(dir $@)
 	$(Q)echo "  CC      $@"
-	$(Q)$(CC) $(TOOL_CFLAGS) -o $@ game/tests/test_host.c game/src/career.c game/src/detail.c kit/src/cfg.c \
-	  kit/src/save.c kit/src/base.c kit/src/log.c -lm
+	$(Q)$(CC) $(TOOL_CFLAGS) -o $@ game/tests/test_host.c game/src/career.c game/src/detail.c $(DGK)/src/cfg.c \
+	  $(DGK)/src/save.c $(DGK)/src/base.c $(DGK)/src/log.c -lm
 tests-host: build/tests/test_host glcheck
 	$(Q)mkdir -p out && build/tests/test_host
 
 # Every GL function the game and the kit call is one DOS-GL implements.
 glcheck:
-	$(Q)python3 tools/glcheck.py $(DOSGL)
+	$(Q)python3 $(DGK)/tools/glcheck.py $(DOSGL) $(wildcard game/src/*.c) $(wildcard $(DGK)/src/*.c)
 
 # The DOS release: dist/fwheel-ID.zip (tools/release.sh).
 CWSDPMI_ZIP ?= $(HOME)/.cache/mga-glide/dl/csdpmi7b.zip

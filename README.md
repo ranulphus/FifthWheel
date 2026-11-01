@@ -8,10 +8,11 @@ look is light-hearted rather than realistic: Transport Tycoon's toy world,
 Ignition's chunky vehicles, Fortnite's colour and bounce.
 
 It runs on [DOS-GL](https://github.com/ranulphus/DOSGL) (OpenGL 1.1 on
-Matrox cards under DJGPP) through SDL3, and is the example game for **dgk**,
-the DOS-GL Kit: the game-agnostic layer in `kit/` (main loop, platform,
-drawing within DOS-GL's subset, text, mixer, test hooks), which will become
-its own repository once a second game uses it.
+Matrox cards under DJGPP) through SDL3, and was the first game on **dgk**,
+the DOS-GL Kit: the game-agnostic layer (main loop, platform, drawing within
+DOS-GL's subset, text, mixer, test hooks). dgk grew here as `kit/` and now
+has its own repository, `~/dgk`, which a second game (Echoes of the Void)
+uses too.
 
 Minimum machine: Pentium II 266, Matrox G200, Sound Blaster 16 (or none),
 640x480. Faster machines and the G400/G450 get more detail.
@@ -35,11 +36,11 @@ and DOSBench times it (FW1, FWP).
 
 ## Building
 
-Needs DOSGL in `~/DOSGL` (`config.mk`; `config.local.mk` overrides it) with
-SDL3 built (`make sdl sdl-host` there), and the DJGPP kit (`make setup-djgpp`
-in DOSGL). `deps.mk` pins DOSGL's latest tested commit: every build refuses
-an older DOSGL and says when DOSGL has moved past the pin; then
-`make regress` and `make pin`.
+Needs DOSGL in `~/DOSGL` with SDL3 built (`make sdl sdl-host` there) and
+the DJGPP kit (`make setup-djgpp` in DOSGL), and dgk in `~/dgk`
+(`config.mk`; `config.local.mk` overrides either). `deps.mk` pins the
+latest tested commit of each: every build refuses an older one and says
+when one has moved past its pin; then `make regress` and `make pin`.
 
 ```
 make dos          # build/dos/FWHEEL.EXE (ship CWSDPMI.EXE beside it)
@@ -67,7 +68,7 @@ The world comes from a seed: `make data WORLD_SEED=n` (default 1;
 
 Command line: `-mode WxH`, `-novsync`, `-nosound`, and for tests `-frames N`,
 `-fixed` (one tick per frame), `-shot F:NAME`, `-nodraw`, `-test` (see
-`kit/include/dgk/app.h`); the game adds `-world FILE` (default
+`dgk/app.h` in dgk); the game adds `-world FILE` (default
 `WORLD.PAK`; the F1 test yard is `YARD.PAK`), `-autopilot` (`-laps N`),
 `-autojob` (`-job D:T:B`), `-dockpose`, `-soundtest`, `-calibrate`, `-joylog`, `-career FILE`, `-money N`, `-fxtest`,
 `-detail low|medium|high`, `-zoom N`, `-title`,

@@ -7,8 +7,7 @@ lives with the project notes; this file records what is built.
 
 | Path | What |
 |---|---|
-| `kit/include/dgk/`, `kit/src/` | dgk: `base` (arenas, CRC, PCG32), `log`, `app` (the loop), `plat_sdl.c` / `plat_headless.c`, `gfx`, `text`, `mix`, `test` |
-| `kit/tools/fontbake.py` | bakes a glyph file into a font atlas (outline and drop shadow) |
+| `~/dgk` (deps.mk's pin) | dgk, once `kit/` here: `base` (arenas, CRC, PCG32), `log`, `app` (the loop), `plat_sdl.c` / `plat_headless.c`, `gfx`, `text`, `mix`, `test`; `tools/fontbake.py` bakes a glyph file into a font atlas (outline and drop shadow) |
 | `game/src/` | Fifth Wheel itself |
 | `data/` | the sources of every asset |
 
@@ -32,7 +31,7 @@ build replaces SDL with OSMesa and a virtual clock. The Linux and headless
 builds run in the harness's dev container (`build/deps/` stages what they
 need from DOSGL).
 
-## Sound (game/src/sound.c, kit/src/mix.c)
+## Sound (game/src/sound.c, dgk's src/mix.c)
 
 Every sound is synthesised at start-up: the diesel as two loops recorded at
 1000 rpm (a deep one with a knock on each firing, a raspy one with a turbo
