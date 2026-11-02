@@ -31,7 +31,7 @@ crlf data/release/README.TXT > "$stage/README.TXT"
 crlf LICENSE > "$stage/LICENSE.TXT"
 {
     crlf data/release/THIRDPTY.TXT
-    for l in "DOS-GL:$DOSGL/LICENSE" "The MGA-Glide HAL:$DOSGL/third_party/mgahal/LICENSE" \
+    for l in "DOS-GL:$DOSGL/LICENSE" "The MGA-Glide HAL:${MGA_GLIDE:-$HOME/MGA-Glide}/LICENSE" \
              "SDL 3:$DOSGL/third_party/sdl/LICENSE.txt"; do
         printf -- '----------------------------------------------------------------------\r\n%s\r\n\r\n' "${l%%:*}"
         crlf "${l#*:}"

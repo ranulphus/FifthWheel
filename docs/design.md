@@ -7,7 +7,7 @@ lives with the project notes; this file records what is built.
 
 | Path | What |
 |---|---|
-| `~/dgk` (deps.mk's pin) | dgk, once `kit/` here: `base` (arenas, CRC, PCG32), `log`, `app` (the loop), `plat_sdl.c` / `plat_headless.c`, `gfx`, `text`, `mix`, `test`; `tools/fontbake.py` bakes a glyph file into a font atlas (outline and drop shadow) |
+| `~/dgk` (its main) | dgk, once `kit/` here: `base` (arenas, CRC, PCG32), `log`, `app` (the loop), `plat_sdl.c` / `plat_headless.c`, `gfx`, `text`, `mix`, `test`; `tools/fontbake.py` bakes a glyph file into a font atlas (outline and drop shadow) |
 | `game/src/` | Fifth Wheel itself |
 | `data/` | the sources of every asset |
 

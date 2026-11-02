@@ -14,7 +14,7 @@ HUD's full-height panels at 1024x768 and 1280x1024, and ground near the
 camera that reaches far off the screen (DOS-GL clips only at its
 2,000-pixel guard band). The HAL now divides the edge terms' common factor
 of 16 out, so edges up to 8,191 pixels fit with the same pixels (MGA-Glide
-`d4c289a`, synced into DOS-GL `06def8b`, which `deps.mk` pins), and 86Box
+`d4c289a`, synced into DOS-GL `06def8b` then), and 86Box
 models the 18-bit fields on the G100 and G200 (MGA-Glide's patch 0012), so
 Loop A shows the overflow if it comes back. Bench with a build at or after
 that pin.

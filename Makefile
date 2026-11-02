@@ -1,4 +1,5 @@
-# Fifth Wheel ("Juggernaut 3D for DOS-GL"), on the dgk kit (~/dgk, deps.mk's pin).
+# Fifth Wheel ("Juggernaut 3D for DOS-GL"), on the dgk kit (~/dgk). DOS-GL, dgk and MGA-Glide (the HAL and
+# harness) are the checkouts beside this one, on main as they are: no pins (the owner's decision, 2026-11-02).
 #
 #   make dos            build/dos/FWHEEL.EXE (DJGPP, DOS-GL, DOSGL's SDL3)
 #   make linux          build/linux/fwheel (SDL3, desktop OpenGL; built in the dev container)
@@ -10,14 +11,13 @@
 #   make release        dist/fwheel-ID.zip: the game, CWSDPMI and the text files (tools/release.sh)
 #   make winvm [CARD=g450]   dist/fwheel-CARD-vm.zip: an 86Box machine with the release on it
 #   make jobsweep       the job autopilot on every depot pair and bay, headless (tools/jobsweep.sh)
-#   make check-deps     DOSGL and dgk at or after deps.mk's pins (every build checks; says if one moved past)
-#   make regress [CARD=g450]   the quick regression set for a new DOSGL or dgk; then make pin
+#   make check-deps     DOSGL, dgk and MGA-Glide's checkouts are there (every build checks)
+#   make regress [CARD=g450]   the quick regression set for a new DOSGL, dgk or HAL
 include config.mk
 -include config.local.mk
-include deps.mk
 include $(DGK)/dgk.mk
 
-MGAHAL   := $(DOSGL)/third_party/mgahal
+MGAHAL   := $(MGA_GLIDE)
 DEV      := $(MGAHAL)/tools/dev
 BUILD_ID := $(shell git describe --always --dirty 2>/dev/null || echo unknown)
 Q ?= @
@@ -30,31 +30,19 @@ WARN      := -std=gnu99 -Wall -Wextra -Werror
 # Every target compiles its GL against DOS-GL's own <GL/gl.h>: the subset is enforced.
 COMMON    := $(WARN) -O2 -ffp-contract=off $(DGK_CFLAGS)
 
-.PHONY: all dos linux headless loopa shots suite tests-host glcheck release winvm jobsweep check-deps regress pin deps clean help
+.PHONY: all dos linux headless loopa shots suite tests-host glcheck release winvm jobsweep check-deps regress deps clean help
 all: dos
 
 check-deps:
-	@for d in "$(DOSGL):$(DOSGL_PIN)" "$(DGK):$(DGK_PIN)"; do dir=$${d%%:*}; pin=$${d##*:}; \
-	  git -C "$$dir" merge-base --is-ancestor "$$pin" HEAD 2>/dev/null \
-	    || { echo "$$dir is not at or after $$pin (deps.mk)"; exit 1; }; \
-	  n=$$(git -C "$$dir" rev-list --count "$$pin..HEAD"); [ "$$n" = 0 ] \
-	    || echo "check-deps: $$dir is $$n commit(s) past the pin: make regress, then make pin"; done
+	@for d in "DOSGL $(DOSGL)/include/GL/gl.h" "DGK $(DGK)/dgk.mk" "MGA_GLIDE $(MGA_GLIDE)/hal/include/mga/hal.h"; do \
+	  [ -f "$${d#* }" ] || { echo "check-deps: no $${d%% *} checkout ($${d#* } is missing)"; exit 1; }; done
 
-# The quick regression set for a new DOSGL or dgk: unit tests, every job headless,
+# The quick regression set for a new DOSGL, dgk or HAL: unit tests, every job headless,
 # DOS against Mesa, and the suite's sound, exit, crash, screen-size and
 # agreement checks on one card. The full `make suite` on g200, g400 and
 # g450 before a release.
 regress: tests-host jobsweep shots
 	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) tools/suite.sh $(CARD) sb16 exit crash modes auto
-
-# Move both pins to DOSGL's and dgk's current commits (after `make regress` passed on them).
-pin:
-	@for d in $(DOSGL) $(DGK); do [ -z "$$(git -C "$$d" status --porcelain --untracked-files=no)" ] \
-	  || { echo "pin: $$d has uncommitted changes"; exit 1; }; done
-	$(Q)sed -i "s/^DOSGL_PIN := .*/DOSGL_PIN := $$(git -C "$(DOSGL)" rev-parse HEAD)/" deps.mk
-	$(Q)sed -i "s/^DGK_PIN   := .*/DGK_PIN   := $$(git -C "$(DGK)" rev-parse HEAD)/" deps.mk
-	$(Q)echo "pin: DOSGL $$(git -C "$(DOSGL)" log --oneline -1)"
-	$(Q)echo "pin: dgk $$(git -C "$(DGK)" log --oneline -1)"
 
 build/gen/font_gen.c: data/font5x7.txt $(DGK_FONTBAKE)
 	@mkdir -p $(dir $@)
@@ -174,7 +162,7 @@ winvm:
 	$(Q)MGAHAL=$(MGAHAL) tools/winvm.sh $(CARD)
 
 release: dos tests-host
-	$(Q)DOSGL=$(DOSGL) DJGPP_PREFIX=$(DJGPP_PREFIX) CWSDPMI_ZIP=$(CWSDPMI_ZIP) sh tools/release.sh
+	$(Q)DOSGL=$(DOSGL) MGA_GLIDE=$(MGA_GLIDE) DJGPP_PREFIX=$(DJGPP_PREFIX) CWSDPMI_ZIP=$(CWSDPMI_ZIP) sh tools/release.sh
 
 jobsweep: headless
 	$(Q)$(DEV) sh tools/jobsweep.sh $(or $(PAR),8)
@@ -183,4 +171,4 @@ clean:
 	rm -rf build out dist
 
 help:
-	@sed -n '3,15p' Makefile
+	@sed -n '4,15p' Makefile

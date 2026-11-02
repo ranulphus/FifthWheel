@@ -38,9 +38,9 @@ and DOSBench times it (FW1, FWP).
 
 Needs DOSGL in `~/DOSGL` with SDL3 built (`make sdl sdl-host` there) and
 the DJGPP kit (`make setup-djgpp` in DOSGL), and dgk in `~/dgk`
-(`config.mk`; `config.local.mk` overrides either). `deps.mk` pins the
-latest tested commit of each: every build refuses an older one and says
-when one has moved past its pin; then `make regress` and `make pin`.
+and MGA-Glide (the HAL and harness) in `~/MGA-Glide` (`config.mk`;
+`config.local.mk` overrides any). All three are used from their main as they
+are, with no pins: after a change in one, `make regress`.
 
 ```
 make dos          # build/dos/FWHEEL.EXE (ship CWSDPMI.EXE beside it)
