@@ -82,4 +82,4 @@ FILES
 Fifth Wheel is free software (MIT licence). Its source, and the
 DOS-GL graphics library it runs on, are at
 https://github.com/ranulphus/FifthWheel and
-https://github.com/ranulphus/DOSGL
+https://github.com/ranulphus/RetroGPU

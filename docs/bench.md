@@ -7,7 +7,7 @@ gameport joystick), then the G400 and the G450. Run from the release ZIP
 
 ## The G200's edge registers (fixed in DOS-GL 06def8b)
 
-On devserver's G200eR2 (2026-10-02, MGA-Glide `docs/loop-c-results.md`) the
+On devserver's G200eR2 (2026-10-02, RetroGPU's `docs/loop-c-results.md`) the
 G200's edge registers (AR0-AR6, 18 bits) overflowed for triangles more than
 about 768 rows tall, which drew short. Fifth Wheel has such triangles: the
 HUD's full-height panels at 1024x768 and 1280x1024, and ground near the
@@ -15,7 +15,7 @@ camera that reaches far off the screen (DOS-GL clips only at its
 2,000-pixel guard band). The HAL now divides the edge terms' common factor
 of 16 out, so edges up to 8,191 pixels fit with the same pixels (MGA-Glide
 `d4c289a`, synced into DOS-GL `06def8b` then), and 86Box
-models the 18-bit fields on the G100 and G200 (MGA-Glide's patch 0012), so
+models the 18-bit fields on the G100 and G200 (RetroGPU's 86Box patch 0012), so
 Loop A shows the overflow if it comes back. Bench with a build at or after
 that pin.
 

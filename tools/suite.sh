@@ -13,7 +13,7 @@
 #                 recording, and the driver played no chunk as silence (SDL
 #                 patch 0005; a recording's gaps cannot show that, since
 #                 86Box does not keep pace with the recorder)
-#   joy           86Box's virtual joystick (MGA-Glide's patch 0105): -calibrate
+#   joy           86Box's virtual joystick (RetroGPU's 86Box patch 0105): -calibrate
 #                 sees it steered left and right, accelerated (forward) and
 #                 braked (back), and saves FWHEEL.CFG; then a run that loads
 #                 it maps half left, full forward and button 1 to steering

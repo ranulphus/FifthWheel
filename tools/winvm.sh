@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # winvm.sh - a ready-to-boot 86Box machine with Fifth Wheel installed, for
-# MGA-Glide's patched 86Box (its Windows kit, or `make 86box` on Linux).
+# RetroGPU's patched 86Box (its Windows kit, or `make 86box` on Linux).
 #
 #   tools/winvm.sh [CARD]      (default g450) -> dist/fwheel-CARD-vm.zip
 #
-# The machine is Loop A's (MGA-Glide tools/86box/mkwinvm.py): a Pentium II
+# The machine is Loop A's (RetroGPU's tools/86box/mkwinvm.py): a Pentium II
 # 350, 64 MB, the Matrox CARD, a Sound Blaster 16 (BLASTER set), FreeDOS.
 # D:\FW holds the release ZIP's files (make release); D:\FW.BAT starts the
 # game, so typing FW at the prompt plays. No retail data: the zip can be

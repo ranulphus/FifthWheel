@@ -7,8 +7,8 @@ procedurally generated 4 x 4 km world, reverse it into a loading bay. The
 look is light-hearted rather than realistic: Transport Tycoon's toy world,
 Ignition's chunky vehicles, Fortnite's colour and bounce.
 
-It runs on [DOS-GL](https://github.com/ranulphus/DOSGL) (OpenGL 1.1 on
-Matrox cards under DJGPP) through SDL3, and was the first game on **dgk**,
+It runs on DOS-GL (OpenGL 1.1 on Matrox cards under DJGPP, part of
+[RetroGPU](https://github.com/ranulphus/RetroGPU)) through SDL3, and was the first game on **dgk**,
 the DOS-GL Kit: the game-agnostic layer (main loop, platform, drawing within
 DOS-GL's subset, text, mixer, test hooks). dgk grew here as `kit/` and now
 has its own repository, [dgk](https://github.com/ranulphus/dgk) (in `~/dgk`),
@@ -36,24 +36,24 @@ and DOSBench times it (FW1, FWP).
 
 ## Building
 
-Needs DOSGL in `~/DOSGL` with SDL3 built (`make sdl sdl-host` there) and
-the DJGPP kit (`make setup-djgpp` in DOSGL), and dgk in `~/dgk`
-and MGA-Glide (the HAL and harness) in `~/MGA-Glide` (`config.mk`;
-`config.local.mk` overrides any). All three are used from their main as they
+Needs RetroGPU (DOS-GL, the HAL and the harness) in `~/RetroGPU`, with
+SDL3 built (`make gl-sdl gl-sdl-host` there) and the DJGPP kit (`make
+setup-djgpp` there), and dgk in `~/dgk` (`config.mk`: `RETROGPU`, `DGK`;
+`config.local.mk` overrides either). Both are used from their main as they
 are, with no pins: after a change in one, `make regress`.
 
 ```
 make dos          # build/dos/FWHEEL.EXE (ship CWSDPMI.EXE beside it)
 make linux        # build/linux/fwheel (SDL3 + desktop OpenGL; built in the dev container)
 make headless     # build/headless/fwheel-hl (OSMesa, for tests)
-make loopa CARD=g450              # FWHEEL.EXE in 86Box (DOSGL's harness)
+make loopa CARD=g450              # FWHEEL.EXE in 86Box (RetroGPU's harness)
 make jobsweep                     # the job autopilot on every job, headless
 make tests-host                   # unit tests (no screen) and the GL-subset check
 make suite CARD=g450              # Loop A: sound, joystick, shop, menus, exits and crashes, memory,
                                   # screen sizes, cards agreeing, the release ZIP
 make release                      # dist/fwheel-ID.zip: the game, CWSDPMI, README.TXT
 make winvm CARD=g450              # dist/fwheel-g450-vm.zip: a ready-to-boot 86Box machine with it installed
-                                  # (MGA-Glide's patched 86Box; type FW at the prompt)
+                                  # (RetroGPU's patched 86Box; type FW at the prompt)
 ```
 
 Playing starts at the title screen; Esc pauses. Keys: arrows or WASD to steer, accelerate and brake (hold the brake at a

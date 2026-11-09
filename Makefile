@@ -1,7 +1,8 @@
-# Fifth Wheel ("Juggernaut 3D for DOS-GL"), on the dgk kit (~/dgk). DOS-GL, dgk and MGA-Glide (the HAL and
-# harness) are the checkouts beside this one, on main as they are: no pins (the owner's decision, 2026-11-02).
+# Fifth Wheel ("Juggernaut 3D for DOS-GL"), on the dgk kit (~/dgk). RetroGPU (DOS-GL, the HAL and the
+# harness; RETROGPU) and dgk are the checkouts beside this one, on main as they are: no pins (the owner's
+# decision, 2026-11-02).
 #
-#   make dos            build/dos/FWHEEL.EXE (DJGPP, DOS-GL, DOSGL's SDL3)
+#   make dos            build/dos/FWHEEL.EXE (DJGPP, DOS-GL, its SDL3)
 #   make linux          build/linux/fwheel (SDL3, desktop OpenGL; built in the dev container)
 #   make headless       build/headless/fwheel-hl (OSMesa, virtual clock; dev container)
 #   make loopa [CARD=g450] [ARGS="-frames 60"]   run FWHEEL.EXE in 86Box: out/loopa-CARD/
@@ -11,13 +12,14 @@
 #   make release        dist/fwheel-ID.zip: the game, CWSDPMI and the text files (tools/release.sh)
 #   make winvm [CARD=g450]   dist/fwheel-CARD-vm.zip: an 86Box machine with the release on it
 #   make jobsweep       the job autopilot on every depot pair and bay, headless (tools/jobsweep.sh)
-#   make check-deps     DOSGL, dgk and MGA-Glide's checkouts are there (every build checks)
-#   make regress [CARD=g450]   the quick regression set for a new DOSGL, dgk or HAL
+#   make check-deps     RetroGPU's and dgk's checkouts are there (every build checks)
+#   make regress [CARD=g450]   the quick regression set for a new RetroGPU (DOS-GL, the HAL) or dgk
 include config.mk
 -include config.local.mk
 include $(DGK)/dgk.mk
 
-MGAHAL   := $(MGA_GLIDE)
+MGAHAL   := $(RETROGPU)
+DOSGL    := $(RETROGPU)/gl
 DEV      := $(MGAHAL)/tools/dev
 BUILD_ID := $(shell git describe --always --dirty 2>/dev/null || echo unknown)
 Q ?= @
@@ -34,10 +36,10 @@ COMMON    := $(WARN) -O2 -ffp-contract=off $(DGK_CFLAGS)
 all: dos
 
 check-deps:
-	@for d in "DOSGL $(DOSGL)/include/GL/gl.h" "DGK $(DGK)/dgk.mk" "MGA_GLIDE $(MGA_GLIDE)/hal/include/mga/hal.h"; do \
+	@for d in "RETROGPU $(RETROGPU)/hal/include/mga/hal.h" "RETROGPU $(DOSGL)/include/GL/gl.h" "DGK $(DGK)/dgk.mk"; do \
 	  [ -f "$${d#* }" ] || { echo "check-deps: no $${d%% *} checkout ($${d#* } is missing)"; exit 1; }; done
 
-# The quick regression set for a new DOSGL, dgk or HAL: unit tests, every job headless,
+# The quick regression set for a new RetroGPU or dgk: unit tests, every job headless,
 # DOS against Mesa, and the suite's sound, exit, crash, screen-size and
 # agreement checks on one card. The full `make suite` on g200, g400 and
 # g450 before a release.
@@ -96,10 +98,11 @@ build/dos/FWHEEL.EXE: build/data/WORLD.PAK $(KIT_SRCS) $(DGK_SDL) $(GAME_SRCS) $
 dos: check-deps build/dos/FWHEEL.EXE build/data/WORLD.PAK build/data/YARD.PAK build/data/budget.cfg
 
 # ---- Linux and headless: built in the dev container ------------------------
-# The container sees this repository and (MGA_EXTRA_DIR) dgk, not DOSGL:
-# stage what it needs from DOSGL first.
+# The container (RetroGPU's tools/dev) sees RetroGPU, this repository and
+# (MGA_EXTRA_DIR) dgk; DOS-GL's headers and the host SDL3 are staged into
+# build/deps all the same, outside it, so the headless build's paths stay here.
 ifdef IN_DEV
-build/deps/stamp: ;                     # staged outside, where DOSGL is visible
+build/deps/stamp: ;                     # staged outside the container
 else
 build/deps/stamp: $(DOSGL)/include/GL/gl.h $(DOSGL)/build/sdl/host/lib/libSDL3.a
 	$(Q)rm -rf build/deps && mkdir -p build/deps/include build/deps/lib
@@ -162,7 +165,7 @@ winvm:
 	$(Q)MGAHAL=$(MGAHAL) tools/winvm.sh $(CARD)
 
 release: dos tests-host
-	$(Q)DOSGL=$(DOSGL) MGA_GLIDE=$(MGA_GLIDE) DJGPP_PREFIX=$(DJGPP_PREFIX) CWSDPMI_ZIP=$(CWSDPMI_ZIP) sh tools/release.sh
+	$(Q)DOSGL=$(DOSGL) RETROGPU=$(RETROGPU) DJGPP_PREFIX=$(DJGPP_PREFIX) CWSDPMI_ZIP=$(CWSDPMI_ZIP) sh tools/release.sh
 
 jobsweep: headless
 	$(Q)$(DEV) sh tools/jobsweep.sh $(or $(PAR),8)

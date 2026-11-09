@@ -19,7 +19,7 @@ triangles (and draw calls), not pixels.
    | High | 6,500 | optional GL fog and textured detail |
 
 2. **Real silicon before the bench:** DOS-GL's rig build on devserver's
-   G200eR2 (DOSGL `docs/rig.md`) measures the chip's time per triangle; the
+   G200eR2 (RetroGPU `gl/docs/rig.md`) measures the chip's time per triangle; the
    CPU's share on a Pentium II comes from a model (86Box's emulated CPU
    time with the waits taken out, and instruction counts).
 3. **The bench**, which decides: DOSBench runs Fifth Wheel's tests on each
@@ -41,7 +41,7 @@ the machinery works.
 From the FWP records a small model, frame_ms = a + b x triangles + c x
 draws + d x textured triangles, is fitted per machine and sets the presets'
 limits (with 15% headroom); FW1 checks the game against it. Changes to
-DOS-GL's hot paths (DOSGL `src/gl/vertex.c`, `emit.c`) are made only when
+DOS-GL's hot paths (RetroGPU `gl/src/gl/vertex.c`, `emit.c`) are made only when
 the model points at them.
 
 ## What the game draws (counted, 2026-10-01)
@@ -97,7 +97,7 @@ rig.
 
 ## The CPU's share (Part C2, 2026-10-02)
 
-DOS-GL built with its stage timers (`make PROF=1` in DOSGL; `DGL_STATS=2`)
+DOS-GL built with its stage timers (`make gl-lib PROF=1` in RetroGPU; `DGL_STATS=2`)
 and the tour (`-fixed -novsync -nosound -autopilot -frames 1500`) on the
 emulated G200 (a Pentium II), summed with the HAL's `tools/perf/profsum.py`.
 The cycles are the emulated CPU's, so this is a model, not a measurement:
@@ -112,7 +112,7 @@ The cycles are the emulated CPU's, so this is a model, not a measurement:
 | **DOS-GL without waits** | **5,289** |
 
 13 register writes a triangle. On devserver's G200eR2 a register write took
-212 ns (MGA-Glide `docs/loop-c-results.md`); if none overlapped the CPU
+212 ns (RetroGPU's `docs/loop-c-results.md`); if none overlapped the CPU
 that would add up to about 730 cycles at 266 MHz.
 
 **Estimate for a Pentium II 266 with a G200:** 5,400 to 6,150 cycles a

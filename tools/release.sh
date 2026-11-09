@@ -2,12 +2,12 @@
 # release.sh - the DOS release: dist/fwheel-ID.zip with the game, the world,
 # the presets, CWSDPMI and the text files (8.3 names, CRLF line ends).
 # Refuses a tree with uncommitted changes (its build would say "-dirty")
-# unless RELEASE_DIRTY=1. Needs DOSGL, DJGPP_PREFIX (make release sets
+# unless RELEASE_DIRTY=1. Needs DOSGL, RETROGPU, DJGPP_PREFIX (make release sets
 # them) and CWSDPMI_ZIP for CWSDPMI.DOC (else only the EXE from DJGPP).
 #
 #   tools/release.sh
 set -eu
-: "${DOSGL:?}" "${DJGPP_PREFIX:?}"
+: "${DOSGL:?}" "${RETROGPU:?}" "${DJGPP_PREFIX:?}"
 if [ -n "$(git status --porcelain --untracked-files=no)" ] && [ "${RELEASE_DIRTY:-0}" != 1 ]; then
     echo "release: uncommitted changes (RELEASE_DIRTY=1 to build anyway)" >&2
     exit 1
@@ -31,7 +31,7 @@ crlf data/release/README.TXT > "$stage/README.TXT"
 crlf LICENSE > "$stage/LICENSE.TXT"
 {
     crlf data/release/THIRDPTY.TXT
-    for l in "DOS-GL:$DOSGL/LICENSE" "The MGA-Glide HAL:${MGA_GLIDE:-$HOME/MGA-Glide}/LICENSE" \
+    for l in "RetroGPU (DOS-GL and its HAL):$RETROGPU/LICENSE" \
              "SDL 3:$DOSGL/third_party/sdl/LICENSE.txt"; do
         printf -- '----------------------------------------------------------------------\r\n%s\r\n\r\n' "${l%%:*}"
         crlf "${l#*:}"

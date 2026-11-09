@@ -25,11 +25,11 @@ picture on every target.
 
 Every target compiles its OpenGL calls against DOS-GL's own `<GL/gl.h>`:
 anything DOS-GL lacks fails to compile on Linux too. The DOS build links
-DOSGL's SDL3 (with its DOS-GL bridge) and `libGL.a`; the Linux build links
+DOS-GL's SDL3 (with its DOS-GL bridge) and `libGL.a`; the Linux build links
 the same pinned SDL3 built for Linux and the system's OpenGL; the headless
 build replaces SDL with OSMesa and a virtual clock. The Linux and headless
 builds run in the harness's dev container (`build/deps/` stages what they
-need from DOSGL).
+need from RetroGPU's `gl/`).
 
 ## Sound (game/src/sound.c, dgk's src/mix.c)
 
