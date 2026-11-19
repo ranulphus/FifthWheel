@@ -287,6 +287,95 @@ static void cmesh_tri(cmesh *c, int a, int b, int d)
     total_tris++;
 }
 
+/* ---- smooth shapes (MEDIUM and HIGH's run) ------------------------------------- */
+
+/* A vertex lit by the sun on its own normal n, darker towards the ground
+ * (shade: 1 at the top of the shape, `low` at its foot, by its normal's
+ * height): a baked hint of the shadow under a crown. */
+static int smooth_vertex(cmesh *c, const float *p, const float *n, uint32_t rgb, float low)
+{
+    float k = low + (1.0f - low) * (0.5f + 0.5f * n[1]);
+    return cmesh_vertex(c, p, mb_shade(rgb, mb_light(n[0], n[1], n[2]) * k));
+}
+
+/* A round blob: an icosahedron's 20 faces, smooth-shaded, centre (x, y)
+ * on the ground plane at height z, radii rx (across) and rz (up). */
+static void blob(float x, float y, float z, float rx, float rz, uint32_t rgb)
+{
+    static const float ico[12][3] = {
+        { -0.526f, 0.851f, 0 }, { 0.526f, 0.851f, 0 }, { -0.526f, -0.851f, 0 }, { 0.526f, -0.851f, 0 },
+        { 0, -0.526f, 0.851f }, { 0, 0.526f, 0.851f }, { 0, -0.526f, -0.851f }, { 0, 0.526f, -0.851f },
+        { 0.851f, 0, -0.526f }, { 0.851f, 0, 0.526f }, { -0.851f, 0, -0.526f }, { -0.851f, 0, 0.526f } };
+    static const int face[20][3] = {
+        { 0, 11, 5 }, { 0, 5, 1 }, { 0, 1, 7 }, { 0, 7, 10 }, { 0, 10, 11 }, { 1, 5, 9 }, { 5, 11, 4 },
+        { 11, 10, 2 }, { 10, 7, 6 }, { 7, 1, 8 }, { 3, 9, 4 }, { 3, 4, 2 }, { 3, 2, 6 }, { 3, 6, 8 },
+        { 3, 8, 9 }, { 4, 9, 5 }, { 2, 4, 11 }, { 6, 2, 10 }, { 8, 6, 7 }, { 9, 8, 1 } };
+    cmesh *c = chunk_for(x, y);
+    int v[12], i;
+    for (i = 0; i < 12; i++) {
+        /* The icosahedron's y is up; its x and z lie on the ground (GL z is -y). */
+        float p[3], n[3], l;
+        p[0] = x + ico[i][0] * rx;
+        p[1] = z + ico[i][1] * rz;
+        p[2] = -y + ico[i][2] * rx;
+        n[0] = ico[i][0] / rx;
+        n[1] = ico[i][1] / rz;
+        n[2] = ico[i][2] / rx;
+        l = sqrtf(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+        n[0] /= l;
+        n[1] /= l;
+        n[2] /= l;
+        v[i] = smooth_vertex(c, p, n, rgb, 0.7f);
+    }
+    for (i = 0; i < 20; i++)
+        cmesh_tri(c, v[face[i][0]], v[face[i][1]], v[face[i][2]]);
+}
+
+/* A smooth cone round (x, y): base radius r at height z0, its tip at z1, n
+ * sides; no base (it stands on something). */
+static void cone(float x, float y, float z0, float z1, float r, int n, uint32_t rgb)
+{
+    cmesh *c = chunk_for(x, y);
+    float slope = r / (z1 - z0), l = sqrtf(1 + slope * slope);
+    int ring[12], i, tip;
+    float p[3], nm[3] = { 0, 1, 0 };
+    for (i = 0; i < n; i++) {
+        float a = 6.2831853f * i / n;
+        p[0] = x + r * cosf(a);
+        p[1] = z0;
+        p[2] = -y + r * sinf(a);
+        nm[0] = cosf(a) / l;
+        nm[1] = slope / l;
+        nm[2] = sinf(a) / l;
+        ring[i] = smooth_vertex(c, p, nm, rgb, 0.72f);
+    }
+    p[0] = x; p[1] = z1; p[2] = -y;
+    nm[0] = 0; nm[1] = 1; nm[2] = 0;
+    tip = smooth_vertex(c, p, nm, rgb, 0.72f);
+    for (i = 0; i < n; i++)
+        cmesh_tri(c, ring[(i + 1) % n], ring[i], tip);
+}
+
+/* A trunk: a cylinder's n sides (no ends), round (x, y) from z0 to z1. */
+static void trunk(float x, float y, float z0, float z1, float r, int n, uint32_t rgb)
+{
+    cmesh *c = chunk_for(x, y);
+    int lo[12], hi[12], i;
+    for (i = 0; i < n; i++) {
+        float a = 6.2831853f * i / n, p[3], nm[3];
+        nm[0] = cosf(a); nm[1] = 0; nm[2] = sinf(a);
+        p[0] = x + r * nm[0]; p[1] = z0; p[2] = -y + r * nm[2];
+        lo[i] = smooth_vertex(c, p, nm, rgb, 1.0f);
+        p[1] = z1;
+        hi[i] = smooth_vertex(c, p, nm, rgb, 1.0f);
+    }
+    for (i = 0; i < n; i++) {
+        int j = (i + 1) % n;
+        cmesh_tri(c, lo[j], lo[i], hi[i]);
+        cmesh_tri(c, lo[j], hi[i], hi[j]);
+    }
+}
+
 /* A flat quad lying on the ground (plus lift), corners in ground coordinates. */
 static void ground_quad(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float lift,
                         uint32_t rgb, float light)
@@ -352,6 +441,233 @@ static void block(float cx, float cy, float hl, float hw, float angle, float h, 
     }
     if (collide)
         add_box(cx, cy, hl, hw, angle);
+}
+
+/* ---- houses (MEDIUM and HIGH's run) ------------------------------------------------ */
+
+static uint32_t ground_colour(float x, float y);
+
+/* A building's frame: (u, v) along and across `angle` from its centre. */
+typedef struct bframe {
+    float cx, cy, c, s;
+} bframe;
+
+static void bpoint(const bframe *f, float u, float v, float h, float *p)
+{
+    p[0] = f->cx + f->c * u - f->s * v;
+    p[1] = h;
+    p[2] = -(f->cy + f->s * u + f->c * v);
+}
+
+/* A flat face of n (3 or 4) points, turned to face `out` (GL), lit by its
+ * normal; points below `foot` darker towards it (a baked hint of the shade
+ * where a wall meets the ground). */
+static void face(cmesh *m, float (*p)[3], int n, const float *out, uint32_t rgb, float foot)
+{
+    float ux = p[1][0] - p[0][0], uy = p[1][1] - p[0][1], uz = p[1][2] - p[0][2];
+    float vx = p[n - 1][0] - p[0][0], vy = p[n - 1][1] - p[0][1], vz = p[n - 1][2] - p[0][2];
+    float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l, light;
+    int v[4], i, flip;
+    l = sqrtf(nx * nx + ny * ny + nz * nz);
+    if (l < 1e-6f)
+        return;
+    flip = nx * out[0] + ny * out[1] + nz * out[2] < 0;
+    if (flip) {
+        nx = -nx;
+        ny = -ny;
+        nz = -nz;
+    }
+    light = mb_light(nx / l, ny / l, nz / l);
+    for (i = 0; i < n; i++) {
+        float k = p[i][1] < foot + 0.05f ? 0.8f : 1.0f;
+        v[i] = cmesh_vertex(m, p[i], mb_shade(rgb, light * k));
+    }
+    for (i = 1; i + 1 < n; i++)
+        if (flip)
+            cmesh_tri(m, v[0], v[i + 1], v[i]);
+        else
+            cmesh_tri(m, v[0], v[i], v[i + 1]);
+}
+
+/* A wall panel on the side of a building facing (du, dv) (a unit
+ * direction in its frame), from u0 to u1 along it (as seen from outside),
+ * at distance d out, from height h0 to h1. */
+static void panel(cmesh *m, const bframe *f, float du, float dv, float d, float a0, float a1, float h0, float h1,
+                  uint32_t rgb, float foot)
+{
+    float p[4][3], out[3];
+    /* Along the side: perpendicular to (du, dv). */
+    float su = -dv, sv = du;
+    bpoint(f, du * d + su * a0, dv * d + sv * a0, h0, p[0]);
+    bpoint(f, du * d + su * a1, dv * d + sv * a1, h0, p[1]);
+    bpoint(f, du * d + su * a1, dv * d + sv * a1, h1, p[2]);
+    bpoint(f, du * d + su * a0, dv * d + sv * a0, h1, p[3]);
+    out[0] = f->c * du - f->s * dv;
+    out[1] = 0;
+    out[2] = -(f->s * du + f->c * dv);
+    face(m, p, 4, out, rgb, foot);
+}
+
+/* The building's base on sloping ground: its corners' lowest, sunk a little. */
+static float bbase(const bframe *f, float hl, float hw)
+{
+    float base = ground(f->cx, f->cy), p[3];
+    int i;
+    for (i = 0; i < 4; i++) {
+        bpoint(f, (i & 1) ? hl : -hl, (i & 2) ? hw : -hw, 0, p);
+        base = DGK_MIN(base, ground(p[0], -p[2]));
+    }
+    return base;
+}
+
+/* Its walls (a box, open below) from `base` - 0.5 to `top`, the four sides darker at their feet. */
+static void walls(cmesh *m, const bframe *f, float hl, float hw, float base, float top, uint32_t rgb)
+{
+    panel(m, f, 0, -1, hw, -hl, hl, base - 0.5f, top, rgb, base);
+    panel(m, f, 1, 0, hl, -hw, hw, base - 0.5f, top, rgb, base);
+    panel(m, f, 0, 1, hw, -hl, hl, base - 0.5f, top, rgb, base);
+    panel(m, f, -1, 0, hl, -hw, hw, base - 0.5f, top, rgb, base);
+}
+
+/* A contact shadow to the south-east, in the ground's own colour, darker. */
+static void bshadow(const bframe *f, float hl, float hw, float h)
+{
+    float off = h * 0.35f, k[4][3];
+    int i;
+    for (i = 0; i < 4; i++)
+        bpoint(f, (i == 1 || i == 2) ? hl : -hl, i >= 2 ? hw : -hw, 0, k[i]);
+    ground_quad(k[0][0] + off, -k[0][2] - off, k[1][0] + off, -k[1][2] - off, k[2][0] + off, -k[2][2] - off,
+                k[3][0] + off, -k[3][2] - off, 0.08f, ground_colour(f->cx, f->cy), 0.6f);
+}
+
+/* A house for MEDIUM and HIGH, on block()'s footprint: a cottage with a
+ * pitched roof (its ridge along its length, eaves overhanging, gables in
+ * its walls' colour), a chimney, a door and windows; taller (the middles
+ * of towns) a flat-roofed block with a parapet and rows of windows. */
+static void house(float cx, float cy, float hl, float hw, float angle, float h, uint32_t wall, uint32_t roof)
+{
+    static const uint32_t glass = 0x8FCBEFu, door = 0x6A4028u;
+    bframe f;
+    cmesh *m;
+    float base, up[3] = { 0, 1, 0 };
+    int i, s;
+    f.cx = cx; f.cy = cy; f.c = cosf(angle); f.s = sinf(angle);
+    m = chunk_for(cx, cy);
+    base = bbase(&f, hl, hw);
+    bshadow(&f, hl, hw, h);
+    if (h > 7.5f) {
+        float top = base + h, p[4][3];
+        int floors = DGK_MIN((int)(h / 3.2f), 3), per = DGK_MIN((int)(hl * 2 / 3.5f), 3), fl;
+        walls(m, &f, hl, hw, base, top, wall);
+        /* The parapet: a rim round the roof, its top darker. */
+        for (s = 0; s < 4; s++)
+            panel(m, &f, s == 1 ? 1.0f : s == 3 ? -1.0f : 0.0f, s == 0 ? -1.0f : s == 2 ? 1.0f : 0.0f,
+                  (s & 1) ? hl + 0.15f : hw + 0.15f, (s & 1) ? -hw - 0.15f : -hl - 0.15f,
+                  (s & 1) ? hw + 0.15f : hl + 0.15f, top - 0.2f, top + 0.45f, mb_shade(wall, 0.92f), -1e9f);
+        bpoint(&f, -hl - 0.15f, -hw - 0.15f, top + 0.45f, p[0]);
+        bpoint(&f, hl + 0.15f, -hw - 0.15f, top + 0.45f, p[1]);
+        bpoint(&f, hl + 0.15f, hw + 0.15f, top + 0.45f, p[2]);
+        bpoint(&f, -hl - 0.15f, hw + 0.15f, top + 0.45f, p[3]);
+        face(m, p, 4, up, roof, -1e9f);
+        for (fl = 0; fl < floors; fl++)              /* windows along both long sides */
+            for (s = -1; s <= 1; s += 2)
+                for (i = 0; i < per; i++) {
+                    float a = -hl + (i + 0.5f) * (2 * hl / per), y0 = base + 1.2f + fl * 3.2f;
+                    panel(m, &f, 0, (float)s, hw + 0.03f, a - 0.6f, a + 0.6f, y0, y0 + 1.4f, glass, -1e9f);
+                }
+        return;
+    }
+    {
+        float eave = base + h * 0.62f, ridge = base + h + 0.6f, o = 0.45f, p[4][3], out[3];
+        walls(m, &f, hl, hw, base, eave, wall);
+        for (s = -1; s <= 1; s += 2) {               /* the gables: triangles at the ends, in the walls' colour */
+            bpoint(&f, s * hl, -hw, eave, p[0]);
+            bpoint(&f, s * hl, hw, eave, p[1]);
+            bpoint(&f, s * hl, 0, ridge, p[2]);
+            out[0] = f.c * s;
+            out[1] = 0;
+            out[2] = -f.s * s;
+            face(m, p, 3, out, wall, -1e9f);
+        }
+        for (s = -1; s <= 1; s += 2) {               /* the roof's two slopes, overhanging */
+            float eh = eave - o * (ridge - eave) / hw;
+            bpoint(&f, -hl - 0.3f, s * (hw + o), eh, p[0]);
+            bpoint(&f, hl + 0.3f, s * (hw + o), eh, p[1]);
+            bpoint(&f, hl + 0.3f, 0, ridge, p[2]);
+            bpoint(&f, -hl - 0.3f, 0, ridge, p[3]);
+            out[0] = -f.s * s * 0.7f;
+            out[1] = 0.7f;
+            out[2] = -f.c * s * 0.7f;
+            face(m, p, 4, out, roof, -1e9f);
+        }
+        {   /* a chimney through the back slope */
+            bframe cf = f;
+            float cu = hl * 0.45f, cv = hw * 0.35f, ch0 = eave, ch1 = ridge + 0.9f;
+            cf.cx = cx + f.c * cu - f.s * cv;
+            cf.cy = cy + f.s * cu + f.c * cv;
+            panel(m, &cf, 0, -1, 0.35f, -0.35f, 0.35f, ch0, ch1, 0xB0573Au, -1e9f);
+            panel(m, &cf, 1, 0, 0.35f, -0.35f, 0.35f, ch0, ch1, 0xB0573Au, -1e9f);
+            panel(m, &cf, 0, 1, 0.35f, -0.35f, 0.35f, ch0, ch1, 0xB0573Au, -1e9f);
+            panel(m, &cf, -1, 0, 0.35f, -0.35f, 0.35f, ch0, ch1, 0xB0573Au, -1e9f);
+            bpoint(&cf, -0.35f, -0.35f, ch1, p[0]);
+            bpoint(&cf, 0.35f, -0.35f, ch1, p[1]);
+            bpoint(&cf, 0.35f, 0.35f, ch1, p[2]);
+            bpoint(&cf, -0.35f, 0.35f, ch1, p[3]);
+            face(m, p, 4, up, 0x5A3A2Au, -1e9f);
+        }
+        /* The front (-v): a door between two windows; the back: two windows. */
+        panel(m, &f, 0, -1, hw + 0.03f, -0.55f, 0.55f, base, base + 2.0f, door, -1e9f);
+        for (s = -1; s <= 1; s += 2)
+            for (i = -1; i <= 1; i += 2) {
+                float a = i * hl * 0.55f;
+                panel(m, &f, 0, (float)s, hw + 0.03f, a - 0.55f, a + 0.55f, eave - 1.7f, eave - 0.5f, glass, -1e9f);
+            }
+    }
+}
+
+/* A depot's warehouse for MEDIUM and HIGH, on block()'s footprint: walls,
+ * and an arched roof (smooth, eight strips) over its length. */
+static void warehouse(float cx, float cy, float hl, float hw, float angle, float h, uint32_t wall, uint32_t roof)
+{
+    enum { ARCH = 8 };
+    bframe f;
+    cmesh *m;
+    float base, eave, rise = 2.6f, o = 0.5f;
+    int i, e, ring[2][ARCH + 1];
+    f.cx = cx; f.cy = cy; f.c = cosf(angle); f.s = sinf(angle);
+    m = chunk_for(cx, cy);
+    base = bbase(&f, hl, hw);
+    eave = base + h;
+    bshadow(&f, hl, hw, h + rise);
+    walls(m, &f, hl, hw, base, eave, wall);
+    for (e = 0; e < 2; e++)                          /* the roof: a parabola across, along u */
+        for (i = 0; i <= ARCH; i++) {
+            float t = -1.0f + 2.0f * i / ARCH, v = t * (hw + o), y = eave + rise * (1 - t * t) - (t * t) * 0.3f, p[3];
+            float slope = -2.0f * rise * t / (hw + o), nl = sqrtf(1 + slope * slope), n[3];
+            bpoint(&f, e ? hl + 0.4f : -hl - 0.4f, v, y, p);
+            /* The normal across the arch, in GL: (-slope, 1) turned by the building's angle. */
+            n[0] = (f.s * slope) / nl;
+            n[1] = 1 / nl;
+            n[2] = (f.c * slope) / nl;
+            ring[e][i] = smooth_vertex(m, p, n, roof, 1.0f);
+        }
+    for (i = 0; i < ARCH; i++) {
+        cmesh_tri(m, ring[0][i], ring[1][i], ring[1][i + 1]);
+        cmesh_tri(m, ring[0][i], ring[1][i + 1], ring[0][i + 1]);
+    }
+    for (e = -1; e <= 1; e += 2) {                   /* the ends, under the arch: a fan in the walls' colour */
+        float p[3][3], out[3];
+        out[0] = f.c * e;
+        out[1] = 0;
+        out[2] = -f.s * e;
+        for (i = 0; i < ARCH; i++) {
+            float t0 = -1.0f + 2.0f * i / ARCH, t1 = -1.0f + 2.0f * (i + 1) / ARCH;
+            bpoint(&f, e * hl, 0, eave, p[0]);
+            bpoint(&f, e * hl, t0 * hw, eave + rise * (1 - t0 * t0), p[1]);
+            bpoint(&f, e * hl, t1 * hw, eave + rise * (1 - t1 * t1), p[2]);
+            face(m, p, 3, out, wall, -1e9f);
+        }
+    }
 }
 
 /* ---- roads ------------------------------------------------------------------------ */
@@ -671,20 +987,34 @@ static float road_distance(float x, float y)
     return sqrtf(best);
 }
 
+/* A town's street from (x0, y0) to (x1, y1) at height h, in pieces 16 m
+ * long: a triangle goes to the chunk holding its middle, so one long quad
+ * was drawn only while that chunk was in view, and the fog (worked out at
+ * the corners) washed the whole of it out from its far ends. */
+static void street(float x0, float y0, float x1, float y1, float h, float lift)
+{
+    static float s[64][3];
+    float l = sqrtf((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
+    int n = DGK_CLAMP((int)ceilf(l / 16.0f), 1, 63), k;
+    for (k = 0; k <= n; k++) {
+        s[k][0] = x0 + (x1 - x0) * k / n;
+        s[k][1] = y0 + (y1 - y0) * k / n;
+        s[k][2] = h;
+    }
+    road_ribbon((const float (*)[3])s, n + 1, 4.5f, 0, lift);
+}
+
 static void build_town(const place *t)
 {
     int n = town_blocks(t), i, j, k;
-    float h = t->h;
     for (i = -n; i <= n; i++) {                   /* streets */
-        float s[2][3], x0, y0, x1, y1;
+        float x0, y0, x1, y1;
         town_frame(t, i * GRID, -n * GRID, &x0, &y0);
         town_frame(t, i * GRID, n * GRID, &x1, &y1);
-        s[0][0] = x0; s[0][1] = y0; s[0][2] = h; s[1][0] = x1; s[1][1] = y1; s[1][2] = h;
-        road_ribbon((const float (*)[3])s, 2, 4.5f, 0, 0.12f);
+        street(x0, y0, x1, y1, t->h, 0.12f);
         town_frame(t, -n * GRID, i * GRID, &x0, &y0);
         town_frame(t, n * GRID, i * GRID, &x1, &y1);
-        s[0][0] = x0; s[0][1] = y0; s[1][0] = x1; s[1][1] = y1;
-        road_ribbon((const float (*)[3])s, 2, 4.5f, 0, 0.13f);   /* crossings: not coplanar */
+        street(x0, y0, x1, y1, t->h, 0.13f);     /* crossings: not coplanar */
     }
     for (j = -n; j < n; j++)                      /* buildings, set back from the streets */
         for (i = -n; i < n; i++) {
@@ -700,7 +1030,11 @@ static void build_town(const place *t)
                 town_frame(t, bu + ou, bv + ov, &x, &y);
                 if (road_distance(x, y) < DGK_MAX(w, d) / 2 + 9.0f)          /* the main roads cut through */
                     continue;
+                variant = WG_LOW_ONLY;
                 block(x, y, w / 2, d / 2, t->heading, tall, wall, roof, 1, 1);
+                variant = WG_HIGH_ONLY;
+                house(x, y, w / 2, d / 2, t->heading, tall, wall, roof);
+                variant = WG_SHARED;
             }
         }
 }
@@ -740,7 +1074,11 @@ static void build_depot(const place *d, wg_depot *out)
         quad(q[0], q[1], q[2], q[3], 0x8A8F99u, 0.95f);
     }
     depot_frame(d, 0, 45, &x, &y);                          /* the warehouse */
+    variant = WG_LOW_ONLY;
     block(x, y, 42, 10, d->heading, 7, 0xE4E0D6u, 0x3A6FD8u, 1, 1);
+    variant = WG_HIGH_ONLY;
+    warehouse(x, y, 42, 10, d->heading, 7, 0xE4E0D6u, 0x3A6FD8u);
+    variant = WG_SHARED;
     for (i = 0; i < WG_BAYS; i++) {
         float bx, by, u = (i - 1) * 16.0f, px, py;
         depot_frame(d, u, 34.2f, &bx, &by);                 /* a dark door on the warehouse face */
@@ -906,6 +1244,36 @@ static tvert crossing(tvert p, float fp, tvert q, float fq)
     return r;
 }
 
+/* The boundaries the cuts found between two fields: hedges go along them. */
+#define MAX_HEDGE 60000
+static tvert hedge[MAX_HEDGE][2];
+static int hedge_pair[MAX_HEDGE], nhedge;
+
+/* A stretch of boundary between fields fa and fb, from p to q. One that
+ * carries on from the last (the same two fields, and an end in common: a
+ * cell's two triangles cut one straight boundary in turn) lengthens it. */
+static void add_hedge(int fa, int fb, tvert p, tvert q)
+{
+    int pair = fa < fb ? fa * FIELDS + fb : fb * FIELDS + fa, e;
+    if (nhedge && hedge_pair[nhedge - 1] == pair)
+        for (e = 0; e < 2; e++) {
+            tvert *end = &hedge[nhedge - 1][e];
+            if (end->x == p.x && end->y == p.y) {
+                *end = q;
+                return;
+            }
+            if (end->x == q.x && end->y == q.y) {
+                *end = p;
+                return;
+            }
+        }
+    if (nhedge < MAX_HEDGE) {
+        hedge[nhedge][0] = p;
+        hedge[nhedge][1] = q;
+        hedge_pair[nhedge++] = pair;
+    }
+}
+
 /* A convex piece of a terrain triangle, cut along the regions' boundaries
  * until each piece lies in one region's colour; each a fan of its own
  * vertices. The pieces lie on the triangle (heights interpolated), so the
@@ -946,17 +1314,26 @@ static void terrain_piece(cmesh *c, const tvert *v, int n, int depth)
     }
     for (i = 0; i < n; i++)
         f[i] = region_split(reg[0], reg[k], v[i].x, v[i].y);
-    for (i = 0; i < n; i++) {                        /* Sutherland-Hodgman: a gets f <= 0, b gets f > 0 */
-        int j = (i + 1) % n;
-        if (f[i] <= 0)
-            a[na++] = v[i];
-        else
-            b[nb++] = v[i];
-        if ((f[i] <= 0) != (f[j] <= 0)) {
-            tvert x = f[i] <= 0 ? crossing(v[i], f[i], v[j], f[j]) : crossing(v[j], f[j], v[i], f[i]);
-            a[na++] = x;
-            b[nb++] = x;
+    {
+        tvert cut[2];
+        int ncut = 0;
+        for (i = 0; i < n; i++) {                    /* Sutherland-Hodgman: a gets f <= 0, b gets f > 0 */
+            int j = (i + 1) % n;
+            if (f[i] <= 0)
+                a[na++] = v[i];
+            else
+                b[nb++] = v[i];
+            if ((f[i] <= 0) != (f[j] <= 0)) {
+                tvert x = f[i] <= 0 ? crossing(v[i], f[i], v[j], f[j]) : crossing(v[j], f[j], v[i], f[i]);
+                a[na++] = x;
+                b[nb++] = x;
+                if (ncut < 2)
+                    cut[ncut++] = x;
+            }
         }
+        /* Between two fields (not round a place's grass): a stretch of hedge. */
+        if (ncut == 2 && reg[0] >= 0 && reg[k] >= 0)
+            add_hedge(reg[0], reg[k], cut[0], cut[1]);
     }
     if (na >= 3)
         terrain_piece(c, a, na, depth + 1);
@@ -1050,6 +1427,57 @@ static void build_terrain(void)
         }
 }
 
+/* Hedges along the fields' boundaries (MEDIUM and HIGH's run; nothing
+ * collides with them): a mound 1.5 m across and 1 m high, smooth-shaded
+ * (three edges, so 4 triangles), on each stretch the cuts found, kept off
+ * the roads (8 m) and the places' grass, with a gap now and then. */
+#define HEDGE_EDGES 3
+static void build_hedges(void)
+{
+    static const float prof[HEDGE_EDGES][2] = { { -0.75f, -0.2f }, { 0.0f, 1.0f }, { 0.75f, -0.2f } };
+    static const float pn[HEDGE_EDGES][2] = { { -0.8f, 0.6f }, { 0.0f, 1.0f }, { 0.8f, 0.6f } };
+    int h, k, made = 0;
+    variant = WG_HIGH_ONLY;
+    for (h = 0; h < nhedge; h++) {
+        const tvert *a = &hedge[h][0], *b = &hedge[h][1];
+        float dx = b->x - a->x, dy = b->y - a->y, l = sqrtf(dx * dx + dy * dy), nx, ny, mx, my;
+        int va[HEDGE_EDGES], vb[HEDGE_EDGES];
+        cmesh *c;
+        uint32_t col;
+        if (l < 0.5f)
+            continue;
+        mx = (a->x + b->x) * 0.5f;
+        my = (a->y + b->y) * 0.5f;
+        if (road_distance(mx, my) < 8.0f || hash2((int)mx, (int)my, 91) % 9 == 0)
+            continue;
+        nx = -dy / l;
+        ny = dx / l;
+        col = (hash2((int)(mx / 40), (int)(my / 40), 92) & 1) ? 0x3A8A34u : 0x478F3Au;
+        c = chunk_for(mx, my);
+        for (k = 0; k < HEDGE_EDGES; k++) {
+            float p[3], n[3];
+            n[0] = nx * pn[k][0];
+            n[1] = pn[k][1];
+            n[2] = -ny * pn[k][0];
+            p[0] = a->x + nx * prof[k][0];
+            p[1] = a->h + prof[k][1];
+            p[2] = -(a->y + ny * prof[k][0]);
+            va[k] = smooth_vertex(c, p, n, col, 0.8f);
+            p[0] = b->x + nx * prof[k][0];
+            p[1] = b->h + prof[k][1];
+            p[2] = -(b->y + ny * prof[k][0]);
+            vb[k] = smooth_vertex(c, p, n, col, 0.8f);
+        }
+        for (k = 0; k + 1 < HEDGE_EDGES; k++) {
+            cmesh_tri(c, va[k], vb[k], vb[k + 1]);
+            cmesh_tri(c, va[k], vb[k + 1], va[k + 1]);
+        }
+        made++;
+    }
+    variant = WG_SHARED;
+    printf("fwgen: %d stretches of hedge\n", made);
+}
+
 static void build_trees(void)
 {
     static const uint32_t leaves[] = { 0x3E9E3Au, 0x4CB040u, 0x2F8A38u, 0x6AC24Au };
@@ -1066,21 +1494,27 @@ static void build_trees(void)
         if (near || road_distance(x, y) < 18.0f)
             continue;
         g = ground(x, y);
+        variant = WG_LOW_ONLY;
         if (dgk_rng_below(&rng, 3)) {                               /* lollipop: trunk and a chunky crown */
             float s = 1.6f + frand() * 1.2f;
+            uint32_t col;
             block(x, y, 0.35f, 0.35f, 0, 2.2f + s * 0.4f, 0x7A5230u, 0x7A5230u, 0, 1);
             {
                 float c0 = g + 1.8f, c1 = c0 + s * 2.2f;
                 float v[8][3] = { { x - s, c0, -(y - s) }, { x + s, c0, -(y - s) }, { x + s, c0, -(y + s) },
                                   { x - s, c0, -(y + s) }, { x - s, c1, -(y - s) }, { x + s, c1, -(y - s) },
                                   { x + s, c1, -(y + s) }, { x - s, c1, -(y + s) } };
-                uint32_t col = leaves[dgk_rng_below(&rng, 4)];
+                col = leaves[dgk_rng_below(&rng, 4)];
                 quad(v[4], v[5], v[6], v[7], col, -1);
                 quad(v[0], v[1], v[5], v[4], col, -1);
                 quad(v[1], v[2], v[6], v[5], col, -1);
                 quad(v[2], v[3], v[7], v[6], col, -1);
                 quad(v[3], v[0], v[4], v[7], col, -1);
             }
+            /* MEDIUM and HIGH: a round crown, a little wider than tall, on a round trunk. */
+            variant = WG_HIGH_ONLY;
+            trunk(x, y, g - 0.3f, g + 2.2f + s * 0.4f, 0.32f, 5, 0x7A5230u);
+            blob(x, y, g + 1.8f + s * 1.25f, s * 1.25f, s * 1.15f, col);
         } else {                                                     /* cone: a four-sided spire */
             float s = 1.8f + frand() * 1.0f, top = g + 7 + frand() * 3;
             float v[5][3] = { { x - s, g + 0.6f, -(y - s) }, { x + s, g + 0.6f, -(y - s) }, { x + s, g + 0.6f, -(y + s) },
@@ -1091,7 +1525,13 @@ static void build_trees(void)
             quad(v[2], v[3], v[4], v[4], col, -1);
             quad(v[3], v[0], v[4], v[4], col, -1);
             add_box(x, y, 0.5f, 0.5f, 0);
+            /* MEDIUM and HIGH: a pine, two smooth tiers on a stub of trunk. */
+            variant = WG_HIGH_ONLY;
+            trunk(x, y, g - 0.3f, g + 1.2f, 0.3f, 5, 0x6A4628u);
+            cone(x, y, g + 0.6f, g + 0.6f + (top - g) * 0.62f, s * 1.25f, 7, mb_shade(col, 0.92f));
+            cone(x, y, g + 0.6f + (top - g) * 0.36f, top + 0.4f, s * 0.95f, 7, col);
         }
+        variant = WG_SHARED;
         placed++;
     }
     printf("fwgen: %d trees\n", placed);
@@ -1432,6 +1872,7 @@ int main(int argc, char **argv)
         s[0][2] = s[1][2] = places[i].h;
         road_ribbon((const float (*)[3])s, 2, 4.5f, 0, 0.14f);
     }
+    build_hedges();
     build_trees();
     add_box(WG_SIZE / 2, -1, WG_SIZE / 2, 1, 0);          /* the world's edge */
     add_box(WG_SIZE / 2, WG_SIZE + 1, WG_SIZE / 2, 1, 0);

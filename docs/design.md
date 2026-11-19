@@ -109,7 +109,11 @@ frames a second on a Pentium II 266 with a G200.
   (`CVAR`, docs/formats.md): each chunk's triangles are LOW's run, the
   shared run and MEDIUM and HIGH's run, one draw call either way. The
   shared terrain has 37% of the faceted terrain's vertices (DOS-GL
-  transforms each once); the pack is 8.3 MB (the plan's limit is 12).
+  transforms each once). The pack is 11.6 MB (the plan's limit is 12),
+  loaded whole: LOW carries about 5 MB of MEDIUM and HIGH's run it never
+  draws, and the 32 MB machine's heap (the mem suite: within 20 MB) is
+  mostly the pack. If it grows further, MEDIUM and HIGH's run goes into a
+  pack of its own that LOW does not load.
 - **The lorry** is as round as the preset's `models` says (`BUDGET.CFG`): 0
   (LOW) the boxes it always was; 1 (MEDIUM) and 2 (HIGH) a rounded cab
   with a wrap-round windscreen, side windows, mirrors, a grille and round
@@ -120,6 +124,25 @@ frames a second on a Pentium II 266 with a G200.
   trailer's (under its body) 8. With the box trailer: 360 triangles at 0,
   922 at 1, 1,242 at 2. It is built again when the governor changes the
   preset.
+- **Trees and hedges.** At MEDIUM and HIGH the trees are round: a smooth
+  crown (an icosahedron's 20 faces, normals from its middle, darker
+  underneath) on a five-sided trunk, about 30 triangles, and pines of two
+  smooth seven-sided tiers; LOW keeps its box crowns and spires in its own
+  run, at the same places, with the same collision boxes (the physics is
+  the same at every detail). Hedges run along the fields' boundaries, where
+  the field cuts find them (a cell's two stretches of one boundary made one,
+  10,729 stretches): a smooth three-edged mound 1.5 m across and 1 m high,
+  4 triangles, kept 8 m off the roads, a gap now and then; nothing collides
+  with them, and LOW has none.
+- **Houses** at MEDIUM and HIGH stand on LOW's boxes' footprints (the same
+  collision boxes): cottages with walls to the eaves, a pitched roof with
+  an overhang and gable ends, a chimney, a door and windows; the taller
+  buildings in the middles of towns flat-roofed with a parapet and rows of
+  windows; each about 30 to 60 triangles, flat-shaded, the walls darker at
+  their feet. A depot's warehouse has an arched roof. Their contact shadows
+  take the ground's own colour, darker. A town's streets are laid in 16 m
+  pieces: one quad from end to end went to the chunk holding its middle and
+  was drawn only while that chunk was in view, at every detail.
 - **The camera** follows speed (the owner's idea): 64 degrees down for
   manoeuvring, easing down from 18 km/h to the preset's `pitch_min` by 61
   km/h (LOW 52, MEDIUM 24, HIGH 20 degrees), closer and looking a little

@@ -141,16 +141,23 @@ timing is approximate, so the bench still decides.
 
 Smooth terrain (37% of the vertices), the rounded lorry at MEDIUM and HIGH
 (`models`), the camera coming down with speed (`pitch_min`: sky and fog at
-MEDIUM and HIGH), fields cut true at MEDIUM and HIGH, contact shadows and
-the route's chevrons. Headless, triangles a frame, mean / most:
+MEDIUM and HIGH), fields cut true, round trees, hedges and houses at
+MEDIUM and HIGH, contact shadows and the route's chevrons. Headless,
+triangles a frame, mean / most:
 
 | Preset | FW1 (`-autopilot -frames 3000`) | A whole job (`-autojob`) |
 |---|---|---|
-| LOW (`models` 0, `pitch_min` 52) | 1,448 / 1,992 | 1,438 / 2,102 |
-| MEDIUM (`models` 1, `pitch_min` 24) | 2,566 / 3,548 | 2,642 / 4,194 |
-| HIGH (`models` 2, `pitch_min` 20) | 3,180 / 4,520 | 3,156 / 4,964 |
+| LOW (`models` 0, `pitch_min` 52) | 1,511 / 1,992 | 1,464 / 2,102 |
+| MEDIUM (`models` 1, `pitch_min` 24) | 3,354 / 4,872 | 3,130 / 5,570 |
+| HIGH (`models` 2, `pitch_min` 20) | 4,113 / 6,240 | 3,702 / 6,490 |
 
-LOW costs what it did (less the terrain's vertex transforms): the pack's
-LOW run keeps its plainer terrain. The P3 with a TNT2 M64 ran the old look
-at 167 fps (the owner, 2026-11-19); MEDIUM and HIGH are meant for it and
-the G400 and G450, and want measuring there (FW1, FW1H).
+LOW costs what it did: the pack's LOW run keeps its plainer world (its
+mean rose 4% only because a town's streets, which had been drawn only
+while one chunk of them was in view, now always are). The P3 with a TNT2
+M64 ran the old look at 167 fps (the owner, 2026-11-19); MEDIUM and HIGH
+are meant for it and the G400 and G450, and want measuring there (FW1,
+FW1H). MEDIUM's peaks are past the plan's first guess (4,000); if the
+bench says so, the levers are the hedges (about 400 triangles a frame at
+MEDIUM), the far plane and pitch_min, all in BUDGET.CFG or the pack's runs.
+86Box draws the haul at MEDIUM, with fog, at a few frames a second; that is
+86Box, not a measurement.
