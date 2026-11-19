@@ -92,6 +92,35 @@ it brakes and jolting on knocks. Callouts squash and stretch as they land.
 Each kind lives in a fixed pool (16 coins, 64 confetti, 32 dust: a new one
 takes an old one's place), so a frame's cost has a ceiling (`-fxtest`).
 
+## The look (game/src/mesh.c, lorry.c, tools/fwgen.c)
+
+Cartoon and smooth, in the manner of the Nintendo 64 and GameCube rather
+than the faceted low-poly of before (the owner's direction, 2026-11-19),
+one art style scaled by the detail presets so that LOW still holds 30
+frames a second on a Pentium II 266 with a G200.
+
+- **The terrain** is smooth-shaded: each height sample a vertex lit by its
+  own normal, shared by the cells round it that lie in the same field, so
+  the fields' edges stay crisp. It has the same triangles as the faceted
+  terrain had and 37% of its vertices (DOS-GL transforms each once), and
+  the pack shrank from 7.0 to 5.0 MB.
+- **The lorry** is as round as the preset's `models` says (`BUDGET.CFG`): 0
+  (LOW) the boxes it always was; 1 (MEDIUM) and 2 (HIGH) a rounded cab
+  with a wrap-round windscreen, side windows, mirrors, a grille and round
+  lamps, round wheels with hubs, fuel tanks and mudguards, a rounded
+  trailer with a white roof, doors and tail lamps, a domed tanker. Big
+  parts round their edges in 1 or 2 steps a quarter turn (`mb_rbox`),
+  small ones not at all; the tractor's wheels have 8 or 12 sides, the
+  trailer's (under its body) 8. With the box trailer: 360 triangles at 0,
+  922 at 1, 1,242 at 2. It is built again when the governor changes the
+  preset.
+- **Light** on the world is baked (a warm sun from the north-west, strong
+  ambient). The lorry keeps each vertex's normal and is lit again as it
+  turns (`mb_relight`: the sun stays put in the world), with a plastic
+  toy's glint where its surfaces face halfway between the sun and straight
+  up. DOS-GL has no OpenGL lighting; this is a few hundred dot products a
+  frame.
+
 ## Shadows (game/src/lorry.c)
 
 The tractor, its trailer and the trailers standing at depots each cast a

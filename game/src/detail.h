@@ -1,7 +1,7 @@
 /* detail.h - the detail presets (LOW, MEDIUM, HIGH): how far the camera may
  * pull back and see, how many flourishes play at once, how much of the
  * road network the minimap draws, how far away standing trailers are
- * drawn. Their numbers come from BUDGET.CFG when it is there (`low.far =
+ * drawn, how round the models are. Their numbers come from BUDGET.CFG when it is there (`low.far =
  * 110`, ...), so the bench's measurements can retune them without a new
  * build. The governor steps below the chosen preset while frames run slow
  * (off in tests). */
@@ -18,6 +18,7 @@ typedef struct detail {
     int coins, confetti, dust;  /* flourishes at once (at most fx's pools) */
     int minimap_step;           /* road points one minimap segment spans */
     float trailers;             /* metres within which standing trailers are drawn */
+    int models;                 /* how round the models are: 0 boxes, 1 rounded, 2 rounder */
 } detail;
 
 extern const char *const detail_name[DETAILS];

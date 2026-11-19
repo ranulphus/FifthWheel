@@ -136,3 +136,20 @@ timing is approximate, so the bench still decides.
   colours) is the triangle-path work's next target; it gains every game.
 - LOW's numbers in `BUDGET.CFG` (the far plane above all) are the lever
   that needs no build.
+
+## The new look (2026-11-19)
+
+Smooth terrain (the same triangles, 37% of the vertices), the rounded
+lorry at MEDIUM and HIGH (`models`), contact shadows and the route's
+chevrons. Headless, triangles a frame, mean / most:
+
+| Preset | FW1 (`-autopilot -frames 3000`) | A whole job (`-autojob`) |
+|---|---|---|
+| LOW (`models` 0: boxes) | 1,440 / 1,992 | 1,429 / 2,102 |
+| MEDIUM (`models` 1) | 2,048 / 2,554 | 2,074 / 2,786 |
+| HIGH (`models` 2) | 2,379 / 2,874 | 2,434 / 3,434 |
+
+LOW costs what it did, less the terrain's vertex transforms; the P3 with a
+TNT2 M64 ran the old look at 167 fps (the owner, 2026-11-19), so MEDIUM and
+HIGH have room for more.
+

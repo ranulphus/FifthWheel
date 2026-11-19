@@ -25,9 +25,9 @@ void garage_open(garage *g, const career *c, lorry_meshes *m);
  * and sets g->open to 0 when the player leaves (the caller restyles the
  * lorry from the career then). */
 int  garage_tick(garage *g, career *c, lorry_meshes *m);
-void garage_draw(const garage *g, const career *c, const lorry_meshes *m, const dgk_font *font, float alpha);
+void garage_draw(const garage *g, const career *c, lorry_meshes *m, const dgk_font *font, float alpha);
 /* The showroom alone: a sky, a platform with a coloured rim, the tractor
  * turning (spin, radians) with a trailer of that type behind (-1: none). */
-void showroom_draw(const lorry_meshes *m, float spin, uint32_t rim_rgba, int trailer);
+void showroom_draw(lorry_meshes *m, float spin, uint32_t rim_rgba, int trailer);
 
 #endif

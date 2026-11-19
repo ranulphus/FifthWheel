@@ -191,10 +191,15 @@ static void dock_pose(game *g)
     g->r.gear = -1;
 }
 
-/* The detail in force: the chosen preset, less the governor's notches. */
+/* The detail in force: the chosen preset, less the governor's notches. The
+ * lorry is built again when its roundness changes. */
 static void detail_apply(game *g)
 {
     g->det = detail_effective(g->presets, g->detail_chosen, g->gov.notch);
+    if (g->lorry.quality != g->det.models) {
+        lorry_build(&g->lorry, g->det.models);
+        career_style(g);
+    }
     fx_caps(&g->fxs, g->det.coins, g->det.confetti, g->det.dust);
     g->cam.zoom = DGK_MIN(g->cam.zoom, g->det.zoom_max);
 }
@@ -260,7 +265,7 @@ static int init(void *u)
     camera_reset(&g->cam, &g->r);
     g->cam_prev = g->cam;
     autopilot_reset(&g->ap, &g->r, &g->w);
-    lorry_build(&g->lorry);
+    lorry_build(&g->lorry, 0);                       /* at the detail's roundness once it is known */
     if (dgk_font_load(&g->font, &fw_font) != 0)
         return -1;
     if (g->replay_path) {

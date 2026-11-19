@@ -133,7 +133,7 @@ static void centred(const dgk_font *f, float y, float scale, uint32_t rgba, cons
 
 /* The showroom: a sky, a platform with a coloured rim, and the tractor
  * turning on it (with a trailer of the given type behind, or -1). */
-void showroom_draw(const lorry_meshes *m, float spin, uint32_t rim_rgba, int trailer)
+void showroom_draw(lorry_meshes *m, float spin, uint32_t rim_rgba, int trailer)
 {
     int i;
     rig r;
@@ -175,7 +175,7 @@ void showroom_draw(const lorry_meshes *m, float spin, uint32_t rim_rgba, int tra
     lorry_draw(m, &r, NULL, NULL);
 }
 
-void garage_draw(const garage *g, const career *c, const lorry_meshes *m, const dgk_font *font, float alpha)
+void garage_draw(const garage *g, const career *c, lorry_meshes *m, const dgk_font *font, float alpha)
 {
     const item *it = &items[g->shown[g->kind]];
     float spin = g->spin_prev + (g->spin - g->spin_prev) * alpha;
