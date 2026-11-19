@@ -204,6 +204,9 @@ cancelling are input like the pedals, so replays carry them.
 
 - **Coupling:** back the tractor under the trailer: the fifth wheel within
   0.6 m of the kingpin, lined up within 12 degrees, slower than 1.5 m/s.
+- **Where to go:** before coupling, a gold arrow spins and bobs over the
+  waiting trailer's nose; within 150 m of the bay, over the bay, and while
+  docking a gold outline pulses round the bay on the ground (guides.c).
 - **The route:** the shortest way over the road graph (Dijkstra). The HUD's
   arrow points along it and the minimap draws it; more than 60 m off it,
   it is worked out again from the nearest junction. On the road ahead, gold

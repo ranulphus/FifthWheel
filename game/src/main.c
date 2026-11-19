@@ -652,8 +652,10 @@ static void draw(void *u, float alpha)
     {
         const parked *standing[WG_MAX_PLACES * 2];
         int i, n = parked_near(g, &r, standing);
-        if (g->has_jobs)
+        if (g->has_jobs) {
             route_draw(&g->jobs, &r, &g->w, dgk_app.ticks);
+            bay_draw(&g->jobs, &r, &g->w, dgk_app.ticks);
+        }
         lorry_shadows_begin();
         lorry_shadow_rig(&r, &g->w);
         for (i = 0; i < n; i++)
@@ -664,6 +666,8 @@ static void draw(void *u, float alpha)
             lorry_draw_trailer(&g->lorry, standing[i]->type, standing[i]->x, standing[i]->y, standing[i]->heading,
                                &g->w);
     }
+    if (g->has_jobs)
+        target_arrow_draw(&g->jobs, &r, &g->w, dgk_app.ticks);
     fx_draw_world(&g->fxs, &g->cam);
     glDisable(GL_FOG);
     if (g->rearcam)

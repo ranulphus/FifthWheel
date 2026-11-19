@@ -158,3 +158,111 @@ void route_draw(const jobs *j, const rig *r, const world *w, uint32_t ticks)
     glEnable(GL_DEPTH_TEST);
 }
 
+/* ---- the target's markers -------------------------------------------------- */
+
+#define BAY_HALF 1.6f           /* the bay's lines either side of its middle */
+#define BAY_LEN 19.5f           /* from the dock out to the lines' ends */
+#define BAY_NEAR 150.0f         /* metres from the bay: the markers show */
+
+/* The bay's middle line: from (bx, by) at the dock, out along heading bh. */
+static int target_bay(const jobs *j, const rig *r, const world *w, float *bx, float *by, float *bh)
+{
+    if (j->state != JOB_HAULING && j->state != JOB_DOCKING)
+        return 0;
+    jobs_bay(j, w, bx, by, bh);
+    return (*bx - r->x) * (*bx - r->x) + (*by - r->y) * (*by - r->y) < BAY_NEAR * BAY_NEAR;
+}
+
+void bay_draw(const jobs *j, const rig *r, const world *w, uint32_t ticks)
+{
+    float bx, by, bh, c, s, pulse = 0.5f + 0.5f * sinf((float)ticks * 0.07f);
+    static const float edge[4][4] = { { -0.5f, -BAY_HALF, BAY_LEN, -BAY_HALF }, { BAY_LEN, -BAY_HALF, BAY_LEN, BAY_HALF },
+                                      { BAY_LEN, BAY_HALF, -0.5f, BAY_HALF }, { -0.5f, BAY_HALF, -0.5f, -BAY_HALF } };
+    int k;
+    if (!target_bay(j, r, w, &bx, &by, &bh))
+        return;
+    c = cosf(bh);
+    s = sinf(bh);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBegin(GL_QUADS);
+    dgk_gfx_draws++;
+    glColor4ub(255, 210, 63, (GLubyte)(110.0f + 120.0f * pulse));
+    for (k = 0; k < 4; k++) {
+        /* A strip 0.35 m wide inside each side of the bay's rectangle. */
+        float a0 = edge[k][0], c0 = edge[k][1], a1 = edge[k][2], c1 = edge[k][3];
+        float da = a1 - a0, dc = c1 - c0, l = sqrtf(da * da + dc * dc), ia = -dc / l * 0.35f, ic = da / l * 0.35f;
+        float p[4][2] = { { a0, c0 }, { a1, c1 }, { a1 + ia, c1 + ic }, { a0 + ia, c0 + ic } };
+        int q;
+        for (q = 0; q < 4; q++) {
+            float x = bx + c * p[q][0] - s * p[q][1], y = by + s * p[q][0] + c * p[q][1];
+            glVertex3f(x, world_height(w, x, y) + CHEV_LIFT, -y);
+        }
+        dgk_gfx_tris += 2;
+    }
+    glEnd();
+    glDisable(GL_BLEND);
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
+}
+
+/* A gold arrow pointing down at (x, y), its tip `up` metres above the
+ * ground, turned `spin` radians: a four-sided head and a square shaft,
+ * each side a shade of its own. */
+static void arrow3d(const world *w, float x, float y, float up, float spin)
+{
+    static const float shade[4] = { 1.0f, 0.82f, 0.68f, 0.86f };
+    float g = world_height(w, x, y) + up;
+    int k;
+    glPushMatrix();
+    glTranslatef(x, g, -y);
+    glRotatef(spin * 57.29578f, 0, 1, 0);
+    glDisable(GL_CULL_FACE);
+    glBegin(GL_TRIANGLES);
+    dgk_gfx_draws++;
+    for (k = 0; k < 4; k++) {
+        float a0 = k * 1.5707963f, a1 = (k + 1) * 1.5707963f;
+        float x0 = cosf(a0) * 1.0f, z0 = sinf(a0) * 1.0f, x1 = cosf(a1) * 1.0f, z1 = sinf(a1) * 1.0f;
+        float sx0 = cosf(a0) * 0.38f, sz0 = sinf(a0) * 0.38f, sx1 = cosf(a1) * 0.38f, sz1 = sinf(a1) * 0.38f;
+        GLubyte r = (GLubyte)(255 * shade[k]), gg = (GLubyte)(210 * shade[k]), b = (GLubyte)(63 * shade[k]);
+        glColor3ub(r, gg, b);
+        glVertex3f(0, 0, 0);                         /* the head: from the tip up to its rim */
+        glVertex3f(x0, 1.3f, z0);
+        glVertex3f(x1, 1.3f, z1);
+        glVertex3f(sx0, 1.3f, sz0);                  /* the shaft's side */
+        glVertex3f(sx0, 2.9f, sz0);
+        glVertex3f(sx1, 2.9f, sz1);
+        glVertex3f(sx0, 1.3f, sz0);
+        glVertex3f(sx1, 2.9f, sz1);
+        glVertex3f(sx1, 1.3f, sz1);
+    }
+    glColor3ub(255, 236, 140);                       /* the head's rim and the shaft's top, lit */
+    for (k = 1; k < 3; k++) {
+        glVertex3f(1.0f, 1.3f, 0);
+        glVertex3f(cosf(k * 1.5707963f), 1.3f, sinf(k * 1.5707963f));
+        glVertex3f(cosf((k + 1) * 1.5707963f), 1.3f, sinf((k + 1) * 1.5707963f));
+        glVertex3f(0.38f, 2.9f, 0);
+        glVertex3f(cosf(k * 1.5707963f) * 0.38f, 2.9f, sinf(k * 1.5707963f) * 0.38f);
+        glVertex3f(cosf((k + 1) * 1.5707963f) * 0.38f, 2.9f, sinf((k + 1) * 1.5707963f) * 0.38f);
+    }
+    glEnd();
+    dgk_gfx_tris += 16;
+    glEnable(GL_CULL_FACE);
+    glPopMatrix();
+}
+
+void target_arrow_draw(const jobs *j, const rig *r, const world *w, uint32_t ticks)
+{
+    float t = (float)ticks / 60.0f, bob = 0.7f * fabsf(sinf(t * 2.6f)), bx, by, bh;
+    if (j->state == JOB_TO_PICKUP) {
+        const parked *p = &j->trailers[j->current.from];
+        if (p->present)
+            arrow3d(w, p->x - 1.0f * cosf(p->heading), p->y - 1.0f * sinf(p->heading), 5.6f + bob, t * 2.0f);
+        return;
+    }
+    if (target_bay(j, r, w, &bx, &by, &bh) && j->state != JOB_DOCKING)
+        arrow3d(w, bx + 9.0f * cosf(bh), by + 9.0f * sinf(bh), 5.0f + bob, t * 2.0f);
+}
+

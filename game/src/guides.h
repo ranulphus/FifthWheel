@@ -17,4 +17,12 @@ void guides_draw(const rig *r, const world *w);
  * before the shadows and the lorries. Nothing when the rig is off the route. */
 void route_draw(const jobs *j, const rig *r, const world *w, uint32_t ticks);
 
+/* Where the job wants the rig. Docking (or hauling within 150 m of the
+ * bay): a pulsing gold outline round the bay, drawn on the ground like the
+ * chevrons (before the shadows and the lorries; bay_draw); and a gold arrow
+ * spinning and bobbing over the bay, or over the waiting trailer's nose
+ * before coupling, drawn after the lorries (target_arrow_draw). */
+void bay_draw(const jobs *j, const rig *r, const world *w, uint32_t ticks);
+void target_arrow_draw(const jobs *j, const rig *r, const world *w, uint32_t ticks);
+
 #endif
