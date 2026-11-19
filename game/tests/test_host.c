@@ -60,6 +60,17 @@ static void presets(void)
     CHECK(p[DETAIL_HIGH].confetti == 64, "confetti held to the pool: %d", p[DETAIL_HIGH].confetti);
     CHECK(p[DETAIL_MEDIUM].zoom_max == 1, "medium.zoom_max: %d", p[DETAIL_MEDIUM].zoom_max);
     CHECK(detail_parse("high") == DETAIL_HIGH && detail_parse("ultra") == -1, "parse");
+    /* Each card's own preset (the owner's targets). */
+    CHECK(detail_for_renderer("DOS-GL on MGA-G200 (AGP)") == DETAIL_LOW, "G200: low");
+    CHECK(detail_for_renderer("DOS-GL on MGA-G100 (PCI)") == DETAIL_LOW, "G100: low");
+    CHECK(detail_for_renderer("DOS-GL on Software") == DETAIL_LOW, "software: low");
+    CHECK(detail_for_renderer("DOS-GL on MGA-G400/G450") == DETAIL_MEDIUM, "G400: medium");
+    CHECK(detail_for_renderer("DOS-GL on MGA-G450") == DETAIL_MEDIUM, "G450: medium");
+    CHECK(detail_for_renderer("DOS-GL on Riva TNT2 M64") == DETAIL_MEDIUM, "TNT2 M64: medium");
+    CHECK(detail_for_renderer("DOS-GL on Vanta") == DETAIL_LOW, "a Vanta (a cut-down TNT2): low");
+    CHECK(detail_for_renderer("DOS-GL on ATI Radeon 7500") == DETAIL_HIGH, "Radeon 7500: high");
+    CHECK(detail_for_renderer("Mesa Intel(R) UHD Graphics") == DETAIL_HIGH, "a desktop's GL: high");
+    CHECK(detail_for_renderer(NULL) == DETAIL_LOW, "no renderer: low");
 }
 
 static void settings(void)

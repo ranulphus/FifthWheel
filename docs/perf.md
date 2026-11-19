@@ -141,23 +141,27 @@ timing is approximate, so the bench still decides.
 
 Smooth terrain (37% of the vertices), the rounded lorry at MEDIUM and HIGH
 (`models`), the camera coming down with speed (`pitch_min`: sky and fog at
-MEDIUM and HIGH), fields cut true, round trees, hedges and houses at
-MEDIUM and HIGH, contact shadows and the route's chevrons. Headless,
-triangles a frame, mean / most:
+MEDIUM and HIGH), fields cut true, round trees, hedges, houses and the
+roads' edge lines at MEDIUM and HIGH, contact shadows, the route's
+chevrons and the target's markers. Headless, triangles a frame, mean /
+most:
 
 | Preset | FW1 (`-autopilot -frames 3000`) | A whole job (`-autojob`) |
 |---|---|---|
-| LOW (`models` 0, `pitch_min` 52) | 1,511 / 1,992 | 1,464 / 2,102 |
-| MEDIUM (`models` 1, `pitch_min` 24) | 3,354 / 4,872 | 3,130 / 5,570 |
-| HIGH (`models` 2, `pitch_min` 20) | 4,113 / 6,240 | 3,702 / 6,490 |
+| LOW (`models` 0, `pitch_min` 52) | 1,500 / 1,992 | 1,459 / 2,102 |
+| MEDIUM (`models` 1, `pitch_min` 24) | 3,514 / 5,100 | 3,277 / 5,834 |
+| HIGH (`models` 2, `pitch_min` 20) | 4,289 / 6,480 | 3,867 / 6,804 |
 
-LOW costs what it did: the pack's LOW run keeps its plainer world (its
-mean rose 4% only because a town's streets, which had been drawn only
-while one chunk of them was in view, now always are). The P3 with a TNT2
-M64 ran the old look at 167 fps (the owner, 2026-11-19); MEDIUM and HIGH
-are meant for it and the G400 and G450, and want measuring there (FW1,
-FW1H). MEDIUM's peaks are past the plan's first guess (4,000); if the
-bench says so, the levers are the hedges (about 400 triangles a frame at
-MEDIUM), the far plane and pitch_min, all in BUDGET.CFG or the pack's runs.
+The presets' cards (the owner, 2026-11-19): LOW the G200, MEDIUM the G400,
+G450 and TNT2, HIGH the Radeon 7200 and 7500 (to come in DOS-GL; their
+hardware transforms vertices, so HIGH's triangles will cost the CPU
+little). LOW costs what it did: the pack's LOW run keeps its plainer world
+(its mean rose 4% only because a town's streets, which had been drawn
+only while one chunk of them was in view, now always are). The P3 with a
+TNT2 M64 ran the old look at 167 fps; MEDIUM wants measuring there and on
+the G400 and G450 (FW1). Its peaks are past the plan's first guess
+(4,000); if the bench says so, the levers are the hedges (about 400
+triangles a frame), the far plane and pitch_min, all in BUDGET.CFG or the
+pack's runs. HIGH is for the Radeon and can grow.
 86Box draws the haul at MEDIUM, with fog, at a few frames a second; that is
 86Box, not a measurement.

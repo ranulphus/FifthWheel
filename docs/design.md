@@ -60,12 +60,22 @@ can ask for `-title`); while recording or replaying, Esc still quits.
 
 ## Detail (game/src/detail.c)
 
+Each preset is meant for a card (the owner, 2026-11-19): LOW for the
+Matrox G200 (the minimum machine, a Pentium II 266, at 30 frames a
+second), MEDIUM for the G400, G450 and the RIVA TNT2, HIGH for the ATI
+Radeon 7200 and 7500 once DOS-GL drives them (a Radeon transforms vertices
+itself, so HIGH need not keep to what a CPU can transform). The game
+starts at the preset meant for the card it finds (`detail_for_renderer`,
+from DOS-GL's renderer name; a desktop's own OpenGL gets HIGH) unless
+`-detail` or the options' choice in `FWHEEL.CFG` says otherwise; tests start
+at MEDIUM on every card, so a frame is the same picture on each.
+
 LOW, MEDIUM and HIGH (`docs/perf.md`) set the far plane, the furthest zoom
 (Z cycles near, normal and far), the flourishes' caps, the minimap's road
-detail and the standing trailers' distance; `BUDGET.CFG` overrides the
-numbers. The governor watches the frame time and steps a preset down when
-frames run slow, back up when there is room again; it is off in tests and
-with `-fixed`.
+detail, the standing trailers' distance, how round the models are and how
+low the camera comes; `BUDGET.CFG` overrides the numbers. The governor
+watches the frame time and steps a preset down when frames run slow, back
+up when there is room again; it is off in tests and with `-fixed`.
 
 ## Career and garage (game/src/career.c, garage.c)
 

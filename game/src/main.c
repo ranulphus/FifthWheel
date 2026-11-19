@@ -209,16 +209,28 @@ static void detail_apply(game *g)
     g->cam.zoom = DGK_MIN(g->cam.zoom, g->det.zoom_max);
 }
 
+/* The detail: -detail, else FWHEEL.CFG's, else the card's own (detail.h),
+ * except in a test, where it is MEDIUM on every card so that the same frame
+ * is the same picture on each. */
 static void detail_start(game *g)
 {
     int d = detail_parse(dgk_cfg_get(&g->cfg, "detail"));
+    const char *renderer = (const char *)glGetString(GL_RENDERER), *why = "chosen";
     detail_load(g->presets, g->budget_path);
-    if (g->detail_chosen < 0)
-        g->detail_chosen = d >= 0 ? d : DETAIL_MEDIUM;
+    if (g->detail_chosen < 0 && d >= 0) {
+        g->detail_chosen = d;
+        why = g->cfg_path;
+    } else if (g->detail_chosen < 0 && dgk_test_active()) {
+        g->detail_chosen = DETAIL_MEDIUM;
+        why = "a test";
+    } else if (g->detail_chosen < 0) {
+        g->detail_chosen = detail_for_renderer(renderer);
+        why = renderer ? renderer : "no renderer";
+    }
     g->gov.on = !dgk_app.fixed && !dgk_test_active() && dgk_cfg_int(&g->cfg, "governor", 1);
     g->cam.zoom = g->zoom_wanted >= 0 ? g->zoom_wanted : 1;
     detail_apply(g);
-    dgk_log("FW-CFG detail %s, governor %s", detail_name[g->detail_chosen], g->gov.on ? "on" : "off");
+    dgk_log("FW-CFG detail %s (%s), governor %s", detail_name[g->detail_chosen], why, g->gov.on ? "on" : "off");
 }
 
 static int init(void *u)

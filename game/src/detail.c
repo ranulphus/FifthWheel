@@ -49,6 +49,32 @@ void detail_load(detail presets[DETAILS], const char *budget_path)
                 presets[1].far, presets[2].far);
 }
 
+static int has(const char *s, const char *word)
+{
+    size_t n = strlen(word);
+    for (; *s; s++) {
+        size_t i;
+        for (i = 0; i < n && s[i] && (s[i] | 32) == (word[i] | 32); i++)
+            continue;
+        if (i == n)
+            return 1;
+    }
+    return 0;
+}
+
+int detail_for_renderer(const char *renderer)
+{
+    if (!renderer)
+        return DETAIL_LOW;
+    if (has(renderer, "radeon"))
+        return DETAIL_HIGH;
+    if (has(renderer, "G400") || has(renderer, "G450") || has(renderer, "G550") || has(renderer, "TNT"))
+        return DETAIL_MEDIUM;
+    if (strncmp(renderer, "DOS-GL", 6) != 0)
+        return DETAIL_HIGH;                          /* a desktop's own OpenGL (the Linux build) */
+    return DETAIL_LOW;                               /* the G200, the G100, software, anything else */
+}
+
 int detail_parse(const char *name)
 {
     int i;

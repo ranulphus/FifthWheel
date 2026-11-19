@@ -27,6 +27,12 @@ extern const char *const detail_name[DETAILS];
 /* The compiled-in presets, then BUDGET.CFG's numbers over them (if found). */
 void detail_load(detail presets[DETAILS], const char *budget_path);
 int  detail_parse(const char *name);          /* "low", "medium", "high"; -1 if neither */
+/* The preset a card is meant for (the owner's targets, 2026-11-19): LOW
+ * for the G200 (and the G100, the software renderer, anything unknown on
+ * DOS-GL), MEDIUM for the G400, G450 and the TNT2, HIGH for the Radeon 7200
+ * and 7500 (when DOS-GL drives them) and a desktop's own OpenGL. From
+ * glGetString(GL_RENDERER): "DOS-GL on MGA-G450" and the like. */
+int  detail_for_renderer(const char *renderer);
 
 /* The governor: fed each frame's milliseconds, it steps down a notch after
  * 2 s averaging slower than 36 ms (under 28 fps) and back up after 6 s
