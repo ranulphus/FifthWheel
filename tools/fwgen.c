@@ -257,6 +257,35 @@ static void quad(const float *p0, const float *p1, const float *p2, const float 
     total_tris += 2;
 }
 
+/* A vertex of chunk c's mesh (GL coordinates, an RGB colour): its index. */
+static int cmesh_vertex(cmesh *c, const float *p, uint32_t rgb)
+{
+    if (c->nverts + 1 > c->cap_v) {
+        c->cap_v = c->cap_v ? c->cap_v * 2 : 1024;
+        c->pos = (float *)realloc(c->pos, (size_t)c->cap_v * 12);
+        c->rgba = (uint8_t *)realloc(c->rgba, (size_t)c->cap_v * 4);
+    }
+    memcpy(&c->pos[c->nverts * 3], p, 3 * sizeof(float));
+    c->rgba[c->nverts * 4 + 0] = (uint8_t)(rgb >> 16);
+    c->rgba[c->nverts * 4 + 1] = (uint8_t)(rgb >> 8);
+    c->rgba[c->nverts * 4 + 2] = (uint8_t)rgb;
+    c->rgba[c->nverts * 4 + 3] = 255;
+    return c->nverts++;
+}
+
+static void cmesh_tri(cmesh *c, int a, int b, int d)
+{
+    if (c->ntris + 1 > c->cap_t) {
+        c->cap_t = c->cap_t ? c->cap_t * 2 : 1024;
+        c->idx = (uint16_t *)realloc(c->idx, (size_t)c->cap_t * 6);
+    }
+    c->idx[c->ntris * 3 + 0] = (uint16_t)a;
+    c->idx[c->ntris * 3 + 1] = (uint16_t)b;
+    c->idx[c->ntris * 3 + 2] = (uint16_t)d;
+    c->ntris++;
+    total_tris++;
+}
+
 /* A flat quad lying on the ground (plus lift), corners in ground coordinates. */
 static void ground_quad(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float lift,
                         uint32_t rgb, float light)
@@ -810,20 +839,64 @@ static void fit_surfaces(void)
     }
 }
 
+/* The sun's light on the terrain at sample (i, j), from its own normal (the
+ * height field's slope across the samples either side): smooth shading. */
+static float terrain_light(int i, int j)
+{
+    float sx = (h_at(i + 1, j) - h_at(i - 1, j)) / (2 * WG_CELL), sy = (h_at(i, j + 1) - h_at(i, j - 1)) / (2 * WG_CELL);
+    float l = sqrtf(sx * sx + 1 + sy * sy);
+    return mb_light(-sx / l, 1 / l, sy / l);
+}
+
+/* The terrain, smooth: each sample a vertex lit by its own normal, shared by
+ * the cells around it that lie in the same field; where fields meet, each
+ * keeps its own (the patchwork's edges stay crisp). The cells' split is the
+ * one world_height reads (0-1-2, 0-2-3). */
+#define CHUNK_CELLS 8                    /* WG_CHUNK / WG_CELL: checked in build_terrain */
+
 static void build_terrain(void)
 {
-    int i, j;
+    int i, j, cx, cy;
+    if (CHUNK_CELLS * WG_CELL != WG_CHUNK) {
+        fprintf(stderr, "fwgen: CHUNK_CELLS is not WG_CHUNK / WG_CELL\n");
+        exit(1);
+    }
     for (i = 0; i < FIELDS; i++) {
         field_seed[i][0] = frand() * WG_SIZE;
         field_seed[i][1] = frand() * WG_SIZE;
         field_crop[i] = (uint8_t)dgk_rng_below(&rng, DGK_ARRAY_LEN(crops));
     }
-    for (j = 0; j < WG_HN - 1; j++)
-        for (i = 0; i < WG_HN - 1; i++) {
-            float x0 = i * WG_CELL, y0 = j * WG_CELL, x1 = x0 + WG_CELL, y1 = y0 + WG_CELL;
-            float p[4][3] = { { x0, h_at(i, j), -y0 }, { x1, h_at(i + 1, j), -y0 },
-                              { x1, h_at(i + 1, j + 1), -y1 }, { x0, h_at(i, j + 1), -y1 } };
-            quad(p[0], p[1], p[2], p[3], ground_colour(x0 + WG_CELL / 2, y0 + WG_CELL / 2), -1);
+    for (cy = 0; cy < WG_CHUNKS; cy++)
+        for (cx = 0; cx < WG_CHUNKS; cx++) {
+            /* Up to four colours meet at a sample: its vertices so far. */
+            static struct { uint32_t rgb; int idx; } seen[CHUNK_CELLS + 1][CHUNK_CELLS + 1][4];
+            static int nseen[CHUNK_CELLS + 1][CHUNK_CELLS + 1];
+            cmesh *c = &chunks[cy * WG_CHUNKS + cx];
+            memset(nseen, 0, sizeof nseen);
+            for (j = 0; j < CHUNK_CELLS; j++)
+                for (i = 0; i < CHUNK_CELLS; i++) {
+                    static const int corner[4][2] = { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } };
+                    int gi = cx * CHUNK_CELLS + i, gj = cy * CHUNK_CELLS + j, v[4], k;
+                    uint32_t rgb = ground_colour((gi + 0.5f) * WG_CELL, (gj + 0.5f) * WG_CELL);
+                    for (k = 0; k < 4; k++) {
+                        int li = i + corner[k][0], lj = j + corner[k][1], s;
+                        for (s = 0; s < nseen[lj][li] && seen[lj][li][s].rgb != rgb; s++)
+                            continue;
+                        if (s == nseen[lj][li]) {
+                            float p[3];
+                            p[0] = (gi + corner[k][0]) * WG_CELL;
+                            p[1] = h_at(gi + corner[k][0], gj + corner[k][1]);
+                            p[2] = -(gj + corner[k][1]) * WG_CELL;
+                            seen[lj][li][s].rgb = rgb;
+                            seen[lj][li][s].idx = cmesh_vertex(c, p, mb_shade(rgb, terrain_light(gi + corner[k][0],
+                                                                                                 gj + corner[k][1])));
+                            nseen[lj][li]++;
+                        }
+                        v[k] = seen[lj][li][s].idx;
+                    }
+                    cmesh_tri(c, v[0], v[1], v[2]);
+                    cmesh_tri(c, v[0], v[2], v[3]);
+                }
         }
 }
 
