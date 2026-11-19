@@ -217,7 +217,8 @@ typedef struct cmesh {
     int nverts, ntris, cap_v, cap_t;
 } cmesh;
 
-static cmesh chunks[WG_CHUNKS * WG_CHUNKS];
+static cmesh chunks[WG_VARIANTS][WG_CHUNKS * WG_CHUNKS];
+static int variant = WG_SHARED;                   /* where quad() puts what it makes */
 static long total_tris;
 
 static cmesh *chunk_for(float x, float y)
@@ -225,7 +226,7 @@ static cmesh *chunk_for(float x, float y)
     int cx = (int)(x / WG_CHUNK), cy = (int)(y / WG_CHUNK);
     cx = cx < 0 ? 0 : cx >= WG_CHUNKS ? WG_CHUNKS - 1 : cx;
     cy = cy < 0 ? 0 : cy >= WG_CHUNKS ? WG_CHUNKS - 1 : cy;
-    return &chunks[cy * WG_CHUNKS + cx];
+    return &chunks[variant][cy * WG_CHUNKS + cx];
 }
 
 /* A quad in GL coordinates (x, height, -y), anticlockwise seen from its
@@ -782,14 +783,16 @@ static void build_depot(const place *d, wg_depot *out)
 static float field_seed[FIELDS][2];
 static uint8_t field_crop[FIELDS];
 
-static uint32_t ground_colour(float x, float y)
+/* The ground's regions: a place's grass (a disc, radius r + 30), else the
+ * field of the nearest seed. A region: -1 - place, or the field's index. */
+static int region_at(float x, float y)
 {
     int i, best = 0;
     float bd = 1e30f;
     for (i = 0; i < nplaces; i++) {
         float dx = x - places[i].x, dy = y - places[i].y;
         if (dx * dx + dy * dy < (places[i].r + 30) * (places[i].r + 30))
-            return 0x7CCB55u;                                   /* town and depot grass */
+            return -1 - i;
     }
     for (i = 0; i < FIELDS; i++) {
         float dx = x - field_seed[i][0], dy = y - field_seed[i][1], d = dx * dx + dy * dy;
@@ -798,7 +801,34 @@ static uint32_t ground_colour(float x, float y)
             best = i;
         }
     }
-    return crops[field_crop[best]];
+    return best;
+}
+
+static uint32_t region_colour(int r)
+{
+    return r < 0 ? 0x7CCB55u : crops[field_crop[r]];       /* town and depot grass; a crop */
+}
+
+static uint32_t ground_colour(float x, float y)
+{
+    return region_colour(region_at(x, y));
+}
+
+/* Negative on region a's side of its boundary with region b, positive on
+ * b's: between two fields the bisector of their seeds (a straight line);
+ * round a place, its disc (a circle: cut by chords, 2 cm off at most). */
+static float region_split(int a, int b, float x, float y)
+{
+    if (a < 0) {
+        const place *p = &places[-1 - a];
+        return (x - p->x) * (x - p->x) + (y - p->y) * (y - p->y) - (p->r + 30) * (p->r + 30);
+    }
+    if (b < 0) {
+        const place *p = &places[-1 - b];
+        return (p->r + 30) * (p->r + 30) - (x - p->x) * (x - p->x) - (y - p->y) * (y - p->y);
+    }
+    return (x - field_seed[a][0]) * (x - field_seed[a][0]) + (y - field_seed[a][1]) * (y - field_seed[a][1]) -
+           (x - field_seed[b][0]) * (x - field_seed[b][0]) - (y - field_seed[b][1]) * (y - field_seed[b][1]);
 }
 
 /* The terrain fitted under everything laid flat on it: the roads, each
@@ -848,10 +878,98 @@ static float terrain_light(int i, int j)
     return mb_light(-sx / l, 1 / l, sy / l);
 }
 
+/* A point of the terrain: ground x, y, its height and its light. */
+typedef struct tvert {
+    float x, y, h, light;
+} tvert;
+
+/* Where f (f(p) < 0 < f(q)) crosses p-q, worked out from whichever end
+ * comes first (x, then y): the cells either side of an edge cross it at
+ * exactly the same point, so no crack opens between them. */
+static tvert crossing(tvert p, float fp, tvert q, float fq)
+{
+    tvert r;
+    float t;
+    if (q.x < p.x || (q.x == p.x && q.y < p.y)) {
+        tvert s = p;
+        float fs = fp;
+        p = q;
+        q = s;
+        fp = fq;
+        fq = fs;
+    }
+    t = fp / (fp - fq);
+    r.x = p.x + (q.x - p.x) * t;
+    r.y = p.y + (q.y - p.y) * t;
+    r.h = p.h + (q.h - p.h) * t;
+    r.light = p.light + (q.light - p.light) * t;
+    return r;
+}
+
+/* A convex piece of a terrain triangle, cut along the regions' boundaries
+ * until each piece lies in one region's colour; each a fan of its own
+ * vertices. The pieces lie on the triangle (heights interpolated), so the
+ * ground is where it was. */
+static void terrain_piece(cmesh *c, const tvert *v, int n, int depth)
+{
+    tvert a[12], b[12];
+    int reg[12], i, k, na = 0, nb = 0;
+    float f[12], mx = 0, my = 0;
+    /* Each corner's region, a little inside the piece: a corner made by a
+     * cut lies on the boundary itself, where either region might answer. */
+    for (i = 0; i < n; i++) {
+        mx += v[i].x / n;
+        my += v[i].y / n;
+    }
+    for (i = 0; i < n; i++)
+        reg[i] = region_at(v[i].x + (mx - v[i].x) * 0.01f, v[i].y + (my - v[i].y) * 0.01f);
+    for (k = 1; k < n && region_colour(reg[k]) == region_colour(reg[0]); k++)
+        continue;
+    if (k == n || depth > 6 || n > 9) {
+        float cx = 0, cy = 0;
+        int first;
+        for (i = 0; i < n; i++) {
+            cx += v[i].x / n;
+            cy += v[i].y / n;
+        }
+        first = c->nverts;
+        for (i = 0; i < n; i++) {
+            float p[3];
+            p[0] = v[i].x;
+            p[1] = v[i].h;
+            p[2] = -v[i].y;
+            cmesh_vertex(c, p, mb_shade(k == n ? region_colour(reg[0]) : ground_colour(cx, cy), v[i].light));
+        }
+        for (i = 1; i + 1 < n; i++)
+            cmesh_tri(c, first, first + i, first + i + 1);
+        return;
+    }
+    for (i = 0; i < n; i++)
+        f[i] = region_split(reg[0], reg[k], v[i].x, v[i].y);
+    for (i = 0; i < n; i++) {                        /* Sutherland-Hodgman: a gets f <= 0, b gets f > 0 */
+        int j = (i + 1) % n;
+        if (f[i] <= 0)
+            a[na++] = v[i];
+        else
+            b[nb++] = v[i];
+        if ((f[i] <= 0) != (f[j] <= 0)) {
+            tvert x = f[i] <= 0 ? crossing(v[i], f[i], v[j], f[j]) : crossing(v[j], f[j], v[i], f[i]);
+            a[na++] = x;
+            b[nb++] = x;
+        }
+    }
+    if (na >= 3)
+        terrain_piece(c, a, na, depth + 1);
+    if (nb >= 3)
+        terrain_piece(c, b, nb, depth + 1);
+}
+
 /* The terrain, smooth: each sample a vertex lit by its own normal, shared by
- * the cells around it that lie in the same field; where fields meet, each
- * keeps its own (the patchwork's edges stay crisp). The cells' split is the
- * one world_height reads (0-1-2, 0-2-3). */
+ * the cells around it that lie in the same field. A cell whose corners lie
+ * in fields of different colours is cut along their boundary (straight
+ * between fields, chords round a place's grass), so the patchwork's edges
+ * run true rather than in 16 m steps. The cells' split is the one
+ * world_height reads (0-1-2, 0-2-3). */
 #define CHUNK_CELLS 8                    /* WG_CHUNK / WG_CELL: checked in build_terrain */
 
 static void build_terrain(void)
@@ -871,13 +989,45 @@ static void build_terrain(void)
             /* Up to four colours meet at a sample: its vertices so far. */
             static struct { uint32_t rgb; int idx; } seen[CHUNK_CELLS + 1][CHUNK_CELLS + 1][4];
             static int nseen[CHUNK_CELLS + 1][CHUNK_CELLS + 1];
-            cmesh *c = &chunks[cy * WG_CHUNKS + cx];
+            cmesh *c = &chunks[WG_SHARED][cy * WG_CHUNKS + cx];
             memset(nseen, 0, sizeof nseen);
             for (j = 0; j < CHUNK_CELLS; j++)
                 for (i = 0; i < CHUNK_CELLS; i++) {
                     static const int corner[4][2] = { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } };
                     int gi = cx * CHUNK_CELLS + i, gj = cy * CHUNK_CELLS + j, v[4], k;
-                    uint32_t rgb = ground_colour((gi + 0.5f) * WG_CELL, (gj + 0.5f) * WG_CELL);
+                    uint32_t rgb = ground_colour((gi + 0.5f) * WG_CELL, (gj + 0.5f) * WG_CELL), at[4];
+                    for (k = 0; k < 4; k++)
+                        at[k] = ground_colour((gi + corner[k][0]) * WG_CELL, (gj + corner[k][1]) * WG_CELL);
+                    if (at[1] != at[0] || at[2] != at[0] || at[3] != at[0]) {
+                        tvert t[4];
+                        for (k = 0; k < 4; k++) {
+                            t[k].x = (gi + corner[k][0]) * WG_CELL;
+                            t[k].y = (gj + corner[k][1]) * WG_CELL;
+                            t[k].h = h_at(gi + corner[k][0], gj + corner[k][1]);
+                            t[k].light = terrain_light(gi + corner[k][0], gj + corner[k][1]);
+                        }
+                        {
+                            /* MEDIUM and HIGH: cut true. LOW: the cell whole, in its middle's colour (fewer triangles). */
+                            tvert t1[3], t2[3];
+                            cmesh *lo = &chunks[WG_LOW_ONLY][cy * WG_CHUNKS + cx];
+                            int q[4];
+                            t1[0] = t[0]; t1[1] = t[1]; t1[2] = t[2];
+                            t2[0] = t[0]; t2[1] = t[2]; t2[2] = t[3];
+                            terrain_piece(&chunks[WG_HIGH_ONLY][cy * WG_CHUNKS + cx], t1, 3, 0);
+                            terrain_piece(&chunks[WG_HIGH_ONLY][cy * WG_CHUNKS + cx], t2, 3, 0);
+                            for (k = 0; k < 4; k++) {
+                                float pp[3];
+                                pp[0] = t[k].x;
+                                pp[1] = t[k].h;
+                                pp[2] = -t[k].y;
+                                q[k] = cmesh_vertex(lo, pp, mb_shade(rgb, t[k].light));
+                            }
+                            cmesh_tri(lo, q[0], q[1], q[2]);
+                            cmesh_tri(lo, q[0], q[2], q[3]);
+                        }
+                        continue;
+                    }
+                    rgb = at[0];
                     for (k = 0; k < 4; k++) {
                         int li = i + corner[k][0], lj = j + corner[k][1], s;
                         for (s = 0; s < nseen[lj][li] && seen[lj][li][s].rgb != rgb; s++)
@@ -1112,31 +1262,48 @@ static int write_pack(const char *path, const wg_depot *depots)
     uint16_t *tris = NULL;
     size_t cap_v = 0, cap_t = 0, nv = 0, nt = 0;
     int c, i, n;
+    wg_variant *var = (wg_variant *)calloc(WG_CHUNKS * WG_CHUNKS, sizeof *var);
+    size_t run_tris[WG_VARIANTS] = { 0, 0, 0 };
     for (c = 0; c < WG_CHUNKS * WG_CHUNKS; c++) {
-        cmesh *m = &chunks[c];
+        /* The chunk's three runs one after another (LOW's, the shared, MEDIUM and HIGH's), each's indices
+         * moved past the vertices before it. */
         float ox = (c % WG_CHUNKS) * WG_CHUNK, oy = (c / WG_CHUNKS) * WG_CHUNK, hmin = 1e9f, hmax = -1e9f;
+        int r, base = 0;
         index[c].first_vertex = (uint32_t)nv;
-        index[c].nverts = (uint32_t)m->nverts;
         index[c].first_index = (uint32_t)nt * 3;
-        index[c].ntris = (uint32_t)m->ntris;
-        verts = (wg_vertex *)grow(verts, &cap_v, (nv + (size_t)m->nverts) * sizeof *verts);
-        tris = (uint16_t *)grow(tris, &cap_t, (nt + (size_t)m->ntris) * 6);
-        for (i = 0; i < m->nverts; i++) {
-            wg_vertex *v = &verts[nv + (size_t)i];
-            float x = m->pos[i * 3], h = m->pos[i * 3 + 1], y = -m->pos[i * 3 + 2];
-            v->x = (int16_t)lrintf((x - ox) * WG_UNIT);
-            v->y = (int16_t)lrintf(h * WG_UNIT);
-            v->z = (int16_t)lrintf((oy - y) * WG_UNIT);
-            v->pad = 0;
-            memcpy(v->rgba, &m->rgba[i * 4], 4);
-            hmin = DGK_MIN(hmin, h);
-            hmax = DGK_MAX(hmax, h);
+        for (r = 0; r < WG_VARIANTS; r++) {
+            cmesh *m = &chunks[r][c];
+            verts = (wg_vertex *)grow(verts, &cap_v, (nv + (size_t)m->nverts) * sizeof *verts);
+            tris = (uint16_t *)grow(tris, &cap_t, (nt + (size_t)m->ntris) * 6);
+            for (i = 0; i < m->nverts; i++) {
+                wg_vertex *v = &verts[nv + (size_t)i];
+                float x = m->pos[i * 3], h = m->pos[i * 3 + 1], y = -m->pos[i * 3 + 2];
+                v->x = (int16_t)lrintf((x - ox) * WG_UNIT);
+                v->y = (int16_t)lrintf(h * WG_UNIT);
+                v->z = (int16_t)lrintf((oy - y) * WG_UNIT);
+                v->pad = 0;
+                memcpy(v->rgba, &m->rgba[i * 4], 4);
+                hmin = DGK_MIN(hmin, h);
+                hmax = DGK_MAX(hmax, h);
+            }
+            for (i = 0; i < m->ntris * 3; i++)
+                tris[nt * 3 + (size_t)i] = (uint16_t)(m->idx[i] + base);
+            if (base + m->nverts > 65535) {
+                fprintf(stderr, "fwgen: chunk %d has %d vertices, more than 16-bit indices reach\n", c,
+                        base + m->nverts);
+                exit(1);
+            }
+            base += m->nverts;
+            run_tris[r] += (size_t)m->ntris;
+            nv += (size_t)m->nverts;
+            nt += (size_t)m->ntris;
+            index[c].ntris += (uint32_t)m->ntris;
         }
-        memcpy(tris + nt * 3, m->idx, (size_t)m->ntris * 6);
-        index[c].hmin = (int16_t)floorf((m->nverts ? hmin : 0) * 10);
-        index[c].hmax = (int16_t)ceilf((m->nverts ? hmax : 0) * 10);
-        nv += (size_t)m->nverts;
-        nt += (size_t)m->ntris;
+        index[c].nverts = (uint32_t)base;
+        var[c].low_tris = (uint32_t)chunks[WG_LOW_ONLY][c].ntris;
+        var[c].high_tris = (uint32_t)chunks[WG_HIGH_ONLY][c].ntris;
+        index[c].hmin = (int16_t)floorf((base ? hmin : 0) * 10);
+        index[c].hmax = (int16_t)ceilf((base ? hmax : 0) * 10);
     }
     {
         wg_world h;
@@ -1148,6 +1315,8 @@ static int write_pack(const char *path, const wg_depot *depots)
     pakw_section(w, WG_CINDEX, index, sizeof *index * WG_CHUNKS * WG_CHUNKS);
     pakw_section(w, WG_CVERTS, verts, (uint32_t)(nv * sizeof *verts));
     pakw_section(w, WG_CTRIS, tris, (uint32_t)(nt * 6));
+    pakw_section(w, WG_CVARIANT, var, sizeof *var * WG_CHUNKS * WG_CHUNKS);
+    free(var);
     {
         int16_t *hg = (int16_t *)malloc(sizeof(int16_t) * WG_HN * WG_HN);
         for (i = 0; i < WG_HN * WG_HN; i++)
@@ -1201,8 +1370,10 @@ static int write_pack(const char *path, const wg_depot *depots)
         sp[2] = atan2f(tour[n + 1][1] - tour[n][1], tour[n + 1][0] - tour[n][0]);
         pakw_section(w, WG_SPAWN, sp, sizeof sp);
     }
-    printf("fwgen: %lu vertices, %lu triangles in %d chunks, %d boxes, %d roads (%d points), %d depots\n",
-           (unsigned long)nv, (unsigned long)nt, WG_CHUNKS * WG_CHUNKS, nboxes, nedges, npts, ndepots);
+    printf("fwgen: %lu vertices, %lu triangles in %d chunks (LOW only %lu, shared %lu, MEDIUM and HIGH only %lu), "
+           "%d boxes, %d roads (%d points), %d depots\n", (unsigned long)nv, (unsigned long)nt, WG_CHUNKS * WG_CHUNKS,
+           (unsigned long)run_tris[WG_LOW_ONLY], (unsigned long)run_tris[WG_SHARED],
+           (unsigned long)run_tris[WG_HIGH_ONLY], nboxes, nedges, npts, ndepots);
     free(index);
     free(verts);
     free(tris);

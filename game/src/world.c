@@ -81,6 +81,7 @@ int world_load(world *w, const char *path)
         w->verts = (const wg_vertex *)dgk_pak_section(&w->pak, WG_CVERTS, NULL);
         w->tris = (const uint16_t *)dgk_pak_section(&w->pak, WG_CTRIS, NULL);
         w->height = (const int16_t *)dgk_pak_section(&w->pak, WG_HEIGHT, NULL);
+        w->variants = (const wg_variant *)dgk_pak_section(&w->pak, WG_CVARIANT, NULL);
         if (!w->chunks || !w->verts || !w->tris || !w->height || !d || w->hdr->version != 1) {
             dgk_log("FW-ERROR %s: not a version 1 world", path);
             world_free(w);
@@ -243,7 +244,14 @@ void world_draw(world *w, float x, float y, float r)
         for (cx = cx0; cx <= cx1; cx++) {
             const wg_chunk *c = &w->chunks[cy * WG_CHUNKS + cx];
             const wg_vertex *v = w->verts + c->first_vertex;
-            if (!c->ntris)
+            uint32_t first = 0, n = c->ntris;
+            if (w->variants) {                       /* this detail's runs: LOW's and the shared, or those and the rest */
+                const wg_variant *var = &w->variants[cy * WG_CHUNKS + cx];
+                if (w->models)
+                    first = var->low_tris;
+                n = c->ntris - (w->models ? var->low_tris : var->high_tris);
+            }
+            if (!n)
                 continue;
             if (box_hidden(plane, cx * WG_CHUNK - margin, c->hmin / 10.0f - 1.0f, -((cy + 1) * WG_CHUNK + margin),
                            (cx + 1) * WG_CHUNK + margin, c->hmax / 10.0f + 1.0f, -(cy * WG_CHUNK - margin))) {
@@ -255,9 +263,9 @@ void world_draw(world *w, float x, float y, float r)
             glScalef(1.0f / WG_UNIT, 1.0f / WG_UNIT, 1.0f / WG_UNIT);
             glVertexPointer(3, GL_SHORT, sizeof *v, &v->x);
             glColorPointer(4, GL_UNSIGNED_BYTE, sizeof *v, v->rgba);
-            glDrawElements(GL_TRIANGLES, (GLsizei)c->ntris * 3, GL_UNSIGNED_SHORT, w->tris + c->first_index);
+            glDrawElements(GL_TRIANGLES, (GLsizei)n * 3, GL_UNSIGNED_SHORT, w->tris + c->first_index + first * 3);
             glPopMatrix();
-            dgk_gfx_tris += c->ntris;
+            dgk_gfx_tris += n;
             dgk_gfx_draws++;
             w->drawn_chunks++;
             dgk_service_if_due();                    /* the audio thread's turn on a slow frame (DOS) */

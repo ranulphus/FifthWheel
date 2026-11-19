@@ -30,6 +30,7 @@ enum { WG_TOWN, WG_DEPOT };
 #define WG_DEPOTS DGK_FOURCC('F', 'W', 'D', 'P')   /* u32 n, then wg_depot[n] */
 #define WG_TOUR   DGK_FOURCC('F', 'W', 'P', 'A')   /* u32 n, then n points {float x, y}: the autopilot's tour */
 #define WG_SPAWN  DGK_FOURCC('F', 'W', 'S', 'P')   /* float x, y, heading */
+#define WG_CVARIANT DGK_FOURCC('C', 'V', 'A', 'R') /* wg_variant[WG_CHUNKS * WG_CHUNKS]: what each detail draws */
 
 typedef struct wg_world {
     uint32_t version, seed, chunks, hn;
@@ -41,6 +42,15 @@ typedef struct wg_chunk {
     uint32_t first_index, ntris;        /* into CTRI */
     int16_t hmin, hmax;                 /* decimetres: the chunk's height range, for culling */
 } wg_chunk;
+
+/* A chunk's triangles in three runs: the first low_tris drawn only at LOW
+ * (detail.h's models 0: the plainer world), the last high_tris only at
+ * MEDIUM and HIGH, those between by both. Without the section, all. */
+typedef struct wg_variant {
+    uint32_t low_tris, high_tris;
+} wg_variant;
+
+enum { WG_LOW_ONLY, WG_SHARED, WG_HIGH_ONLY, WG_VARIANTS };   /* the runs, as fwgen builds them */
 
 typedef struct wg_vertex {
     int16_t x, y, z, pad;               /* chunk-local GL coordinates, WG_UNIT per metre */

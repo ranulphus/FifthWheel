@@ -31,6 +31,8 @@ typedef struct world {
     const int16_t *height;
     const wg_depot *depots;
     int ndepots;
+    const wg_variant *variants;          /* CVAR (NULL: every triangle for every detail) */
+    int models;                          /* the detail's models: 0 draws the LOW runs, else MEDIUM and HIGH's */
     const obb *boxes;
     int nboxes;
     int grid_n;                          /* buckets per side */

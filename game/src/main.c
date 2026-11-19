@@ -198,6 +198,7 @@ static void detail_apply(game *g)
 {
     g->det = detail_effective(g->presets, g->detail_chosen, g->gov.notch);
     g->cam.pitch_min = g->det.pitch_min * 3.14159265f / 180.0f;
+    g->w.models = g->det.models;                     /* the world's runs for this detail (CVAR) */
     if (g->lorry.quality != g->det.models) {
         lorry_build(&g->lorry, g->det.models);
         career_style(g);

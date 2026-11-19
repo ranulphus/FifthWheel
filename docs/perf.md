@@ -139,17 +139,18 @@ timing is approximate, so the bench still decides.
 
 ## The new look (2026-11-19)
 
-Smooth terrain (the same triangles, 37% of the vertices), the rounded
-lorry at MEDIUM and HIGH (`models`), contact shadows and the route's
-chevrons. Headless, triangles a frame, mean / most:
+Smooth terrain (37% of the vertices), the rounded lorry at MEDIUM and HIGH
+(`models`), the camera coming down with speed (`pitch_min`: sky and fog at
+MEDIUM and HIGH), fields cut true at MEDIUM and HIGH, contact shadows and
+the route's chevrons. Headless, triangles a frame, mean / most:
 
 | Preset | FW1 (`-autopilot -frames 3000`) | A whole job (`-autojob`) |
 |---|---|---|
-| LOW (`models` 0: boxes) | 1,440 / 1,992 | 1,429 / 2,102 |
-| MEDIUM (`models` 1) | 2,048 / 2,554 | 2,074 / 2,786 |
-| HIGH (`models` 2) | 2,379 / 2,874 | 2,434 / 3,434 |
+| LOW (`models` 0, `pitch_min` 52) | 1,448 / 1,992 | 1,438 / 2,102 |
+| MEDIUM (`models` 1, `pitch_min` 24) | 2,566 / 3,548 | 2,642 / 4,194 |
+| HIGH (`models` 2, `pitch_min` 20) | 3,180 / 4,520 | 3,156 / 4,964 |
 
-LOW costs what it did, less the terrain's vertex transforms; the P3 with a
-TNT2 M64 ran the old look at 167 fps (the owner, 2026-11-19), so MEDIUM and
-HIGH have room for more.
-
+LOW costs what it did (less the terrain's vertex transforms): the pack's
+LOW run keeps its plainer terrain. The P3 with a TNT2 M64 ran the old look
+at 167 fps (the owner, 2026-11-19); MEDIUM and HIGH are meant for it and
+the G400 and G450, and want measuring there (FW1, FW1H).

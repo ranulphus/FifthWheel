@@ -100,10 +100,16 @@ one art style scaled by the detail presets so that LOW still holds 30
 frames a second on a Pentium II 266 with a G200.
 
 - **The terrain** is smooth-shaded: each height sample a vertex lit by its
-  own normal, shared by the cells round it that lie in the same field, so
-  the fields' edges stay crisp. It has the same triangles as the faceted
-  terrain had and 37% of its vertices (DOS-GL transforms each once), and
-  the pack shrank from 7.0 to 5.0 MB.
+  own normal, shared by the cells round it that lie in the same field. At
+  MEDIUM and HIGH the fields' edges run true: a cell whose corners lie in
+  fields of different colours is cut along the boundary (straight between
+  two fields' seeds, chords round a place's grass), its pieces on its own
+  triangles, so the ground is where it was; at LOW such a cell is whole,
+  in its middle's colour, in 16 m steps as before. The pack keeps both
+  (`CVAR`, docs/formats.md): each chunk's triangles are LOW's run, the
+  shared run and MEDIUM and HIGH's run, one draw call either way. The
+  shared terrain has 37% of the faceted terrain's vertices (DOS-GL
+  transforms each once); the pack is 8.3 MB (the plan's limit is 12).
 - **The lorry** is as round as the preset's `models` says (`BUDGET.CFG`): 0
   (LOW) the boxes it always was; 1 (MEDIUM) and 2 (HIGH) a rounded cab
   with a wrap-round windscreen, side windows, mirrors, a grille and round

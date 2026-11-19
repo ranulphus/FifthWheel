@@ -35,6 +35,7 @@ when the generator is built at -O0 and at -O2.
 | `CIDX` | per chunk, row-major from the south-west: u32 first vertex, vertices, first index, triangles; s16 lowest and highest height (decimetres) |
 | `CVRT` | vertices: s16 x, y, z, pad (chunk-local GL coordinates, 32 per metre: x - chunk x, height, chunk y - y), u8 r, g, b, a (lighting baked in) |
 | `CTRI` | u16 indices, chunk-local |
+| `CVAR` | per chunk: u32 LOW's triangles, MEDIUM and HIGH's: a chunk's triangles are three runs, the first drawn only at LOW (the detail's `models` 0), the last only at MEDIUM and HIGH, those between by all; without the section every detail draws every triangle |
 | `HGHT` | s16 heights (decimetres), 257 x 257 at 16 m: the terrain's own (the game reads the ground with the terrain triangles' split) |
 | `FWCO` | collision boxes, as in the yard (buildings, docks, tree trunks, the world's edge) |
 | `GRPH` | u32 nodes, edges, points; nodes {float x, y; u32 kind (0 town, 1 depot), place}; edges {u32 a, b, first point, points; float length}; points {float x, y} (8 m apart); every depot is a dead end (one road, from its gate) |
