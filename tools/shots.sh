@@ -4,8 +4,9 @@
 # imgcmp.py (RGB565, tolerance 24, 0.5% of pixels, colour edges excluded).
 # The frames: the world's ten poses (-tourshots 10: along the tour and at
 # two depots, no HUD), the first scene with its HUD (the job board, the
-# minimap) and a trailer reversing into a bay (-dockpose: the reversing
-# camera, its guide lines). Needs MGAHAL and DEV (make shots sets them).
+# minimap), a trailer reversing into a bay (-dockpose: the reversing
+# camera, its guide lines) and a job's haul 40 s in (-autojob: the route's
+# chevrons, the shadows, the HUD on the road). Needs MGAHAL and DEV (make shots sets them).
 #
 #   tools/shots.sh [CARD]    (default g450; make shots CARD=...)
 set -eu
@@ -17,15 +18,18 @@ rm -rf $dos $hl
 mkdir -p $dos $hl/out
 
 # DOS, one boot per set of frames; the guest's C:\OUT comes back as files/.
-for name in tour hud dock; do
+# The runs log nothing while they draw (86Box draws the haul at about 10
+# frames a second), so the harness waits 300 s of silence, not 60.
+for name in tour hud dock haul; do
     case $name in
     tour) args="-tourshots 10" ;;
     hud) args="-frames 61 -shot 60:H0" ;;
     dock) args="-dockpose -frames 121 -shot 120:H1" ;;
+    haul) args="-autojob -frames 2401 -shot 2400:H2" ;;
     esac
     "$DEV" python3 "$MGAHAL/tools/loopa/run.py" --name "fwshots-$name" --card "$card" \
         --exe build/dos/FWHEEL.EXE --file build/data/WORLD.PAK --args="-test -fixed -nosound $args" \
-        --out "$PWD/$dos/$name" --timeout 900 > /dev/null || true
+        --out "$PWD/$dos/$name" --timeout 900 --idle 300 > /dev/null || true
     echo "shots: DOS $name: $(cat $dos/$name/status 2>/dev/null || echo none)"
     # The same frames headless.
     "$DEV" sh -c "cd $hl && LP_NUM_THREADS=2 ../../build/headless/fwheel-hl -world ../../build/data/WORLD.PAK \
