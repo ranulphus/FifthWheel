@@ -109,7 +109,9 @@ frames a second on a Pentium II 266 with a G200.
   (`CVAR`, docs/formats.md): each chunk's triangles are LOW's run, the
   shared run and MEDIUM and HIGH's run, one draw call either way. The
   shared terrain has 37% of the faceted terrain's vertices (DOS-GL
-  transforms each once). The pack is 11.6 MB (the plan's limit is 12),
+  transforms each once), and fwgen keeps each run's identical vertices once
+  (the corners the road's quads and the cut terrain's pieces share: a
+  quarter fewer). The pack is 10.0 MB (the plan's limit is 12),
   loaded whole: LOW carries about 5 MB of MEDIUM and HIGH's run it never
   draws, and the 32 MB machine's heap (the mem suite: within 20 MB) is
   mostly the pack. If it grows further, MEDIUM and HIGH's run goes into a
@@ -143,6 +145,9 @@ frames a second on a Pentium II 266 with a G200.
   take the ground's own colour, darker. A town's streets are laid in 16 m
   pieces: one quad from end to end went to the chunk holding its middle and
   was drawn only while that chunk was in view, at every detail.
+- **Roads** at MEDIUM and HIGH have a white line along each edge; at every
+  detail the centre's dashes (and the edge lines) stop 25 m short of a
+  town's middle, where the roads meet and run over one another.
 - **The camera** follows speed (the owner's idea): 64 degrees down for
   manoeuvring, easing down from 18 km/h to the preset's `pitch_min` by 61
   km/h (LOW 52, MEDIUM 24, HIGH 20 degrees), closer and looking a little

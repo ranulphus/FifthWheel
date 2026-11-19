@@ -904,10 +904,20 @@ static void apply_levelling(void)
 
 /* The road surface: a ribbon a little above the levelled ground, with bold
  * dashes down the middle. */
-static void road_ribbon(const float (*p)[3], int n, float half, int dashes, float lift)
+/* A road's painting: dashes down the middle, and (MEDIUM and HIGH's run)
+ * a white line along each edge; none within quiet0 metres of its start or
+ * quiet1 of its end, where it meets other roads in a town's middle. */
+typedef struct paint {
+    int dashes, edges;
+    float quiet0, quiet1;
+} paint;
+
+static void road_ribbon(const float (*p)[3], int n, float half, const paint *pt, float lift)
 {
     int i;
-    float along = 0;
+    float along = 0, total = 0;
+    for (i = 0; i + 1 < n; i++)
+        total += sqrtf((p[i + 1][0] - p[i][0]) * (p[i + 1][0] - p[i][0]) + (p[i + 1][1] - p[i][1]) * (p[i + 1][1] - p[i][1]));
     for (i = 0; i + 1 < n; i++) {
         float dx = p[i + 1][0] - p[i][0], dy = p[i + 1][1] - p[i][1], l = sqrtf(dx * dx + dy * dy);
         float nx0, ny0, nx1, ny1;
@@ -928,7 +938,27 @@ static void road_ribbon(const float (*p)[3], int n, float half, int dashes, floa
                               { p[i][0] + nx0, p[i][2] + lift, -(p[i][1] + ny0) } };
             quad(q[0], q[1], q[2], q[3], 0x565B66u, 0.92f);
         }
-        if (dashes) {                                /* a bold dash over each piece's first half */
+        if (pt && (along < pt->quiet0 || total - along - l < pt->quiet1)) {
+            along += l;
+            continue;
+        }
+        if (pt && pt->edges) {                       /* edge lines: MEDIUM and HIGH */
+            int save = variant, e;
+            variant = WG_HIGH_ONLY;
+            for (e = -1; e <= 1; e += 2) {
+                float o0 = e * (1.0f - 0.45f / half), o1 = e * (1.0f - 0.27f / half);
+                float m[4][3] = { { p[i][0] + nx0 * o0, p[i][2] + lift + 0.06f, -(p[i][1] + ny0 * o0) },
+                                  { p[i + 1][0] + nx1 * o0, p[i + 1][2] + lift + 0.06f, -(p[i + 1][1] + ny1 * o0) },
+                                  { p[i + 1][0] + nx1 * o1, p[i + 1][2] + lift + 0.06f, -(p[i + 1][1] + ny1 * o1) },
+                                  { p[i][0] + nx0 * o1, p[i][2] + lift + 0.06f, -(p[i][1] + ny0 * o1) } };
+                if (e > 0)
+                    quad(m[0], m[1], m[2], m[3], 0xF2F2EAu, 1.0f);
+                else
+                    quad(m[3], m[2], m[1], m[0], 0xF2F2EAu, 1.0f);
+            }
+            variant = save;
+        }
+        if (pt && pt->dashes) {                      /* a bold dash over each piece's first half */
             float w0 = 0.22f / half, mx = (p[i][0] + p[i + 1][0]) / 2, my = (p[i][1] + p[i + 1][1]) / 2;
             float mh = (p[i][2] + p[i + 1][2]) / 2;
             float m[4][3] = { { p[i][0] - nx0 * w0, p[i][2] + lift + 0.08f, -(p[i][1] - ny0 * w0) },
@@ -1001,7 +1031,7 @@ static void street(float x0, float y0, float x1, float y1, float h, float lift)
         s[k][1] = y0 + (y1 - y0) * k / n;
         s[k][2] = h;
     }
-    road_ribbon((const float (*)[3])s, n + 1, 4.5f, 0, lift);
+    road_ribbon((const float (*)[3])s, n + 1, 4.5f, NULL, lift);
 }
 
 static void build_town(const place *t)
@@ -1712,30 +1742,49 @@ static int write_pack(const char *path, const wg_depot *depots)
         index[c].first_vertex = (uint32_t)nv;
         index[c].first_index = (uint32_t)nt * 3;
         for (r = 0; r < WG_VARIANTS; r++) {
+            /* The run's vertices as the pack keeps them (16-bit, chunk-local), each kept once: two the same
+             * (a corner of the road's quads, of the cut terrain's pieces) are one, which DOS-GL transforms once. */
             cmesh *m = &chunks[r][c];
+            int *remap = (int *)malloc(sizeof(int) * (size_t)(m->nverts + 1)), hcap = 1, kept = 0, *slot;
+            while (hcap < m->nverts * 2 + 2)
+                hcap *= 2;
+            slot = (int *)malloc(sizeof(int) * (size_t)hcap);
+            for (i = 0; i < hcap; i++)
+                slot[i] = -1;
             verts = (wg_vertex *)grow(verts, &cap_v, (nv + (size_t)m->nverts) * sizeof *verts);
             tris = (uint16_t *)grow(tris, &cap_t, (nt + (size_t)m->ntris) * 6);
             for (i = 0; i < m->nverts; i++) {
-                wg_vertex *v = &verts[nv + (size_t)i];
+                wg_vertex q;
+                uint32_t hsh;
                 float x = m->pos[i * 3], h = m->pos[i * 3 + 1], y = -m->pos[i * 3 + 2];
-                v->x = (int16_t)lrintf((x - ox) * WG_UNIT);
-                v->y = (int16_t)lrintf(h * WG_UNIT);
-                v->z = (int16_t)lrintf((oy - y) * WG_UNIT);
-                v->pad = 0;
-                memcpy(v->rgba, &m->rgba[i * 4], 4);
+                int at;
+                q.x = (int16_t)lrintf((x - ox) * WG_UNIT);
+                q.y = (int16_t)lrintf(h * WG_UNIT);
+                q.z = (int16_t)lrintf((oy - y) * WG_UNIT);
+                q.pad = 0;
+                memcpy(q.rgba, &m->rgba[i * 4], 4);
+                hsh = dgk_crc32(0, &q, sizeof q) & (uint32_t)(hcap - 1);
+                for (at = (int)hsh; slot[at] >= 0 && memcmp(&verts[nv + (size_t)slot[at]], &q, sizeof q); at = (at + 1) & (hcap - 1))
+                    continue;
+                if (slot[at] < 0) {
+                    slot[at] = kept;
+                    verts[nv + (size_t)kept++] = q;
+                }
+                remap[i] = slot[at];
                 hmin = DGK_MIN(hmin, h);
                 hmax = DGK_MAX(hmax, h);
             }
             for (i = 0; i < m->ntris * 3; i++)
-                tris[nt * 3 + (size_t)i] = (uint16_t)(m->idx[i] + base);
-            if (base + m->nverts > 65535) {
-                fprintf(stderr, "fwgen: chunk %d has %d vertices, more than 16-bit indices reach\n", c,
-                        base + m->nverts);
+                tris[nt * 3 + (size_t)i] = (uint16_t)(remap[m->idx[i]] + base);
+            if (base + kept > 65535) {
+                fprintf(stderr, "fwgen: chunk %d has %d vertices, more than 16-bit indices reach\n", c, base + kept);
                 exit(1);
             }
-            base += m->nverts;
+            free(remap);
+            free(slot);
+            base += kept;
             run_tris[r] += (size_t)m->ntris;
-            nv += (size_t)m->nverts;
+            nv += (size_t)kept;
             nt += (size_t)m->ntris;
             index[c].ntris += (uint32_t)m->ntris;
         }
@@ -1857,9 +1906,15 @@ int main(int argc, char **argv)
     apply_levelling();
     fit_surfaces();
     build_terrain();
-    for (e = 0; e < nedges; e++)
-        road_ribbon((const float (*)[3])&pts[edges[e].first_point], (int)edges[e].npoints, 4.5f, 1,
+    for (e = 0; e < nedges; e++) {
+        /* Painted, but not in a town's middle, where roads meet and run over one another. */
+        paint pt;
+        pt.dashes = pt.edges = 1;
+        pt.quiet0 = nodes[edges[e].a].kind == WG_TOWN ? 25.0f : 0.0f;
+        pt.quiet1 = nodes[edges[e].b].kind == WG_TOWN ? 25.0f : 0.0f;
+        road_ribbon((const float (*)[3])&pts[edges[e].first_point], (int)edges[e].npoints, 4.5f, &pt,
                     0.16f + 0.02f * e);                     /* each road its own height: no z-fighting where they meet */
+    }
     for (i = 0; i < nplaces; i++)
         if (places[i].kind == WG_TOWN)
             build_town(&places[i]);
@@ -1870,7 +1925,7 @@ int main(int argc, char **argv)
         depot_frame(&places[i], 0, -52, &s[0][0], &s[0][1]);        /* the gate to the apron */
         depot_frame(&places[i], 0, -34, &s[1][0], &s[1][1]);
         s[0][2] = s[1][2] = places[i].h;
-        road_ribbon((const float (*)[3])s, 2, 4.5f, 0, 0.14f);
+        road_ribbon((const float (*)[3])s, 2, 4.5f, NULL, 0.14f);
     }
     build_hedges();
     build_trees();
