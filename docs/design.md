@@ -158,3 +158,25 @@ neighbours. Every depot is a dead end off its nearest town: its gate faces
 that town and its road leaves straight for 50 m before it bends. No road
 enters a depot's yard: the generator tries wider bends, and fails rather
 than write a world where one does.
+
+Towns and depots stand on flat ground: a town is levelled to its height
+36 m beyond its outer streets (its blocks too), easing back into the hills
+over 56 m, so no slope at a town's edge passes 25 degrees; a depot's yard
+is levelled around its apron. On a place's flat ground a road is at the
+place's height, easing back to its own smoothed profile over 120 m of road,
+so roads meet in a town at one height and reach a gate at the apron's.
+
+Nothing laid flat on the ground (roads, streets, aprons) has terrain above
+it. Levelling flattens the 16 m height samples near a road, but a cell's
+far corners could keep a crest's height, and the cell's triangles then rose
+through the road between them (2026-11-19: 6% of the roads' points, and
+whole stretches of the autopilot's tour and of the towns' streets, were
+buried). Each terrain triangle under such a surface now has its corners
+fitted to the surface's plane (its grade carried on along it, level
+across): raised to no more than 0.3 m below it, then, for every surface
+after every raise, cut to 2 cm below it. The physics is flat, so none of
+this changes a drive: the tour's hashes and every job are as before. One
+stretch still stands up to 1.7 m above the ground the lorry rides: two
+depot roads leave town 4 30 m apart at their own heights, and each cuts
+the ground under the other (roads that leave a town at a small angle are
+to share a trunk).

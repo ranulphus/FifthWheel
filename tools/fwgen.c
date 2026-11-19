@@ -83,6 +83,68 @@ static float ground(float x, float y)
     return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
 }
 
+/* The terrain as drawn: each cell split into the triangles (i, j)-(i+1, j)-(i+1, j+1)
+ * and (i, j)-(i+1, j+1)-(i, j+1), as the game's world_height reads it. The
+ * three samples of the triangle under (x, y), and its height there. */
+static float terrain_tri(float x, float y, int idx[3])
+{
+    float gx = x / WG_CELL, gy = y / WG_CELL, fx, fy;
+    int i = DGK_CLAMP((int)floorf(gx), 0, WG_HN - 2), j = DGK_CLAMP((int)floorf(gy), 0, WG_HN - 2);
+    fx = gx - i;
+    fy = gy - j;
+    idx[0] = j * WG_HN + i;
+    if (fx >= fy) {
+        idx[1] = j * WG_HN + i + 1;
+        idx[2] = (j + 1) * WG_HN + i + 1;
+        return height[idx[0]] * (1 - fx) + height[idx[1]] * (fx - fy) + height[idx[2]] * fy;
+    }
+    idx[1] = (j + 1) * WG_HN + i + 1;
+    idx[2] = (j + 1) * WG_HN + i;
+    return height[idx[0]] * (1 - fy) + height[idx[1]] * fx + height[idx[2]] * (fy - fx);
+}
+
+/* What lies flat on the ground (roads, streets, aprons) is drawn a little
+ * above its own height; the terrain under it is kept at least CLEARANCE below
+ * that height, and (filled) no more than FILL below it. */
+#define CLEARANCE 0.02f
+#define FILL 0.3f
+
+/* Fit the terrain under a strip from (x0, y0) at height h0 to (x1, y1) at
+ * h1, `half` wide either side plus half a metre (for a ribbon's mitred
+ * joints), to the strip's plane (its grade carried on past its ends, level
+ * across it). Cutting, each terrain triangle under the strip has its corners
+ * lowered to the plane less the clearance: a triangle and the plane are both
+ * flat, so the triangle then lies below the strip wherever they overlap.
+ * Filling, they are raised to the plane less FILL, so the strip does not
+ * stand far above the ground (the lorry rides the ground). Levelling
+ * flattens the samples near a road, but a 16 m cell's far corners could keep
+ * a crest's height and rise through the road between them, or a hollow's and
+ * leave it standing in the air. The triangles are found at points a metre
+ * apart along the strip and 1.25 m or less across. */
+static void fit_strip(float x0, float y0, float h0, float x1, float y1, float h1, float half, int fill)
+{
+    float dx = x1 - x0, dy = y1 - y0, l = sqrtf(dx * dx + dy * dy), nx, ny, r = half + 0.5f;
+    int n, i, k, c, idx[3], across = (int)ceilf(r / 1.25f);
+    if (l < 0.01f)
+        return;
+    nx = -dy / l;
+    ny = dx / l;
+    n = (int)ceilf(l);
+    for (i = 0; i <= n; i++)
+        for (k = -across; k <= across; k++) {
+            float t = (float)i / n, o = r * k / across;
+            terrain_tri(x0 + dx * t + nx * o, y0 + dy * t + ny * o, idx);
+            for (c = 0; c < 3; c++) {
+                float px = (float)(idx[c] % WG_HN) * WG_CELL - x0, py = (float)(idx[c] / WG_HN) * WG_CELL - y0;
+                float plane = h0 + (h1 - h0) * (px * dx + py * dy) / (l * l);
+                if (fill && height[idx[c]] < plane - FILL)
+                    height[idx[c]] = plane - FILL;
+                else if (!fill && height[idx[c]] > plane - CLEARANCE)
+                    height[idx[c]] = plane - CLEARANCE;
+            }
+        }
+}
+
 static void make_hills(void)
 {
     int i, j;
@@ -95,8 +157,19 @@ static void make_hills(void)
 
 typedef struct place {
     float x, y, r, heading;
+    float h;                                      /* its streets or apron: the ground there, levelled */
     int kind;                                     /* WG_TOWN, WG_DEPOT */
 } place;
+
+#define GRID 64.0f                               /* town block */
+/* A town is flat to TOWN_FLAT beyond its outer streets (every block too: a
+ * block's middle is 32 m from a street), easing back into the hills over
+ * TOWN_EASE (wide enough that no slope at a town's edge passes 25 degrees). */
+#define TOWN_FLAT 36.0f
+#define TOWN_EASE 56.0f
+/* A road on a place's flat ground is at the place's height, easing back to
+ * its own profile over this many metres of road beyond it. */
+#define ROAD_EASE 120.0f
 
 static place places[WG_MAX_PLACES];
 static int nplaces, ntowns, ndepots;
@@ -291,6 +364,20 @@ static int in_depot(float x, float y)
     return 0;
 }
 
+/* On a place's flat ground (level_town, level_depot): a town's to TOWN_FLAT
+ * beyond its outer streets; a depot's apron, its gate (on the edge) and the
+ * yard around it. */
+static int place_flat(const place *p, float x, float y)
+{
+    float c = cosf(p->heading), s = sinf(p->heading), dx = x - p->x, dy = y - p->y;
+    float u = dx * c + dy * s, v = -dx * s + dy * c;
+    if (p->kind == WG_TOWN) {
+        float e = (float)(int)(p->r / GRID) * GRID + TOWN_FLAT;
+        return fabsf(u) <= e && fabsf(v) <= e;
+    }
+    return fabsf(u) <= 68.0f && fabsf(v) <= 53.0f;
+}
+
 /* Where a road leaves a depot: 50 m straight out from its gate. */
 static void depot_stub(int node, float *x, float *y)
 {
@@ -324,7 +411,7 @@ static int road_attempt(int a, int b, int attempt)
 {
     float cp[7][2], len = sqrtf(dist2(a, b)), nx, ny, raw[4096];
     float spread = 1.0f + (attempt < 0 ? 0 : attempt) * 0.2f;
-    int n = 0, i, k, seg, first = npts, count;
+    int n = 0, i, k, seg, first = npts, count, end;
     wg_edge *e = &edges[nedges];
     if (nedges == MAX_EDGES)
         return 1;
@@ -400,6 +487,29 @@ static int road_attempt(int a, int b, int attempt)
             tmp[i] = sum / c;
         }
         memcpy(raw, tmp, sizeof(float) * (size_t)count);
+    }
+    /* On a town's or a depot's flat ground the road is at the place's height,
+     * easing back to its own profile beyond: roads meet in a town at one
+     * height and reach a depot's gate at its apron's. */
+    for (end = 0; end < 2; end++) {
+        const place *pl = &places[end ? b : a];
+        float along = 0, last_on = -1;
+        for (k = 0; k < count; k++) {
+            int q = end ? count - 1 - k : k, prev = end ? q + 1 : q - 1;
+            float w;
+            if (k)
+                along += sqrtf((pts[first + q][0] - pts[first + prev][0]) * (pts[first + q][0] - pts[first + prev][0]) +
+                               (pts[first + q][1] - pts[first + prev][1]) * (pts[first + q][1] - pts[first + prev][1]));
+            if (place_flat(pl, pts[first + q][0], pts[first + q][1])) {
+                raw[q] = pl->h;
+                last_on = along;
+                continue;
+            }
+            if (last_on < 0 || along - last_on >= ROAD_EASE)
+                break;
+            w = 1.0f - smooth((along - last_on) / ROAD_EASE);
+            raw[q] += (pl->h - raw[q]) * w;
+        }
     }
     e->a = (uint32_t)a;
     e->b = (uint32_t)b;
@@ -491,8 +601,6 @@ static const uint32_t house_walls[] = { 0xF4E3C8u, 0xE8C9A0u, 0xF2F2F2u, 0xD8E8F
 static const uint32_t house_roofs[] = { 0xD8472Au, 0x3A6FD8u, 0x5A9A3Au, 0xE89A2Au, 0x8A4AB8u, 0x606878u };
 static const uint32_t crops[] = { 0x5DBB3Fu, 0x52AD37u, 0x74C448u, 0xE6C84Au, 0xD9B040u, 0x9E7A4Au, 0x68B84Cu };
 
-#define GRID 64.0f                               /* town block */
-
 /* The street lines of town t in its own frame: -n..n blocks each way. */
 static int town_blocks(const place *t)
 {
@@ -509,15 +617,14 @@ static void town_frame(const place *t, float u, float v, float *x, float *y)
 static void level_town(const place *t)
 {
     int n = town_blocks(t), i;
-    float h = ground(t->x, t->y);
     for (i = -n; i <= n; i++) {                   /* each street, level at the town's height */
         float x0, y0, x1, y1;
         town_frame(t, i * GRID, -n * GRID, &x0, &y0);
         town_frame(t, i * GRID, n * GRID, &x1, &y1);
-        level_segment(x0, y0, h, x1, y1, h, 12.0f, 26.0f);
+        level_segment(x0, y0, t->h, x1, y1, t->h, TOWN_FLAT, TOWN_EASE);
         town_frame(t, -n * GRID, i * GRID, &x0, &y0);
         town_frame(t, n * GRID, i * GRID, &x1, &y1);
-        level_segment(x0, y0, h, x1, y1, h, 12.0f, 26.0f);
+        level_segment(x0, y0, t->h, x1, y1, t->h, TOWN_FLAT, TOWN_EASE);
     }
 }
 
@@ -537,7 +644,7 @@ static float road_distance(float x, float y)
 static void build_town(const place *t)
 {
     int n = town_blocks(t), i, j, k;
-    float h = ground(t->x, t->y);
+    float h = t->h;
     for (i = -n; i <= n; i++) {                   /* streets */
         float s[2][3], x0, y0, x1, y1;
         town_frame(t, i * GRID, -n * GRID, &x0, &y0);
@@ -577,18 +684,18 @@ static void depot_frame(const place *d, float u, float v, float *x, float *y)
  * three dock bays, the entrance on the front (-v) where the road arrives. */
 static void level_depot(const place *d)
 {
-    float h = ground(d->x, d->y), x0, y0, x1, y1;
+    float x0, y0, x1, y1;
     int k;
     for (k = -2; k <= 2; k++) {
         depot_frame(d, -48, k * 16.0f, &x0, &y0);
         depot_frame(d, 48, k * 16.0f, &x1, &y1);
-        level_segment(x0, y0, h, x1, y1, h, 20.0f, 30.0f);
+        level_segment(x0, y0, d->h, x1, y1, d->h, 20.0f, 30.0f);
     }
 }
 
 static void build_depot(const place *d, wg_depot *out)
 {
-    float h = ground(d->x, d->y), c[4][2], x, y;
+    float h = d->h, c[4][2], x, y;
     static const float cu[4] = { -48, 48, 48, -48 }, cv[4] = { -35, -35, 35, 35 };
     int i, k;
     for (i = 0; i < 4; i++)
@@ -616,7 +723,16 @@ static void build_depot(const place *d, wg_depot *out)
             depot_frame(d, lu + 0.15f, 14, &q[1][0], &q[1][1]);
             depot_frame(d, lu + 0.15f, 34, &q[2][0], &q[2][1]);
             depot_frame(d, lu - 0.15f, 34, &q[3][0], &q[3][1]);
-            ground_quad(q[0][0], q[0][1], q[1][0], q[1][1], q[2][0], q[2][1], q[3][0], q[3][1], 0.2f, 0xF4F4F0u, 1.0f);
+            {
+                float p[4][3];
+                int m;
+                for (m = 0; m < 4; m++) {
+                    p[m][0] = q[m][0];
+                    p[m][1] = h + 0.2f;
+                    p[m][2] = -q[m][1];
+                }
+                quad(p[0], p[1], p[2], p[3], 0xF4F4F0u, 1.0f);
+            }
         }
         /* Docked: the trailer's rear at the dock face, pointing out of the bay. */
         depot_frame(d, u, 33.5f, &out->bay[i][0], &out->bay[i][1]);
@@ -654,6 +770,44 @@ static uint32_t ground_colour(float x, float y)
         }
     }
     return crops[field_crop[best]];
+}
+
+/* The terrain fitted under everything laid flat on it: the roads, each
+ * town's streets, each depot's apron (in strips 5 m wide) and its gate's
+ * stub. Every strip is filled first and cut after, so a fill for one strip
+ * never raises the ground through another. */
+static void fit_surfaces(void)
+{
+    int e, i, k, fill;
+    for (fill = 1; fill >= 0; fill--) {
+        for (e = 0; e < nedges; e++)
+            for (i = (int)edges[e].first_point; i + 1 < (int)(edges[e].first_point + edges[e].npoints); i++)
+                fit_strip(pts[i][0], pts[i][1], pts[i][2], pts[i + 1][0], pts[i + 1][1], pts[i + 1][2], 4.5f, fill);
+        for (k = 0; k < nplaces; k++) {
+            const place *p = &places[k];
+            float x0, y0, x1, y1;
+            if (p->kind == WG_TOWN) {
+                int n = town_blocks(p);
+                for (i = -n; i <= n; i++) {
+                    town_frame(p, i * GRID, -n * GRID, &x0, &y0);
+                    town_frame(p, i * GRID, n * GRID, &x1, &y1);
+                    fit_strip(x0, y0, p->h, x1, y1, p->h, 4.5f, fill);
+                    town_frame(p, -n * GRID, i * GRID, &x0, &y0);
+                    town_frame(p, n * GRID, i * GRID, &x1, &y1);
+                    fit_strip(x0, y0, p->h, x1, y1, p->h, 4.5f, fill);
+                }
+                continue;
+            }
+            for (i = 0; i < 15; i++) {
+                depot_frame(p, -48, -35 + i * 5.0f, &x0, &y0);
+                depot_frame(p, 48, -35 + i * 5.0f, &x1, &y1);
+                fit_strip(x0, y0, p->h, x1, y1, p->h, 2.5f, fill);
+            }
+            depot_frame(p, 0, -52, &x0, &y0);
+            depot_frame(p, 0, -34, &x1, &y1);
+            fit_strip(x0, y0, p->h, x1, y1, p->h, 4.5f, fill);
+        }
+    }
 }
 
 static void build_terrain(void)
@@ -999,11 +1153,13 @@ int main(int argc, char **argv)
     place_kind(WG_DEPOT, 8, 560.0f, 320.0f, 60.0f, 60.0f);
     ndepots = nplaces - ntowns;
     face_depots();
-    for (i = 0; i < nplaces; i++)                    /* flat ground for towns and depots */
+    for (i = 0; i < nplaces; i++) {                  /* flat ground for towns and depots */
+        places[i].h = ground(places[i].x, places[i].y);
         if (places[i].kind == WG_TOWN)
             level_town(&places[i]);
         else
             level_depot(&places[i]);
+    }
     apply_levelling();
     memset(road_weight, 0, sizeof road_weight);
     build_network();
@@ -1015,6 +1171,7 @@ int main(int argc, char **argv)
         for (i = (int)edges[e].first_point; i + 1 < (int)(edges[e].first_point + edges[e].npoints); i++)
             level_segment(pts[i][0], pts[i][1], pts[i][2], pts[i + 1][0], pts[i + 1][1], pts[i + 1][2], 12.0f, 28.0f);
     apply_levelling();
+    fit_surfaces();
     build_terrain();
     for (e = 0; e < nedges; e++)
         road_ribbon((const float (*)[3])&pts[edges[e].first_point], (int)edges[e].npoints, 4.5f, 1,
@@ -1028,7 +1185,7 @@ int main(int argc, char **argv)
         depots[i - ntowns].node = (uint32_t)i;
         depot_frame(&places[i], 0, -52, &s[0][0], &s[0][1]);        /* the gate to the apron */
         depot_frame(&places[i], 0, -34, &s[1][0], &s[1][1]);
-        s[0][2] = s[1][2] = ground(places[i].x, places[i].y);
+        s[0][2] = s[1][2] = places[i].h;
         road_ribbon((const float (*)[3])s, 2, 4.5f, 0, 0.14f);
     }
     build_trees();
