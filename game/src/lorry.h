@@ -27,5 +27,14 @@ void lorry_style(lorry_meshes *m, uint32_t paint, int decal, int cab);
 void lorry_draw(const lorry_meshes *m, const rig *r, const world *w, const cab_sway *sway);
 /* A trailer standing on its legs, kingpin at (kx, ky). */
 void lorry_draw_trailer(const lorry_meshes *m, int type, float kx, float ky, float heading, const world *w);
+/* Soft contact shadows under the rig and standing trailers, a little to the
+ * south-east (the sun is in the north-west, as the world's shadows have it).
+ * Drawn after the world and before the lorries, over whatever is there (the
+ * lorries then draw over them): a road can stand well above the terrain the
+ * lorry rides, and would hide a shadow laid on that (w NULL: flat at 0). */
+void lorry_shadows_begin(void);
+void lorry_shadow_rig(const rig *r, const world *w);
+void lorry_shadow_trailer(float kx, float ky, float heading, const world *w);
+void lorry_shadows_end(void);
 
 #endif

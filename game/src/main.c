@@ -576,6 +576,25 @@ static float lerp_angle(float a, float b, float t)
     return a + d * t;
 }
 
+/* The trailers standing at depots within the detail's reach of the rig:
+ * one waiting and one delivered at most at each. */
+static int parked_near(const game *g, const rig *r, const parked **out)
+{
+    int i, n = 0;
+    if (!g->has_jobs)
+        return 0;
+    for (i = 0; i < g->w.ndepots; i++) {
+        float dx = g->w.depots[i].x - r->x, dy = g->w.depots[i].y - r->y;
+        if (dx * dx + dy * dy > g->det.trailers * g->det.trailers)
+            continue;
+        if (g->jobs.trailers[i].present)
+            out[n++] = &g->jobs.trailers[i];
+        if (g->jobs.docked[i].present)
+            out[n++] = &g->jobs.docked[i];
+    }
+    return n;
+}
+
 static void draw(void *u, float alpha)
 {
     game *g = (game *)u;
@@ -600,19 +619,18 @@ static void draw(void *u, float alpha)
                      g->det.far);
         world_draw(&g->w, tx, ty, g->det.far * 0.65f);
     }
-    lorry_draw(&g->lorry, &r, &g->w, &g->fxs.sway);
-    if (g->has_jobs) {
-        int i;
-        for (i = 0; i < g->w.ndepots; i++) {
-            const parked *t = &g->jobs.trailers[i], *d = &g->jobs.docked[i];
-            float dx = g->w.depots[i].x - r.x, dy = g->w.depots[i].y - r.y;
-            if (dx * dx + dy * dy > g->det.trailers * g->det.trailers)
-                continue;
-            if (t->present)
-                lorry_draw_trailer(&g->lorry, t->type, t->x, t->y, t->heading, &g->w);
-            if (d->present)
-                lorry_draw_trailer(&g->lorry, d->type, d->x, d->y, d->heading, &g->w);
-        }
+    {
+        const parked *standing[WG_MAX_PLACES * 2];
+        int i, n = parked_near(g, &r, standing);
+        lorry_shadows_begin();
+        lorry_shadow_rig(&r, &g->w);
+        for (i = 0; i < n; i++)
+            lorry_shadow_trailer(standing[i]->x, standing[i]->y, standing[i]->heading, &g->w);
+        lorry_shadows_end();
+        lorry_draw(&g->lorry, &r, &g->w, &g->fxs.sway);
+        for (i = 0; i < n; i++)
+            lorry_draw_trailer(&g->lorry, standing[i]->type, standing[i]->x, standing[i]->y, standing[i]->heading,
+                               &g->w);
     }
     fx_draw_world(&g->fxs, &g->cam);
     if (g->rearcam)

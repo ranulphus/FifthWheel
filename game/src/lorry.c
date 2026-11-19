@@ -241,3 +241,85 @@ void lorry_draw_trailer(const lorry_meshes *m, int type, float kx, float ky, flo
     dgk_gfx_draw_mesh(&m->trailer[type]);
     glPopMatrix();
 }
+
+#define SHADOW_LIFT 0.3f        /* above the terrain: about where a road's surface is */
+#define SHADOW_SOFT 0.8f        /* metres over which the edge fades */
+#define SHADOW_ALPHA 120        /* of 255, under the middle */
+#define SHADOW_EAST 0.55f       /* the offset to the south-east */
+
+static float shadow_height(const world *w, float x, float y)
+{
+    return w ? world_height(w, x, y) + SHADOW_LIFT : 0.03f;
+}
+
+/* A footprint from `a0` to `a1` metres along `heading` from (x, y), `half`
+ * wide either side: dark in the middle, fading to nothing across its edge
+ * (four trapezoids round an inner quad), on the ground south-east of it. */
+static void shadow(const world *w, float x, float y, float heading, float a0, float a1, float half)
+{
+    static const float sa[4] = { 0, 1, 1, 0 }, sc[4] = { -1, -1, 1, 1 };
+    float c = cosf(heading), s = sinf(heading), in[4][3], out[4][3], f = SHADOW_SOFT * 0.5f;
+    int k;
+    x += SHADOW_EAST;
+    y -= SHADOW_EAST;
+    for (k = 0; k < 4; k++) {
+        float ai = sa[k] ? a1 - f : a0 + f, ao = sa[k] ? a1 + f : a0 - f;
+        float ci = sc[k] * (half - f), co = sc[k] * (half + f);
+        in[k][0] = x + c * ai - s * ci;
+        in[k][1] = y + s * ai + c * ci;
+        out[k][0] = x + c * ao - s * co;
+        out[k][1] = y + s * ao + c * co;
+        in[k][2] = shadow_height(w, in[k][0], in[k][1]);
+        out[k][2] = shadow_height(w, out[k][0], out[k][1]);
+    }
+    glColor4ub(0, 0, 0, SHADOW_ALPHA);
+    for (k = 0; k < 4; k++)
+        glVertex3f(in[k][0], in[k][2], -in[k][1]);
+    for (k = 0; k < 4; k++) {
+        int j = (k + 1) & 3;
+        glColor4ub(0, 0, 0, 0);
+        glVertex3f(out[k][0], out[k][2], -out[k][1]);
+        glVertex3f(out[j][0], out[j][2], -out[j][1]);
+        glColor4ub(0, 0, 0, SHADOW_ALPHA);
+        glVertex3f(in[j][0], in[j][2], -in[j][1]);
+        glVertex3f(in[k][0], in[k][2], -in[k][1]);
+    }
+    dgk_gfx_tris += 10;
+}
+
+void lorry_shadows_begin(void)
+{
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBegin(GL_QUADS);
+    dgk_gfx_draws++;
+}
+
+/* The tractor from its back (1.1 m behind the rear axle) to its bumper; with
+ * a trailer, only ahead of the trailer's nose (the trailer's shadow covers
+ * the rest, and two would darken where they overlap). */
+void lorry_shadow_rig(const rig *r, const world *w)
+{
+    float hx, hy;
+    shadow(w, r->x, r->y, r->heading, r->has_trailer ? RIG_HITCH + 1.0f : -1.1f, 4.9f, 1.25f);
+    if (!r->has_trailer)
+        return;
+    rig_hitch(r, &hx, &hy);
+    lorry_shadow_trailer(hx, hy, r->trailer_heading, w);
+}
+
+/* A trailer from its back to its nose, 1 m ahead of the kingpin. */
+void lorry_shadow_trailer(float kx, float ky, float heading, const world *w)
+{
+    shadow(w, kx, ky, heading, -RIG_TRAILER_REAR, 1.0f, 1.28f);
+}
+
+void lorry_shadows_end(void)
+{
+    glEnd();
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+}

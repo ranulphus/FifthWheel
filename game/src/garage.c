@@ -169,6 +169,9 @@ void showroom_draw(const lorry_meshes *m, float spin, uint32_t rim_rgba, int tra
     r.y = -1.9f * sinf(spin);
     r.has_trailer = trailer >= 0;
     r.trailer_type = trailer >= 0 ? trailer : 0;
+    lorry_shadows_begin();
+    lorry_shadow_rig(&r, NULL);
+    lorry_shadows_end();
     lorry_draw(m, &r, NULL, NULL);
 }
 

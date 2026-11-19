@@ -92,6 +92,18 @@ it brakes and jolting on knocks. Callouts squash and stretch as they land.
 Each kind lives in a fixed pool (16 coins, 64 confetti, 32 dust: a new one
 takes an old one's place), so a frame's cost has a ceiling (`-fxtest`).
 
+## Shadows (game/src/lorry.c)
+
+The tractor, its trailer and the trailers standing at depots each cast a
+soft contact shadow, a little to the south-east as the buildings' baked
+ones fall (the sun is in the north-west): a dark footprint fading out over
+0.8 m, 10 triangles each, in one immediate-mode block before the lorries.
+The lorry rides the terrain, and a road can stand well above it (its ribbon
+is lifted a little, and more where the ground under it dips), so the
+shadows are drawn with depth testing off, over whatever is there, and the
+lorries then over them. With a trailer, the tractor's shadow starts at the
+trailer's nose, so the two do not darken each other where they overlap.
+
 ## Controls (game/src/input.c)
 
 The keyboard's digital keys are smoothed so they steer like a wheel. A
