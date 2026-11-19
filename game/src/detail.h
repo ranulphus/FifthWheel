@@ -19,6 +19,7 @@ typedef struct detail {
     int minimap_step;           /* road points one minimap segment spans */
     float trailers;             /* metres within which standing trailers are drawn */
     int models;                 /* how round the models are: 0 boxes, 1 rounded, 2 rounder */
+    float pitch_min;            /* degrees down: how low the camera comes at speed (under 30: sky and fog) */
 } detail;
 
 extern const char *const detail_name[DETAILS];

@@ -114,6 +114,17 @@ frames a second on a Pentium II 266 with a G200.
   trailer's (under its body) 8. With the box trailer: 360 triangles at 0,
   922 at 1, 1,242 at 2. It is built again when the governor changes the
   preset.
+- **The camera** follows speed (the owner's idea): 64 degrees down for
+  manoeuvring, easing down from 18 km/h to the preset's `pitch_min` by 61
+  km/h (LOW 52, MEDIUM 24, HIGH 20 degrees), closer and looking a little
+  higher as it comes down, back up quickly when the rig slows (coupling
+  and docking keep their 75-degree view). At MEDIUM and HIGH the horizon
+  comes into the picture: the sky is a gradient above it (sky.c), and
+  linear fog in the horizon's colour over the last half of the view ends
+  the world in haze. LOW never comes low enough for either (DOS-GL's fog
+  costs most on the G200). The world is drawn as far round the target as
+  the camera sees, and no less than 0.65 of the far plane; so LOW's lower
+  view costs nothing (FW1 1,448 triangles a frame, against 1,440).
 - **Light** on the world is baked (a warm sun from the north-west, strong
   ambient). The lorry keeps each vertex's normal and is lit again as it
   turns (`mb_relight`: the sun stays put in the world), with a plastic

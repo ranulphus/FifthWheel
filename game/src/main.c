@@ -35,6 +35,7 @@
 #include "guides.h"
 #include "dgk/save.h"
 #include "probe.h"
+#include "sky.h"
 #include "sound.h"
 #include <GL/gl.h>
 #include <math.h>
@@ -196,6 +197,7 @@ static void dock_pose(game *g)
 static void detail_apply(game *g)
 {
     g->det = detail_effective(g->presets, g->detail_chosen, g->gov.notch);
+    g->cam.pitch_min = g->det.pitch_min * 3.14159265f / 180.0f;
     if (g->lorry.quality != g->det.models) {
         lorry_build(&g->lorry, g->det.models);
         career_style(g);
@@ -285,7 +287,8 @@ static int init(void *u)
         dgk_bench_run("FWHEEL", "F2");
         dgk_app_bench_start(g->dbtest, 30);
     }
-    glClearColor(0.55f, 0.78f, 0.95f, 1);
+    glClearColor(((SKY_HORIZON >> 16) & 255) / 255.0f, ((SKY_HORIZON >> 8) & 255) / 255.0f, (SKY_HORIZON & 255) / 255.0f,
+                 1);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
     glEnable(GL_CULL_FACE);
@@ -620,9 +623,14 @@ static void draw(void *u, float alpha)
     {
         float tx = g->cam_prev.tx + (g->cam.tx - g->cam_prev.tx) * alpha;
         float ty = g->cam_prev.ty + (g->cam.ty - g->cam_prev.ty) * alpha;
+        float pitch, eye_h;
         camera_apply(&g->cam, &g->cam_prev, alpha, (float)dgk_app.width / dgk_app.height, world_height(&g->w, tx, ty),
-                     g->det.far);
-        world_draw(&g->w, tx, ty, g->det.far * 0.65f);
+                     g->det.far, &pitch, &eye_h);
+        sky_draw(pitch);
+        sky_fog(pitch, eye_h, g->det.far);
+        /* As far round the target as the camera sees ahead of the eye (the eye is behind it), and no less than
+         * 0.65 of the far plane (the sides of a steep view); the view's planes cull the rest. */
+        world_draw(&g->w, tx, ty, DGK_MAX(g->det.far * 0.65f, sky_seen(pitch, eye_h, g->det.far)));
     }
     {
         const parked *standing[WG_MAX_PLACES * 2];
@@ -640,6 +648,7 @@ static void draw(void *u, float alpha)
                                &g->w);
     }
     fx_draw_world(&g->fxs, &g->cam);
+    glDisable(GL_FOG);
     if (g->rearcam)
         guides_draw(&r, &g->w);
     if (g->tourshots) {
