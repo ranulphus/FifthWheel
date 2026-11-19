@@ -622,6 +622,8 @@ static void draw(void *u, float alpha)
     {
         const parked *standing[WG_MAX_PLACES * 2];
         int i, n = parked_near(g, &r, standing);
+        if (g->has_jobs)
+            route_draw(&g->jobs, &r, &g->w, dgk_app.ticks);
         lorry_shadows_begin();
         lorry_shadow_rig(&r, &g->w);
         for (i = 0; i < n; i++)

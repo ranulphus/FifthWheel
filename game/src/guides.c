@@ -79,3 +79,82 @@ void guides_draw(const rig *r, const world *w)
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
 }
+
+/* ---- the route's chevrons -------------------------------------------------- */
+
+#define CHEV_FIRST 1            /* road points ahead of the nearest: the first tried */
+#define CHEV_COUNT 7            /* tried: enough to reach CHEV_FAR at 8 m apart */
+#define CHEV_NEAR 7.0f          /* metres from the rig (its rear axle): fading in from here... */
+#define CHEV_IN 4.0f            /* ...over this */
+#define CHEV_FAR 48.0f          /* and out to here... */
+#define CHEV_OUT 12.0f          /* ...over this */
+#define CHEV_LIFT 0.3f          /* above the ground: about where a road's surface is */
+#define CHEV_HALF 1.6f          /* half the chevron's span across the road */
+#define CHEV_LEN 0.9f           /* tip to arms' ends, along the road, halved */
+#define CHEV_THICK 0.8f         /* each arm, along the road */
+#define CHEV_PERIOD 40          /* ticks to slide from one road point to the next */
+
+static void chev_vertex(const world *w, float x, float y)
+{
+    glVertex3f(x, world_height(w, x, y) + CHEV_LIFT, -y);
+}
+
+void route_draw(const jobs *j, const rig *r, const world *w, uint32_t ticks)
+{
+    float slide = (float)(ticks % CHEV_PERIOD) / CHEV_PERIOD, dx, dy;
+    int k;
+    if (j->state != JOB_HAULING || j->route_next >= j->nroute)
+        return;
+    dx = j->route[j->route_next][0] - r->x;
+    dy = j->route[j->route_next][1] - r->y;
+    if (dx * dx + dy * dy > 30.0f * 30.0f)          /* off the route: it will be worked out again */
+        return;
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBegin(GL_QUADS);
+    dgk_gfx_draws++;
+    for (k = 0; k < CHEV_COUNT; k++) {
+        int i = j->route_next + CHEV_FIRST + k;
+        float ax, ay, bx, by, l, ux, uy, nx, ny, px, py, d, fade;
+        if (i + 1 >= j->nroute)
+            break;
+        ax = j->route[i][0];
+        ay = j->route[i][1];
+        bx = j->route[i + 1][0];
+        by = j->route[i + 1][1];
+        l = sqrtf((bx - ax) * (bx - ax) + (by - ay) * (by - ay));
+        if (l < 0.01f)
+            continue;
+        ux = (bx - ax) / l;
+        uy = (by - ay) / l;
+        nx = -uy;
+        ny = ux;
+        px = ax + (bx - ax) * slide;
+        py = ay + (by - ay) * slide;
+        /* By its distance from the rig, so it does not jump as the route's nearest point moves on. */
+        d = sqrtf((px - r->x) * (px - r->x) + (py - r->y) * (py - r->y));
+        fade = DGK_CLAMP((d - CHEV_NEAR) / CHEV_IN, 0.0f, 1.0f) * DGK_CLAMP((CHEV_FAR - d) / CHEV_OUT, 0.0f, 1.0f);
+        if (fade <= 0.0f)
+            continue;
+        glColor4ub(255, 210, 63, (GLubyte)(230.0f * fade));
+        /* The left arm, then the right: from the tip back to each end. */
+        chev_vertex(w, px + ux * CHEV_LEN, py + uy * CHEV_LEN);
+        chev_vertex(w, px - ux * CHEV_LEN + nx * CHEV_HALF, py - uy * CHEV_LEN + ny * CHEV_HALF);
+        chev_vertex(w, px - ux * (CHEV_LEN + CHEV_THICK) + nx * CHEV_HALF,
+                    py - uy * (CHEV_LEN + CHEV_THICK) + ny * CHEV_HALF);
+        chev_vertex(w, px + ux * (CHEV_LEN - CHEV_THICK), py + uy * (CHEV_LEN - CHEV_THICK));
+        chev_vertex(w, px + ux * CHEV_LEN, py + uy * CHEV_LEN);
+        chev_vertex(w, px + ux * (CHEV_LEN - CHEV_THICK), py + uy * (CHEV_LEN - CHEV_THICK));
+        chev_vertex(w, px - ux * (CHEV_LEN + CHEV_THICK) - nx * CHEV_HALF,
+                    py - uy * (CHEV_LEN + CHEV_THICK) - ny * CHEV_HALF);
+        chev_vertex(w, px - ux * CHEV_LEN - nx * CHEV_HALF, py - uy * CHEV_LEN - ny * CHEV_HALF);
+        dgk_gfx_tris += 4;
+    }
+    glEnd();
+    glDisable(GL_BLEND);
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
+}
+

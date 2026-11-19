@@ -6,8 +6,15 @@
 #ifndef FW_GUIDES_H
 #define FW_GUIDES_H
 
-#include "vehicle.h"
+#include "jobs.h"
 
 void guides_draw(const rig *r, const world *w);
+
+/* The route on the road ahead while hauling: gold chevrons pointing the way,
+ * one at each road point (8 m apart) from 7 m to 48 m from the rig, sliding
+ * forward with the ticks and fading in and out at the ends. Drawn over the
+ * world (no depth test: a road can stand above the ground the rig rides),
+ * before the shadows and the lorries. Nothing when the rig is off the route. */
+void route_draw(const jobs *j, const rig *r, const world *w, uint32_t ticks);
 
 #endif

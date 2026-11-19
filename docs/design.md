@@ -132,7 +132,10 @@ cancelling are input like the pedals, so replays carry them.
   0.6 m of the kingpin, lined up within 12 degrees, slower than 1.5 m/s.
 - **The route:** the shortest way over the road graph (Dijkstra). The HUD's
   arrow points along it and the minimap draws it; more than 60 m off it,
-  it is worked out again from the nearest junction.
+  it is worked out again from the nearest junction. On the road ahead, gold
+  chevrons point the way (`route_draw`, guides.c): one at each road point
+  from 7 m to 48 m from the rig, sliding forward and fading in and out by
+  distance, drawn over the world like the shadows.
 - **Docking:** on the destination's apron the gauge shows the gap to the
   dock, the sideways error and the angle; stopped for 1.5 s within a
   grade's limits, the job is done. PERFECT: 0.25 m across, 0.5 m gap, 2
