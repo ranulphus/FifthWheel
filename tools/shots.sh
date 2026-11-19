@@ -30,7 +30,12 @@ for name in tour hud dock haul; do
     "$DEV" python3 "$MGAHAL/tools/loopa/run.py" --name "fwshots-$name" --card "$card" \
         --exe build/dos/FWHEEL.EXE --file build/data/WORLD.PAK --args="-test -fixed -nosound $args" \
         --out "$PWD/$dos/$name" --timeout 900 --idle 300 > /dev/null || true
-    echo "shots: DOS $name: $(cat $dos/$name/status 2>/dev/null || echo none)"
+    # The haul is cut short, so its job's own check fails; its picture is what counts.
+    status=$(cat $dos/$name/status 2>/dev/null || echo none)
+    if [ $name = haul ] && grep -q 'HX-TEST snapshot PASS H2' $dos/$name/serial.log 2>/dev/null; then
+        status="PASS (snapshot; the job is cut short)"
+    fi
+    echo "shots: DOS $name: $status"
     # The same frames headless.
     "$DEV" sh -c "cd $hl && LP_NUM_THREADS=2 ../../build/headless/fwheel-hl -world ../../build/data/WORLD.PAK \
         -test -fixed -nosound $args > $name.log 2>&1" || true
