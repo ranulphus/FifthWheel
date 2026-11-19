@@ -63,4 +63,11 @@ w, h, rgb = png.read_ppm('$ref'); png.write_png('$hl/$lower.png', w, h, rgb)"
         fail=1
     fi
 done
+# Every frame the sets ask for: a run that hung or failed early leaves its frames out.
+for want in P0 P1 P2 P3 P4 P5 P6 P7 P8 P9 H0 H1 H2; do
+    if ! ls $dos/*/files/$want.PPM > /dev/null 2>&1; then
+        echo "shots: $want: no DOS frame"
+        fail=1
+    fi
+done
 exit $fail

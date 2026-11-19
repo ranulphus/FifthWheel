@@ -3,6 +3,8 @@
  *   FWHEEL [kit options, see dgk/app.h] [-world FILE] [-record FILE | -replay FILE] [-hash]
  *          [-trace N]                    the rig's pose every N ticks (FW-TRACE)
  *   FWHEEL -dockpose                     a trailer reversing into a bay, held still (pictures)
+ *   FWHEEL -pose X:Y:H:V                 the rig held at (X, Y) heading H degrees, the camera
+ *                                        as at V m/s (pictures of a place at speed)
  *   FWHEEL -soundtest                    each sound in turn, then quit (the SOUND suite)
  *   FWHEEL -fxtest                       every flourish far past its cap for 2 s (HX-TEST fx-caps)
  *          [-detail low|medium|high]     the detail preset (else FWHEEL.CFG's, else medium)
@@ -263,6 +265,10 @@ static int init(void *u)
         dgk_log("FW-ERROR -autojob needs a world with depots");
         return -1;
     }
+    if (g->posed) {                                  /* -pose: a box trailer behind, held at the place */
+        rig_init(&g->r, g->pose[0], g->pose[1], g->pose[2] * WG_PI / 180.0f);
+        g->r.v = g->pose[3];
+    }
     g->r_prev = g->r;
     g->cam.zoom = 1;
     camera_reset(&g->cam, &g->r);
@@ -415,6 +421,12 @@ static void tick(void *u)
         calibration(g);
         return;
     }
+    if (g->posed) {                                  /* held; only the camera moves, as if at speed */
+        g->r_prev = g->r;
+        g->cam_prev = g->cam;
+        camera_tick(&g->cam, &g->r, 1.0f / DGK_TICK_HZ, NULL);
+        return;
+    }
     if (g->gar.open) {                               /* the garage: the world waits */
         int changed;
         g->car.money = (uint32_t)DGK_MAX(g->jobs.money, 0);
@@ -559,6 +571,10 @@ static void tick(void *u)
                 (unsigned long)dgk_app.ticks + 1, g->r.x, g->r.y, g->r.heading, g->r.trailer_heading, g->r.v, ax, ay,
                 g->r.hits);
     }
+    /* In a test, a line every 10 s of the game's time: a long run in 86Box (a haul drawn at a few frames a
+     * second) is otherwise silent long enough for the harness to call it a hang. */
+    if (dgk_test_active() && (dgk_app.ticks + 1) % 600 == 0)
+        dgk_log("FW-TICK %lu", (unsigned long)dgk_app.ticks + 1);
     if (g->hash && (dgk_app.ticks + 1) % 60 == 0)
         dgk_log("FW-HASH t=%lu h=%08lx x=%.2f y=%.2f v=%.2f gear=%d", (unsigned long)dgk_app.ticks + 1,
                 (unsigned long)h, g->r.x, g->r.y, g->r.v, g->r.gear);
@@ -766,6 +782,8 @@ int main(int argc, char **argv)
             g.hash = 1;
         else if (!strcmp(a, "-dockpose"))
             g.dockpose = 1;
+        else if (!strcmp(a, "-pose") && v)
+            g.posed = sscanf(argv[++i], "%f:%f:%f:%f", &g.pose[0], &g.pose[1], &g.pose[2], &g.pose[3]) == 4;
         else if (!strcmp(a, "-soundtest"))
             g.soundtest = 1;
         else if (!strcmp(a, "-fxtest"))

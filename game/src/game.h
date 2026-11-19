@@ -26,6 +26,8 @@ typedef struct game {
     int mode, laps_wanted, hash, trace, desync, last_laps, tourshots;
     int job_from, job_to, job_bay;  /* -job D:T:B (job_to -1: none) */
     int dockpose;                   /* -dockpose */
+    int posed;                      /* -pose X:Y:H:V: the rig held there, the camera told it moves at V */
+    float pose[4];
     int calibrate_only, joylog;     /* -calibrate (then quit), -joylog */
     dgk_cfg cfg;                    /* the settings file */
     const char *cfg_path;
