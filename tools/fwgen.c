@@ -540,91 +540,6 @@ static void bshadow(const bframe *f, float hl, float hw, float h)
                 k[3][0] + off, -k[3][2] - off, 0.08f, ground_colour(f->cx, f->cy), 0.6f);
 }
 
-/* A house for MEDIUM and HIGH, on block()'s footprint: a cottage with a
- * pitched roof (its ridge along its length, eaves overhanging, gables in
- * its walls' colour), a chimney, a door and windows; taller (the middles
- * of towns) a flat-roofed block with a parapet and rows of windows. */
-static void house(float cx, float cy, float hl, float hw, float angle, float h, uint32_t wall, uint32_t roof)
-{
-    static const uint32_t glass = 0x8FCBEFu, door = 0x6A4028u;
-    bframe f;
-    cmesh *m;
-    float base, up[3] = { 0, 1, 0 };
-    int i, s;
-    f.cx = cx; f.cy = cy; f.c = cosf(angle); f.s = sinf(angle);
-    m = chunk_for(cx, cy);
-    base = bbase(&f, hl, hw);
-    bshadow(&f, hl, hw, h);
-    if (h > 7.5f) {
-        float top = base + h, p[4][3];
-        int floors = DGK_MIN((int)(h / 3.2f), 3), per = DGK_MIN((int)(hl * 2 / 3.5f), 3), fl;
-        walls(m, &f, hl, hw, base, top, wall);
-        /* The parapet: a rim round the roof, its top darker. */
-        for (s = 0; s < 4; s++)
-            panel(m, &f, s == 1 ? 1.0f : s == 3 ? -1.0f : 0.0f, s == 0 ? -1.0f : s == 2 ? 1.0f : 0.0f,
-                  (s & 1) ? hl + 0.15f : hw + 0.15f, (s & 1) ? -hw - 0.15f : -hl - 0.15f,
-                  (s & 1) ? hw + 0.15f : hl + 0.15f, top - 0.2f, top + 0.45f, mb_shade(wall, 0.92f), -1e9f);
-        bpoint(&f, -hl - 0.15f, -hw - 0.15f, top + 0.45f, p[0]);
-        bpoint(&f, hl + 0.15f, -hw - 0.15f, top + 0.45f, p[1]);
-        bpoint(&f, hl + 0.15f, hw + 0.15f, top + 0.45f, p[2]);
-        bpoint(&f, -hl - 0.15f, hw + 0.15f, top + 0.45f, p[3]);
-        face(m, p, 4, up, roof, -1e9f);
-        for (fl = 0; fl < floors; fl++)              /* windows along both long sides */
-            for (s = -1; s <= 1; s += 2)
-                for (i = 0; i < per; i++) {
-                    float a = -hl + (i + 0.5f) * (2 * hl / per), y0 = base + 1.2f + fl * 3.2f;
-                    panel(m, &f, 0, (float)s, hw + 0.03f, a - 0.6f, a + 0.6f, y0, y0 + 1.4f, glass, -1e9f);
-                }
-        return;
-    }
-    {
-        float eave = base + h * 0.62f, ridge = base + h + 0.6f, o = 0.45f, p[4][3], out[3];
-        walls(m, &f, hl, hw, base, eave, wall);
-        for (s = -1; s <= 1; s += 2) {               /* the gables: triangles at the ends, in the walls' colour */
-            bpoint(&f, s * hl, -hw, eave, p[0]);
-            bpoint(&f, s * hl, hw, eave, p[1]);
-            bpoint(&f, s * hl, 0, ridge, p[2]);
-            out[0] = f.c * s;
-            out[1] = 0;
-            out[2] = -f.s * s;
-            face(m, p, 3, out, wall, -1e9f);
-        }
-        for (s = -1; s <= 1; s += 2) {               /* the roof's two slopes, overhanging */
-            float eh = eave - o * (ridge - eave) / hw;
-            bpoint(&f, -hl - 0.3f, s * (hw + o), eh, p[0]);
-            bpoint(&f, hl + 0.3f, s * (hw + o), eh, p[1]);
-            bpoint(&f, hl + 0.3f, 0, ridge, p[2]);
-            bpoint(&f, -hl - 0.3f, 0, ridge, p[3]);
-            out[0] = -f.s * s * 0.7f;
-            out[1] = 0.7f;
-            out[2] = -f.c * s * 0.7f;
-            face(m, p, 4, out, roof, -1e9f);
-        }
-        {   /* a chimney through the back slope */
-            bframe cf = f;
-            float cu = hl * 0.45f, cv = hw * 0.35f, ch0 = eave, ch1 = ridge + 0.9f;
-            cf.cx = cx + f.c * cu - f.s * cv;
-            cf.cy = cy + f.s * cu + f.c * cv;
-            panel(m, &cf, 0, -1, 0.35f, -0.35f, 0.35f, ch0, ch1, 0xB0573Au, -1e9f);
-            panel(m, &cf, 1, 0, 0.35f, -0.35f, 0.35f, ch0, ch1, 0xB0573Au, -1e9f);
-            panel(m, &cf, 0, 1, 0.35f, -0.35f, 0.35f, ch0, ch1, 0xB0573Au, -1e9f);
-            panel(m, &cf, -1, 0, 0.35f, -0.35f, 0.35f, ch0, ch1, 0xB0573Au, -1e9f);
-            bpoint(&cf, -0.35f, -0.35f, ch1, p[0]);
-            bpoint(&cf, 0.35f, -0.35f, ch1, p[1]);
-            bpoint(&cf, 0.35f, 0.35f, ch1, p[2]);
-            bpoint(&cf, -0.35f, 0.35f, ch1, p[3]);
-            face(m, p, 4, up, 0x5A3A2Au, -1e9f);
-        }
-        /* The front (-v): a door between two windows; the back: two windows. */
-        panel(m, &f, 0, -1, hw + 0.03f, -0.55f, 0.55f, base, base + 2.0f, door, -1e9f);
-        for (s = -1; s <= 1; s += 2)
-            for (i = -1; i <= 1; i += 2) {
-                float a = i * hl * 0.55f;
-                panel(m, &f, 0, (float)s, hw + 0.03f, a - 0.55f, a + 0.55f, eave - 1.7f, eave - 0.5f, glass, -1e9f);
-            }
-    }
-}
-
 /* A depot's warehouse for MEDIUM and HIGH, on block()'s footprint: walls,
  * and an arched roof (smooth, eight strips) over its length. */
 static void warehouse(float cx, float cy, float hl, float hw, float angle, float h, uint32_t wall, uint32_t roof)
@@ -1120,9 +1035,13 @@ static float road_distance(float x, float y)
         if (d * d < best)
             best = d * d;
     }
+    /* To the roads' middle lines, segment by segment (their points are 8 m apart: a house between two could
+     * have every corner 6 m from both with the road through its middle). */
     for (e = 0; e < nedges; e++)
-        for (i = (int)edges[e].first_point; i < (int)(edges[e].first_point + edges[e].npoints); i++) {
-            float dx = pts[i][0] - x, dy = pts[i][1] - y, d = dx * dx + dy * dy;
+        for (i = (int)edges[e].first_point; i + 1 < (int)(edges[e].first_point + edges[e].npoints); i++) {
+            float sx = pts[i + 1][0] - pts[i][0], sy = pts[i + 1][1] - pts[i][1], l2 = sx * sx + sy * sy;
+            float t = l2 > 1e-6f ? DGK_CLAMP(((x - pts[i][0]) * sx + (y - pts[i][1]) * sy) / l2, 0.0f, 1.0f) : 0.0f;
+            float dx = pts[i][0] + sx * t - x, dy = pts[i][1] + sy * t - y, d = dx * dx + dy * dy;
             if (d < best)
                 best = d;
         }
@@ -1147,6 +1066,851 @@ static void street(float x0, float y0, float x1, float y1, float h, float lift)
 }
 
 static void lamp(float x, float y, float tall, float ax, float ay);
+
+/* ---- a town's blocks: terraces, gardens, pavements, a park, a landmark ----------------
+ *
+ * Each block inside the town has a terrace along its two sides that face
+ * the streets across `heading` (v), set back ROW_SET from the street's
+ * middle (4.5 m of street, 2 of pavement, 2.5 of front garden), ROW_DEPTH
+ * deep, ROW_END in from the cross streets; back gardens between them. LOW
+ * draws a run of houses (those clear of the main roads, side by side) as
+ * one block, which is also its collision box; MEDIUM and HIGH draw each
+ * house on that footprint. The four blocks round the roundabout have shops;
+ * one block nearby is a park, another the town's landmark. */
+#define ROW_SET 9.0f
+#define ROW_DEPTH 9.0f
+#define ROW_END 12.0f
+
+typedef struct hse {
+    float a, b;                       /* along the row, in its frame */
+    float eave, ridge;                /* above the ground; a shop's ridge is its flat top */
+    uint32_t wall, roof, door, trim;
+    int shop, chimney, dormer, door_left;
+} hse;
+
+static const uint32_t door_colours[] = { 0xC8302Au, 0x2E5FB8u, 0x2F8A4Au, 0xF2C230u, 0x2A2A30u, 0xF4F4F0u };
+static const uint32_t awnings[] = { 0xE8402Au, 0x3A6FD8u, 0x2F9A5Au, 0xF28C28u, 0x8A4AB8u, 0xE84A8Au };
+static const uint32_t signs[] = { 0x1C2E5Au, 0x7A1E1Eu, 0x1E5A3Au, 0x3A2A5Au };
+
+static void hedge_stretch(float ax, float ay, float ah, float bx, float by, float bh, uint32_t col);
+static void pyramid(float x, float y, float angle, float half, float z0, float z1, uint32_t rgb);
+
+static bframe sub_frame(const bframe *f, float u, float v)
+{
+    bframe r = *f;
+    r.cx = f->cx + f->c * u - f->s * v;
+    r.cy = f->cy + f->s * u + f->c * v;
+    return r;
+}
+
+/* GL directions of the frame's +u and +v. */
+static void fdir(const bframe *f, int along_v, float sign, float *out)
+{
+    out[0] = (along_v ? -f->s : f->c) * sign;
+    out[1] = 0;
+    out[2] = -(along_v ? f->c : f->s) * sign;
+}
+
+/* A wall at v = `at` from u0 to u1 (or, across, at u = `at` from v0 to v1), from h0 to h1, facing `sign`. */
+static void wall_at(cmesh *m, const bframe *f, int across, float at, float a0, float a1, float h0, float h1,
+                    float sign, uint32_t rgb, float foot)
+{
+    float p[4][3], out[3];
+    if (!across) {
+        bpoint(f, a0, at, h0, p[0]);
+        bpoint(f, a1, at, h0, p[1]);
+        bpoint(f, a1, at, h1, p[2]);
+        bpoint(f, a0, at, h1, p[3]);
+    } else {
+        bpoint(f, at, a0, h0, p[0]);
+        bpoint(f, at, a1, h0, p[1]);
+        bpoint(f, at, a1, h1, p[2]);
+        bpoint(f, at, a0, h1, p[3]);
+    }
+    fdir(f, !across, sign, out);
+    face(m, p, 4, out, rgb, foot);
+}
+
+/* A flat top at height h over u0..u1, v0..v1. */
+static void top_at(cmesh *m, const bframe *f, float u0, float u1, float v0, float v1, float h, uint32_t rgb)
+{
+    float p[4][3], up[3] = { 0, 1, 0 };
+    bpoint(f, u0, v0, h, p[0]);
+    bpoint(f, u1, v0, h, p[1]);
+    bpoint(f, u1, v1, h, p[2]);
+    bpoint(f, u0, v1, h, p[3]);
+    face(m, p, 4, up, rgb, -1e9f);
+}
+
+/* A box about (u, v), half sizes hu and hv, from h0 to h1, its top in `top`. */
+static void fbox(cmesh *m, const bframe *f, float u, float v, float hu, float hv, float h0, float h1, uint32_t rgb,
+                 uint32_t top)
+{
+    wall_at(m, f, 0, v - hv, u - hu, u + hu, h0, h1, -1, rgb, h0);
+    wall_at(m, f, 0, v + hv, u - hu, u + hu, h0, h1, 1, rgb, h0);
+    wall_at(m, f, 1, u - hu, v - hv, v + hv, h0, h1, -1, rgb, h0);
+    wall_at(m, f, 1, u + hu, v - hv, v + hv, h0, h1, 1, rgb, h0);
+    top_at(m, f, u - hu, u + hu, v - hv, v + hv, h1, top);
+}
+
+/* A roof slope from the eave (at v = ve, height he) up to the ridge (v = vr, height hr), u0..u1. */
+static void slope_at(cmesh *m, const bframe *f, float u0, float u1, float ve, float he, float vr, float hr, uint32_t rgb)
+{
+    float p[4][3], out[3];
+    bpoint(f, u0, ve, he, p[0]);
+    bpoint(f, u1, ve, he, p[1]);
+    bpoint(f, u1, vr, hr, p[2]);
+    bpoint(f, u0, vr, hr, p[3]);
+    fdir(f, 1, ve < vr ? -1.0f : 1.0f, out);
+    out[0] *= 0.6f;
+    out[2] *= 0.6f;
+    out[1] = 0.8f;
+    face(m, p, 4, out, rgb, -1e9f);
+}
+
+/* A gable triangle at u = `at` (facing `sign` along u), its base at h0 across the depth, its peak at h1. */
+static void gable_at(cmesh *m, const bframe *f, float at, float hw, float h0, float h1, float sign, uint32_t rgb)
+{
+    float p[3][3], out[3];
+    bpoint(f, at, -hw, h0, p[0]);
+    bpoint(f, at, hw, h0, p[1]);
+    bpoint(f, at, 0, h1, p[2]);
+    fdir(f, 0, sign, out);
+    face(m, p, 3, out, rgb, -1e9f);
+}
+
+/* One house of a terrace, in the row's frame f (its front at v = -hw, facing -v); base: the ground. The
+ * neighbours (NULL: the run ends there) decide its end walls and gables. */
+static void row_house(const bframe *f, const hse *h, const hse *left, const hse *right, float base, int run_l,
+                      int run_r)
+{
+    static const uint32_t glass = 0x8FCBEFu;
+    const float hw = ROW_DEPTH * 0.5f, o = 0.4f;
+    float uc = (h->a + h->b) * 0.5f, w = h->b - h->a, e = base + h->eave, r = base + h->ridge, du, k;
+    cmesh *m;
+    bframe at = sub_frame(f, uc, 0);
+    int i, nwin;
+    m = chunk_for(at.cx, at.cy);
+    /* Front and back walls; the ends where the run ends or a lower neighbour leaves them showing. */
+    wall_at(m, f, 0, -hw, h->a, h->b, base - 0.5f, e, -1, h->wall, base);
+    wall_at(m, f, 0, hw, h->a, h->b, base - 0.5f, e, 1, h->wall, base);
+    for (i = 0; i < 2; i++) {
+        const hse *nb = i ? right : left;
+        float u = i ? h->b : h->a, sign = i ? 1.0f : -1.0f;
+        float nbe = nb ? base + nb->eave : base - 0.5f, nbr = nb ? base + nb->ridge : base - 0.5f;
+        if (nbe < e - 0.05f)
+            wall_at(m, f, 1, u, -hw, hw, nbe, e, sign, h->wall, base);
+        if (!h->shop && (nbr < r - 0.05f || !nb))
+            gable_at(m, f, u, hw, e, r, sign, h->wall);
+        if (h->shop && (!nb || nbe < e - 0.05f || nb->shop == 0))
+            wall_at(m, f, 1, u, -hw, hw, e, e + 0.5f, sign, h->wall, base);
+    }
+    if (h->shop) {
+        float lo = base + 0.3f, hi = base + 2.6f;
+        top_at(m, f, h->a, h->b, -hw, hw, e + 0.5f, mb_shade(h->roof, 1.05f));
+        wall_at(m, f, 0, -hw, h->a, h->b, e, e + 0.5f, -1, h->wall, base);
+        wall_at(m, f, 0, hw, h->a, h->b, e, e + 0.5f, 1, h->wall, base);
+        /* The shopfront: its window, a door in it; the awning over, the sign above. */
+        wall_at(m, f, 0, -hw - 0.03f, h->a + 0.5f, h->b - 0.5f, lo, hi, -1, glass, -1e9f);
+        du = h->door_left ? h->a + 1.4f : h->b - 1.4f;
+        wall_at(m, f, 0, -hw - 0.05f, du - 0.55f, du + 0.55f, base, base + 2.2f, -1, h->door, -1e9f);
+        {
+            float p[4][3], out[3];
+            bpoint(f, h->a + 0.3f, -hw, base + 3.15f, p[0]);
+            bpoint(f, h->b - 0.3f, -hw, base + 3.15f, p[1]);
+            bpoint(f, h->b - 0.3f, -hw - 1.6f, base + 2.65f, p[2]);
+            bpoint(f, h->a + 0.3f, -hw - 1.6f, base + 2.65f, p[3]);
+            fdir(f, 1, -1, out);
+            out[1] = 1.2f;
+            face(m, p, 4, out, h->trim, -1e9f);
+        }
+        wall_at(m, f, 0, -hw - 0.04f, h->a + 0.4f, h->b - 0.4f, base + 3.3f, base + 4.0f, -1, h->door == 0xF4F4F0u ? 0x1C2E5Au : signs[(int)(uc * 7) & 3], -1e9f);
+        nwin = w > 8.5f ? 3 : 2;
+        for (k = base + 4.6f; k + 1.4f < e - 0.2f; k += 3.0f)       /* the flats above: rows of windows */
+            for (i = 0; i < nwin; i++) {
+                float a = h->a + (i + 0.5f) * (w / nwin);
+                wall_at(m, f, 0, -hw - 0.03f, a - 0.6f, a + 0.6f, k, k + 1.4f, -1, glass, -1e9f);
+                wall_at(m, f, 0, hw + 0.03f, a - 0.6f, a + 0.6f, k, k + 1.4f, 1, glass, -1e9f);
+            }
+        return;
+    }
+    /* The roof's two slopes, overhanging the front and back; past the run's ends a little. */
+    {
+        float u0 = h->a - (run_l ? 0.3f : 0.0f), u1 = h->b + (run_r ? 0.3f : 0.0f), eh = e - o * (r - e) / hw;
+        slope_at(m, f, u0, u1, -hw - o, eh, 0, r, h->roof);
+        slope_at(m, f, u0, u1, hw + o, eh, 0, r, h->roof);
+    }
+    if (h->chimney) {                                /* at one end, on the ridge: a third of them at MEDIUM */
+        float cu = h->door_left ? h->b - 0.7f : h->a + 0.7f;
+        int save = variant;
+        variant = h->chimney == 1 ? WG_MEDIUM_UP : WG_HIGH_ONLY;
+        m = chunk_for(at.cx, at.cy);
+        fbox(m, f, cu, 0.9f, 0.35f, 0.3f, r - 1.4f, r + 0.9f, 0xB0573Au, 0x5A3A2Au);
+        variant = save;
+        m = chunk_for(at.cx, at.cy);
+    }
+    /* The front: a door, a window by it, the windows above; the back's windows above. */
+    du = h->door_left ? h->a + 1.3f : h->b - 1.3f;
+    wall_at(m, f, 0, -hw - 0.03f, du - 0.5f, du + 0.5f, base, base + 2.1f, -1, h->door, -1e9f);
+    {
+        float wu = h->door_left ? (du + 0.5f + h->b) * 0.5f : (h->a + du - 0.5f) * 0.5f;
+        wall_at(m, f, 0, -hw - 0.03f, wu - 0.75f, wu + 0.75f, base + 0.9f, base + 2.2f, -1, glass, -1e9f);
+    }
+    nwin = w > 7.5f ? 2 : 1;
+    for (i = 0; i < nwin; i++) {
+        float a = h->a + (i + 0.5f) * (w / nwin);
+        wall_at(m, f, 0, -hw - 0.03f, a - 0.6f, a + 0.6f, e - 2.0f, e - 0.7f, -1, glass, -1e9f);
+    }
+}
+
+/* HIGH's touches on a house: white frames round its windows, a hood over the door, a box of flowers under
+ * the front window, and (some) a dormer in the front slope. */
+static void row_house_high(const bframe *f, const hse *h, float base)
+{
+    static const uint32_t flowers[] = { 0xE8402Au, 0xF2C230u, 0xE84A8Au, 0x8A4AB8u };
+    const float hw = ROW_DEPTH * 0.5f;
+    float uc = (h->a + h->b) * 0.5f, w = h->b - h->a, e = base + h->eave, r = base + h->ridge, du, wu;
+    bframe at = sub_frame(f, uc, 0);
+    cmesh *m = chunk_for(at.cx, at.cy);
+    int i, nwin = w > 7.5f ? 2 : 1;
+    if (h->shop) {
+        /* The awning's white stripes. */
+        float p[4][3], out[3], a;
+        for (a = h->a + 0.3f + 0.45f; a + 0.45f < h->b - 0.3f; a += 1.8f) {
+            bpoint(f, a, -hw - 0.01f, base + 3.17f, p[0]);
+            bpoint(f, a + 0.9f, -hw - 0.01f, base + 3.17f, p[1]);
+            bpoint(f, a + 0.9f, -hw - 1.61f, base + 2.67f, p[2]);
+            bpoint(f, a, -hw - 1.61f, base + 2.67f, p[3]);
+            fdir(f, 1, -1, out);
+            out[1] = 1.2f;
+            face(m, p, 4, out, 0xF6F4EEu, -1e9f);
+        }
+        return;
+    }
+    for (i = 0; i < nwin; i++) {                     /* frames round the front's windows; the back's windows */
+        float a = h->a + (i + 0.5f) * (w / nwin);
+        wall_at(m, f, 0, -hw - 0.02f, a - 0.75f, a + 0.75f, e - 2.15f, e - 0.55f, -1, h->trim, -1e9f);
+        wall_at(m, f, 0, hw + 0.03f, a - 0.6f, a + 0.6f, e - 2.0f, e - 0.7f, 1, 0x8FCBEFu, -1e9f);
+    }
+    du = h->door_left ? h->a + 1.3f : h->b - 1.3f;
+    wu = h->door_left ? (du + 0.5f + h->b) * 0.5f : (h->a + du - 0.5f) * 0.5f;
+    wall_at(m, f, 0, -hw - 0.02f, wu - 0.9f, wu + 0.9f, base + 0.75f, base + 2.35f, -1, h->trim, -1e9f);
+    fbox(m, f, wu, -hw - 0.3f, 0.85f, 0.25f, base + 0.5f, base + 0.85f, 0x8A5A3Au, flowers[(int)(uc * 3.7f) & 3]);
+    {   /* the door's hood */
+        float p[4][3], out[3];
+        bpoint(f, du - 0.75f, -hw, base + 2.45f, p[0]);
+        bpoint(f, du + 0.75f, -hw, base + 2.45f, p[1]);
+        bpoint(f, du + 0.75f, -hw - 0.8f, base + 2.2f, p[2]);
+        bpoint(f, du - 0.75f, -hw - 0.8f, base + 2.2f, p[3]);
+        fdir(f, 1, -1, out);
+        out[1] = 1.0f;
+        face(m, p, 4, out, h->roof, -1e9f);
+    }
+    if (h->dormer && w > 6.5f) {                     /* a dormer: a little gabled window in the front slope */
+        float dv = -hw * 0.45f, slope_h = e + (r - e) * (1.0f - 0.45f), dh0 = slope_h - 0.2f, dh1 = slope_h + 1.3f;
+        bframe d = sub_frame(f, uc, 0);
+        wall_at(m, &d, 0, dv - 0.6f, -0.8f, 0.8f, dh0, dh1, -1, h->wall, -1e9f);
+        wall_at(m, &d, 0, dv - 0.62f, -0.5f, 0.5f, dh0 + 0.3f, dh1 - 0.2f, -1, 0x8FCBEFu, -1e9f);
+        {
+            /* Its gable over the window, and its little roof's two slopes running back into the main roof. */
+            float p[4][3], out[3];
+            int sd;
+            bpoint(&d, -0.8f, dv - 0.6f, dh1, p[0]);
+            bpoint(&d, 0.8f, dv - 0.6f, dh1, p[1]);
+            bpoint(&d, 0.0f, dv - 0.6f, dh1 + 0.7f, p[2]);
+            fdir(&d, 1, -1, out);
+            face(m, p, 3, out, h->wall, -1e9f);
+            for (sd = -1; sd <= 1; sd += 2) {
+                bpoint(&d, sd * 0.95f, dv - 0.75f, dh1 - 0.05f, p[0]);
+                bpoint(&d, sd * 0.95f, dv + 1.8f, dh1 - 0.05f, p[1]);
+                bpoint(&d, 0.0f, dv + 1.8f, dh1 + 0.72f, p[2]);
+                bpoint(&d, 0.0f, dv - 0.75f, dh1 + 0.72f, p[3]);
+                fdir(&d, 0, (float)sd, out);
+                out[0] *= 0.6f;
+                out[2] *= 0.6f;
+                out[1] = 0.8f;
+                face(m, p, 4, out, h->roof, -1e9f);
+            }
+        }
+    }
+}
+
+static void tree_round(float x, float y, float s, uint32_t col, int collide);
+
+/* The row's houses, from a to b along it (frame f: its middle, front facing -v), those whose footprint is
+ * clear of the main roads; shops or cottages. LOW: a block a run (its collision); MEDIUM and HIGH: the
+ * houses, their front gardens (a low hedge, a path to the door) and, behind, a tree now and then. */
+static void terrace_row(const place *t, const bframe *f, float a, float b, int shops)
+{
+    static const uint32_t trims[] = { 0xF4F2EAu, 0xF4F2EAu, 0xE8E0C8u, 0x2A2A30u };
+    hse hs[16];
+    int n = 0, i, ok[16];
+    float u = a, base = t->h;
+    while (u < b - 4.0f && n < 16) {
+        hse *h = &hs[n];
+        float w = shops ? 8.0f + frand() * 4.0f : 6.0f + frand() * 4.0f;
+        if (b - (u + w) < (shops ? 7.0f : 5.5f))
+            w = b - u;                               /* the last takes what is left */
+        h->a = u;
+        h->b = u + w;
+        h->shop = shops;
+        h->eave = shops ? 7.0f + frand() * 2.5f : 4.8f + frand() * 1.4f;
+        h->ridge = shops ? h->eave : h->eave + 2.2f + frand() * 0.8f;
+        h->wall = house_walls[dgk_rng_below(&rng, 6)];
+        h->roof = house_roofs[dgk_rng_below(&rng, 6)];
+        h->door = door_colours[dgk_rng_below(&rng, 6)];
+        h->trim = shops ? awnings[dgk_rng_below(&rng, 6)] : trims[dgk_rng_below(&rng, 4)];
+        h->chimney = (int)dgk_rng_below(&rng, 3);      /* 1: at MEDIUM and HIGH; 2: at HIGH; 0: none */
+        h->dormer = dgk_rng_below(&rng, 3) == 0;
+        h->door_left = (int)dgk_rng_below(&rng, 2);
+        {
+            /* Clear of the main roads (and the roundabout): every corner of it and its front garden 6 m off. */
+            int c;
+            ok[n] = 1;
+            for (c = 0; c < 4 && ok[n]; c++) {
+                bframe at = sub_frame(f, c & 1 ? h->b : h->a, c & 2 ? ROW_DEPTH * 0.5f : -ROW_DEPTH * 0.5f - 2.5f);
+                ok[n] = road_distance(at.cx, at.cy) >= 6.0f;
+            }
+        }
+        u += w;
+        n++;
+    }
+    for (i = 0; i < n; i++) {
+        int j, k;
+        float sum = 0, uc;
+        bframe c;
+        if (!ok[i] || (i > 0 && ok[i - 1]))
+            continue;
+        for (j = i; j < n && ok[j]; j++)             /* a run: i .. j - 1 */
+            sum += hs[j].eave + (hs[j].shop ? 0.5f : 1.3f);
+        uc = (hs[i].a + hs[j - 1].b) * 0.5f;
+        c = sub_frame(f, uc, 0);
+        variant = WG_LOW_ONLY;
+        block(c.cx, c.cy, (hs[j - 1].b - hs[i].a) * 0.5f, ROW_DEPTH * 0.5f, atan2f(f->s, f->c), sum / (j - i),
+              hs[i].wall, hs[i].roof, 1, 1);
+        variant = WG_MEDIUM_UP;
+        bshadow(&c, (hs[j - 1].b - hs[i].a) * 0.5f, ROW_DEPTH * 0.5f, sum / (j - i));
+        for (k = i; k < j; k++) {
+            const hse *h = &hs[k];
+            float du = h->door_left ? h->a + 1.3f : h->b - 1.3f, fv = -ROW_DEPTH * 0.5f;
+            bframe p0, p1;
+            variant = WG_MEDIUM_UP;
+            row_house(f, h, k > i ? &hs[k - 1] : NULL, k + 1 < j ? &hs[k + 1] : NULL, base, k == i, k == j - 1);
+            /* The front garden: a low hedge (or a white wall) along the pavement, a gap and a path at the door. */
+            if (!h->shop) {
+                uint32_t hedge = (k & 3) == 3 ? 0xEDEAE0u : 0x3E8E36u;
+                p0 = sub_frame(f, h->a + 0.2f, fv - 2.3f);
+                p1 = sub_frame(f, du - 0.7f, fv - 2.3f);
+                hedge_stretch(p0.cx, p0.cy, base - 0.3f, p1.cx, p1.cy, base - 0.3f, hedge);
+                p0 = sub_frame(f, du + 0.7f, fv - 2.3f);
+                p1 = sub_frame(f, h->b - 0.2f, fv - 2.3f);
+                hedge_stretch(p0.cx, p0.cy, base - 0.3f, p1.cx, p1.cy, base - 0.3f, hedge);
+                {
+                    bframe q0 = sub_frame(f, du - 0.55f, fv), q1 = sub_frame(f, du + 0.55f, fv);
+                    bframe q2 = sub_frame(f, du + 0.55f, fv - 2.6f), q3 = sub_frame(f, du - 0.55f, fv - 2.6f);
+                    ground_quad(q3.cx, q3.cy, q2.cx, q2.cy, q1.cx, q1.cy, q0.cx, q0.cy, 0.16f, 0xD8CFC0u, 0.95f);
+                }
+                if (frand() < 0.4f) {                /* a tree in the back garden: a third of them at MEDIUM */
+                    bframe g = sub_frame(f, (h->a + h->b) * 0.5f + (frand() - 0.5f) * 2.0f,
+                                         ROW_DEPTH * 0.5f + 5.0f + frand() * 5.0f);
+                    tree_round(g.cx, g.cy, 1.2f + frand() * 0.6f, 0, frand() < 0.33f ? 0 : -1);
+                }
+            }
+            variant = WG_HIGH_ONLY;
+            row_house_high(f, h, base);
+            variant = WG_SHARED;
+        }
+    }
+}
+
+/* Pavements (MEDIUM and HIGH) along a block's four sides: 2 m of stone, raised, a kerb on the street's side;
+ * in 16 m pieces, none across a main road or the roundabout. */
+static void pavements(const place *t, float u0, float u1, float v0, float v1)
+{
+    const float in = 4.5f, out = 6.5f, lift = 0.3f;
+    int side;
+    variant = WG_MEDIUM_UP;
+    for (side = 0; side < 4; side++) {
+        /* Along v-streets (sides 0, 1: at v0 and v1) from u0+in to u1-in; along u-streets from v0+out to v1-out. */
+        int across = side >= 2;
+        float at = side == 0 ? v0 : side == 1 ? v1 : side == 2 ? u0 : u1, dir = (side & 1) ? -1.0f : 1.0f;
+        float a0 = across ? v0 + out : u0 + in, a1 = across ? v1 - out : u1 - in, a;
+        for (a = a0; a < a1 - 0.5f; a += 16.0f) {
+            float b = DGK_MIN(a + 16.0f, a1), q[4][2], p[4][3], pk[4][3], up[3] = { 0, 1, 0 }, kout[3];
+            float mu = across ? at + dir * 5.5f : (a + b) * 0.5f, mv = across ? (a + b) * 0.5f : at + dir * 5.5f;
+            int k;
+            town_frame(t, mu, mv, &q[0][0], &q[0][1]);
+            if (road_distance(q[0][0], q[0][1]) < 6.5f)
+                continue;
+            for (k = 0; k < 4; k++) {
+                float al = k == 0 || k == 3 ? a : b, off = k < 2 ? in : out;
+                if (across)
+                    town_frame(t, at + dir * off, al, &q[k][0], &q[k][1]);
+                else
+                    town_frame(t, al, at + dir * off, &q[k][0], &q[k][1]);
+                p[k][0] = q[k][0];
+                p[k][1] = t->h + lift;
+                p[k][2] = -q[k][1];
+            }
+            face(chunk_for((q[0][0] + q[2][0]) * 0.5f, (q[0][1] + q[2][1]) * 0.5f), p, 4, up, 0xCFC9BCu, -1e9f);
+            for (k = 0; k < 2; k++) {                /* the kerb: the street side's face */
+                pk[k][0] = p[k][0];
+                pk[k][2] = p[k][2];
+                pk[k][1] = t->h + lift;
+                pk[3 - k][0] = p[k][0];
+                pk[3 - k][2] = p[k][2];
+                pk[3 - k][1] = t->h + 0.1f;
+            }
+            {
+                float wx, wy;
+                if (across) {
+                    town_frame(t, -dir, 0, &wx, &wy);
+                    town_frame(t, 0, 0, &kout[0], &kout[2]);
+                } else {
+                    town_frame(t, 0, -dir, &wx, &wy);
+                    town_frame(t, 0, 0, &kout[0], &kout[2]);
+                }
+                kout[0] = wx - kout[0];
+                kout[1] = 0;
+                kout[2] = -(wy - kout[2]);
+            }
+            variant = WG_HIGH_ONLY;
+            face(chunk_for(p[0][0], -p[0][2]), pk, 4, kout, 0xEDE9DFu, -1e9f);
+            variant = WG_MEDIUM_UP;
+        }
+    }
+    variant = WG_SHARED;
+}
+
+/* The back gardens' hedges (MEDIUM and HIGH): down the block's middle and across its ends. */
+static void garden_hedges(const place *t, float u0, float u1, float v0, float v1)
+{
+    float vm = (v0 + v1) * 0.5f, ua = u0 + ROW_SET + ROW_DEPTH + 0.5f, ub = u1 - ROW_SET - ROW_DEPTH - 0.5f,
+          va = v0 + ROW_SET + ROW_DEPTH + 0.5f,
+          vb = v1 - ROW_SET - ROW_DEPTH - 0.5f, x0, y0, x1, y1, a;
+    variant = WG_MEDIUM_UP;
+    for (a = ua; a < ub - 1.0f; a += 16.0f) {
+        town_frame(t, a, vm, &x0, &y0);
+        town_frame(t, DGK_MIN(a + 16.0f, ub), vm, &x1, &y1);
+        if (road_distance((x0 + x1) * 0.5f, (y0 + y1) * 0.5f) > 6.0f)
+            hedge_stretch(x0, y0, t->h - 0.1f, x1, y1, t->h - 0.1f, 0x3E8E36u);
+    }
+    (void)va;
+    (void)vb;
+    variant = WG_SHARED;
+}
+
+/* A flat disc lying at height h, radius r, n sides, in the chunk at its middle. */
+static void disc_at(float x, float y, float h, float r, int n, uint32_t rgb)
+{
+    float up[3] = { 0, 1, 0 }, p[3][3];
+    cmesh *m = chunk_for(x, y);
+    int k;
+    for (k = 0; k < n; k++) {
+        float a0 = 6.2831853f * k / n, a1 = 6.2831853f * (k + 1) / n;
+        p[0][0] = x; p[0][1] = h; p[0][2] = -y;
+        p[1][0] = x + r * cosf(a0); p[1][1] = h; p[1][2] = -(y + r * sinf(a0));
+        p[2][0] = x + r * cosf(a1); p[2][1] = h; p[2][2] = -(y + r * sinf(a1));
+        face(m, p, 3, up, rgb, -1e9f);
+    }
+}
+
+/* A round tree at (x, y), `s` its size: solid (collide 1: a spire at LOW too, and a collision box), or only
+ * MEDIUM and HIGH's (0) or HIGH's (-1): a garden's, behind hedges and houses. col 0: a green of the woods'. */
+static void tree_round(float x, float y, float s, uint32_t col, int collide)
+{
+    static const uint32_t leaves[] = { 0x3E9E3Au, 0x4CB040u, 0x2F8A38u, 0x6AC24Au };
+    float g = ground(x, y);
+    int save = variant;
+    if (!col)
+        col = leaves[dgk_rng_below(&rng, 4)];
+    if (collide > 0) {                               /* LOW: a four-sided spire, 4 triangles */
+        variant = WG_LOW_ONLY;
+        pyramid(x, y, 0, s * 1.1f, g + 0.4f, g + 2.4f + s * 2.6f, col);
+        add_box(x, y, 0.5f, 0.5f, 0);
+    }
+    variant = collide < 0 ? WG_HIGH_ONLY : WG_MEDIUM_UP;
+    trunk(x, y, g - 0.3f, g + 2.2f + s * 0.4f, 0.32f, 5, 0x7A5230u);
+    blob(x, y, g + 1.8f + s * 1.25f, s * 1.25f, s * 1.15f, col);
+    variant = save;
+}
+
+/* A park on a block: paths corner to corner, a fountain where they cross (solid; at LOW a low block of
+ * water), flower beds, solid trees round its edge; HIGH: benches. */
+static void park(const place *t, float u0, float u1, float v0, float v1)
+{
+    static const uint32_t beds[] = { 0xE8402Au, 0xF2C230u, 0xE84A8Au, 0xF4F4F0u };
+    float cu = (u0 + u1) * 0.5f, cv = (v0 + v1) * 0.5f, x, y, h = t->h;
+    int k;
+    variant = WG_MEDIUM_UP;
+    for (k = 0; k < 2; k++) {                        /* the paths */
+        float au = u0 + 9.0f, bu = u1 - 9.0f, av = k ? v1 - 9.0f : v0 + 9.0f, bv = k ? v0 + 9.0f : v1 - 9.0f;
+        float du = bu - au, dv = bv - av, l = sqrtf(du * du + dv * dv), nu = -dv / l * 1.3f, nv = du / l * 1.3f;
+        float q[4][2];
+        town_frame(t, au + nu, av + nv, &q[0][0], &q[0][1]);
+        town_frame(t, bu + nu, bv + nv, &q[1][0], &q[1][1]);
+        town_frame(t, bu - nu, bv - nv, &q[2][0], &q[2][1]);
+        town_frame(t, au - nu, av - nv, &q[3][0], &q[3][1]);
+        ground_quad(q[3][0], q[3][1], q[2][0], q[2][1], q[1][0], q[1][1], q[0][0], q[0][1], 0.14f + 0.01f * k,
+                    0xE6DCC0u, 0.95f);
+        ground_quad(q[0][0], q[0][1], q[1][0], q[1][1], q[2][0], q[2][1], q[3][0], q[3][1], 0.14f + 0.01f * k,
+                    0xE6DCC0u, 0.95f);
+    }
+    town_frame(t, cu, cv, &x, &y);
+    /* The fountain: a stone basin of water, a column with a bowl, the water rising out of it. */
+    variant = WG_LOW_ONLY;
+    block(x, y, 3.0f, 3.0f, t->heading, 0.7f, 0xD8D0C0u, 0x5FB8E8u, 0, 0);
+    for (k = 0; k < 4; k++)
+        add_box(x, y, 3.3f * cosf(WG_PI / 8), 3.3f * cosf(WG_PI / 8) * tanf(WG_PI / 8), t->heading + k * WG_PI / 4);
+    variant = WG_MEDIUM_UP;
+    trunk(x, y, h - 0.2f, h + 0.75f, 3.3f, 12, 0xD8D0C0u);
+    disc_at(x, y, h + 0.6f, 3.2f, 12, 0x5FB8E8u);
+    trunk(x, y, h + 0.6f, h + 2.4f, 0.35f, 6, 0xD8D0C0u);
+    blob(x, y, h + 2.45f, 1.1f, 0.3f, 0xD8D0C0u);
+    blob(x, y, h + 3.0f, 0.45f, 0.8f, 0xBFE6FAu);
+    /* Flower beds beside the fountain: a round bed of earth, flowers on it (HIGH: more). */
+    for (k = 0; k < 2; k++) {
+        float bx, by;
+        int f;
+        town_frame(t, cu + (k ? 13.0f : -13.0f), cv, &bx, &by);
+        disc_at(bx, by, h + 0.18f, 2.6f, 10, 0x6A4A30u);
+        for (f = 0; f < 5; f++) {
+            float a = 6.2831853f * f / 5 + k;
+            variant = f < 3 ? WG_MEDIUM_UP : WG_HIGH_ONLY;
+            blob(bx + 1.5f * cosf(a), by + 1.5f * sinf(a), h + 0.5f, 0.7f, 0.45f, beds[(f + k) & 3]);
+        }
+        variant = WG_MEDIUM_UP;
+        blob(bx, by, h + 0.6f, 0.8f, 0.6f, beds[(k + 2) & 3]);
+    }
+    /* Trees round the edge, solid. */
+    for (k = 0; k < 8; k++) {
+        float tu = k < 3 ? u0 + 9.0f + k * 23.0f : k < 6 ? u0 + 9.0f + (k - 3) * 23.0f : k == 6 ? u0 + 9.0f : u1 - 9.0f;
+        float tv = k < 3 ? v0 + 8.0f : k < 6 ? v1 - 8.0f : cv;
+        float tx, ty;
+        town_frame(t, tu, tv, &tx, &ty);
+        if (road_distance(tx, ty) > 10.0f)
+            tree_round(tx, ty, 1.5f + frand() * 0.8f, 0, 1);
+    }
+    /* HIGH: benches by the fountain, along the paths. */
+    variant = WG_HIGH_ONLY;
+    for (k = 0; k < 4; k++) {
+        bframe b;
+        float a = t->heading + WG_PI / 4 + k * WG_PI / 2;
+        b.c = cosf(a + WG_PI / 2);
+        b.s = sinf(a + WG_PI / 2);
+        b.cx = x + 7.0f * cosf(a) + 2.3f * cosf(a + WG_PI / 2);
+        b.cy = y + 7.0f * sinf(a) + 2.3f * sinf(a + WG_PI / 2);
+        fbox(chunk_for(b.cx, b.cy), &b, 0, 0, 0.9f, 0.25f, h + 0.4f, h + 0.5f, 0x8A5A3Au, 0xA06A40u);
+        fbox(chunk_for(b.cx, b.cy), &b, 0, 0.25f, 0.9f, 0.05f, h + 0.5f, h + 0.95f, 0x8A5A3Au, 0xA06A40u);
+        fbox(chunk_for(b.cx, b.cy), &b, -0.75f, 0, 0.06f, 0.2f, h, h + 0.4f, 0x3A3A44u, 0x3A3A44u);
+        fbox(chunk_for(b.cx, b.cy), &b, 0.75f, 0, 0.06f, 0.2f, h, h + 0.4f, 0x3A3A44u, 0x3A3A44u);
+    }
+    variant = WG_SHARED;
+}
+
+static void landmark(const place *t, float u0, float u1, float v0, float v1, int kind);
+
+/* A low hedge round a block inside its pavements (MEDIUM and HIGH), a gap where a path comes in from the
+ * street at v0 (gap_u, 0: none); in stretches, none across a main road. */
+static void block_hedge(const place *t, float u0, float u1, float v0, float v1, float gap_u)
+{
+    const float in = 7.2f;
+    float pts[5][2] = { { u0 + in, v0 + in }, { u1 - in, v0 + in }, { u1 - in, v1 - in }, { u0 + in, v1 - in },
+                        { u0 + in, v0 + in } };
+    int k;
+    variant = WG_MEDIUM_UP;
+    for (k = 0; k < 4; k++) {
+        float a, len = sqrtf((pts[k + 1][0] - pts[k][0]) * (pts[k + 1][0] - pts[k][0]) +
+                             (pts[k + 1][1] - pts[k][1]) * (pts[k + 1][1] - pts[k][1]));
+        for (a = 0; a < len - 0.5f; a += 12.0f) {
+            float b = DGK_MIN(a + 12.0f, len), ua, va, ub, vb, x0, y0, x1, y1;
+            ua = pts[k][0] + (pts[k + 1][0] - pts[k][0]) * a / len;
+            va = pts[k][1] + (pts[k + 1][1] - pts[k][1]) * a / len;
+            ub = pts[k][0] + (pts[k + 1][0] - pts[k][0]) * b / len;
+            vb = pts[k][1] + (pts[k + 1][1] - pts[k][1]) * b / len;
+            if (k == 0 && gap_u != 0 && ua < gap_u + 1.6f && ub > gap_u - 1.6f) {   /* the gate */
+                if (ua < gap_u - 1.6f) {
+                    town_frame(t, ua, va, &x0, &y0);
+                    town_frame(t, gap_u - 1.6f, va, &x1, &y1);
+                    hedge_stretch(x0, y0, t->h - 0.35f, x1, y1, t->h - 0.35f, 0x3E8E36u);
+                }
+                if (ub > gap_u + 1.6f) {
+                    town_frame(t, gap_u + 1.6f, va, &x0, &y0);
+                    town_frame(t, ub, vb, &x1, &y1);
+                    hedge_stretch(x0, y0, t->h - 0.35f, x1, y1, t->h - 0.35f, 0x3E8E36u);
+                }
+                continue;
+            }
+            town_frame(t, ua, va, &x0, &y0);
+            town_frame(t, ub, vb, &x1, &y1);
+            if (road_distance((x0 + x1) * 0.5f, (y0 + y1) * 0.5f) > 7.0f)
+                hedge_stretch(x0, y0, t->h - 0.35f, x1, y1, t->h - 0.35f, 0x3E8E36u);
+        }
+    }
+    variant = WG_SHARED;
+}
+
+/* A cone's frustum round (x, y): radius r0 at z0 to r1 at z1, n sides, smooth, no ends. */
+static void frustum(float x, float y, float z0, float z1, float r0, float r1, int n, uint32_t rgb)
+{
+    cmesh *c = chunk_for(x, y);
+    float slope = (r0 - r1) / (z1 - z0), l = sqrtf(1 + slope * slope);
+    int lo[16], hi[16], i;
+    for (i = 0; i < n; i++) {
+        float a = 6.2831853f * i / n, p[3], nm[3];
+        nm[0] = cosf(a) / l; nm[1] = slope / l; nm[2] = sinf(a) / l;
+        p[0] = x + r0 * cosf(a); p[1] = z0; p[2] = -y + r0 * sinf(a);
+        lo[i] = smooth_vertex(c, p, nm, rgb, 1.0f);
+        p[0] = x + r1 * cosf(a); p[1] = z1; p[2] = -y + r1 * sinf(a);
+        hi[i] = smooth_vertex(c, p, nm, rgb, 1.0f);
+    }
+    for (i = 0; i < n; i++) {
+        int j = (i + 1) % n;
+        cmesh_tri(c, lo[j], lo[i], hi[i]);
+        cmesh_tri(c, lo[j], hi[i], hi[j]);
+    }
+}
+
+/* A four-sided pyramid on a square of half side `half` (turned `angle`) at z0, its tip at z1. */
+static void pyramid(float x, float y, float angle, float half, float z0, float z1, uint32_t rgb)
+{
+    cmesh *m = chunk_for(x, y);
+    int k;
+    for (k = 0; k < 4; k++) {
+        float a0 = angle + WG_PI / 4 + k * WG_PI / 2, a1 = a0 + WG_PI / 2, r = half * 1.41421356f;
+        float p[3][3], out[3], am = (a0 + a1) * 0.5f;
+        p[0][0] = x + r * cosf(a0); p[0][1] = z0; p[0][2] = -(y + r * sinf(a0));
+        p[1][0] = x + r * cosf(a1); p[1][1] = z0; p[1][2] = -(y + r * sinf(a1));
+        p[2][0] = x; p[2][1] = z1; p[2][2] = -y;
+        out[0] = cosf(am); out[1] = 0.5f; out[2] = -sinf(am);
+        face(m, p, 3, out, rgb, -1e9f);
+    }
+}
+
+/* A clock face on the wall at v = `at` (facing -v) of frame f, centred at (u, h): a white disc, its hands. */
+static void clock_face(const bframe *f, float u, float at, float h, float r)
+{
+    bframe c = sub_frame(f, u, at);
+    cmesh *m = chunk_for(c.cx, c.cy);
+    float out[3], p[4][3];
+    int k;
+    fdir(f, 1, -1, out);
+    for (k = 0; k < 12; k++) {
+        float a0 = 6.2831853f * k / 12, a1 = 6.2831853f * (k + 1) / 12, tri[3][3];
+        bpoint(&c, 0, 0, h, tri[0]);
+        bpoint(&c, r * cosf(a0), 0, h + r * sinf(a0), tri[1]);
+        bpoint(&c, r * cosf(a1), 0, h + r * sinf(a1), tri[2]);
+        face(m, tri, 3, out, 0xF6F4EEu, -1e9f);
+    }
+    bpoint(&c, -0.08f, -0.02f, h, p[0]);              /* the hour hand (ten to two, as a toy's) */
+    bpoint(&c, 0.08f, -0.02f, h, p[1]);
+    bpoint(&c, 0.5f * r + 0.08f, -0.02f, h + 0.45f * r, p[2]);
+    bpoint(&c, 0.5f * r - 0.08f, -0.02f, h + 0.45f * r, p[3]);
+    face(m, p, 4, out, 0x1C1C24u, -1e9f);
+    bpoint(&c, -0.06f, -0.03f, h, p[0]);              /* the minute hand */
+    bpoint(&c, 0.06f, -0.03f, h, p[1]);
+    bpoint(&c, -0.55f * r + 0.06f, -0.03f, h + 0.7f * r, p[2]);
+    bpoint(&c, -0.55f * r - 0.06f, -0.03f, h + 0.7f * r, p[3]);
+    face(m, p, 4, out, 0x1C1C24u, -1e9f);
+}
+
+/* The town's landmark on a block, facing the street at v0: by `kind`, a church with a spire, a water tower,
+ * a town hall with a clock tower, a windmill. Solid (LOW: boxes and pyramids, the same footprints). On a
+ * lawn, a path to it from the street, trees beside. */
+static void landmark(const place *t, float u0, float u1, float v0, float v1, int kind)
+{
+    float cu = (u0 + u1) * 0.5f, cv = (v0 + v1) * 0.5f, h = t->h, x, y, q[4][2];
+    bframe f, r;
+    cmesh *m;
+    int k;
+    f.c = cosf(t->heading);
+    f.s = sinf(t->heading);
+    town_frame(t, cu, cv, &f.cx, &f.cy);
+    r = f;                                           /* turned a quarter: its u along the block's v */
+    r.c = cosf(t->heading + WG_PI / 2);
+    r.s = sinf(t->heading + WG_PI / 2);
+    m = chunk_for(f.cx, f.cy);
+    variant = WG_MEDIUM_UP;
+    town_frame(t, cu - 1.4f, v0 + 6.5f, &q[0][0], &q[0][1]);    /* the path from the pavement */
+    town_frame(t, cu + 1.4f, v0 + 6.5f, &q[1][0], &q[1][1]);
+    town_frame(t, cu + 1.4f, cv - 8.0f, &q[2][0], &q[2][1]);
+    town_frame(t, cu - 1.4f, cv - 8.0f, &q[3][0], &q[3][1]);
+    ground_quad(q[0][0], q[0][1], q[1][0], q[1][1], q[2][0], q[2][1], q[3][0], q[3][1], 0.15f, 0xE6DCC0u, 0.95f);
+    variant = WG_HIGH_ONLY;                          /* flowers along the path */
+    for (k = 0; k < 6; k++) {
+        static const uint32_t fl[] = { 0xE8402Au, 0xF2C230u, 0xE84A8Au, 0xF4F4F0u };
+        float fx, fy;
+        town_frame(t, cu + (k & 1 ? 2.6f : -2.6f), v0 + 10.0f + (k >> 1) * 4.0f, &fx, &fy);
+        blob(fx, fy, h + 0.4f, 0.9f, 0.4f, fl[k & 3]);
+    }
+    variant = WG_MEDIUM_UP;
+    for (k = 0; k < 4; k++) {                        /* trees at its corners, solid */
+        float tx, ty;
+        town_frame(t, k & 1 ? u1 - 9.0f : u0 + 9.0f, k & 2 ? v1 - 9.0f : v0 + 12.0f, &tx, &ty);
+        if (road_distance(tx, ty) > 10.0f)
+            tree_round(tx, ty, 1.6f + frand() * 0.6f, 0, 1);
+    }
+    switch (kind % 4) {
+    case 0: {
+        /* A church: a nave along the block, a square tower at its front, a spire. */
+        const uint32_t stone = 0xE8DFC8u, slate = 0x5A6478u, copper = 0x5FA88Au, glass = 0x3A5A9Au;
+        bframe nave = sub_frame(&r, 4.0f, 0), tower = sub_frame(&f, 0, -10.0f);
+        float x0, y0;
+        variant = WG_LOW_ONLY;
+        block(nave.cx, nave.cy, 11.0f, 6.0f, t->heading + WG_PI / 2, 10.0f, stone, slate, 1, 1);
+        block(tower.cx, tower.cy, 3.0f, 3.0f, t->heading, 18.0f, stone, stone, 0, 1);
+        pyramid(tower.cx, tower.cy, t->heading, 3.0f, h + 18.0f, h + 30.0f, copper);
+        variant = WG_MEDIUM_UP;
+        bshadow(&nave, 11.0f, 6.0f, 10.0f);
+        wall_at(chunk_for(nave.cx, nave.cy), &nave, 0, -6.0f, -11.0f, 11.0f, h - 0.5f, h + 7.0f, -1, stone, h);
+        wall_at(chunk_for(nave.cx, nave.cy), &nave, 0, 6.0f, -11.0f, 11.0f, h - 0.5f, h + 7.0f, 1, stone, h);
+        wall_at(chunk_for(nave.cx, nave.cy), &nave, 1, 11.0f, -6.0f, 6.0f, h - 0.5f, h + 7.0f, 1, stone, h);
+        gable_at(chunk_for(nave.cx, nave.cy), &nave, 11.0f, 6.0f, h + 7.0f, h + 12.0f, 1, stone);
+        slope_at(chunk_for(nave.cx, nave.cy), &nave, -11.3f, 11.3f, -6.5f, h + 6.6f, 0, h + 12.0f, slate);
+        slope_at(chunk_for(nave.cx, nave.cy), &nave, -11.3f, 11.3f, 6.5f, h + 6.6f, 0, h + 12.0f, slate);
+        for (k = 0; k < 4; k++) {                    /* tall windows down its sides */
+            float a = -7.5f + k * 5.0f;
+            wall_at(chunk_for(nave.cx, nave.cy), &nave, 0, -6.03f, a - 0.8f, a + 0.8f, h + 1.8f, h + 5.8f, -1, glass, -1e9f);
+            wall_at(chunk_for(nave.cx, nave.cy), &nave, 0, 6.03f, a - 0.8f, a + 0.8f, h + 1.8f, h + 5.8f, 1, glass, -1e9f);
+        }
+        fbox(chunk_for(tower.cx, tower.cy), &tower, 0, 0, 3.0f, 3.0f, h - 0.5f, h + 18.0f, stone, stone);
+        for (k = 0; k < 4; k++) {                    /* the belfry's openings */
+            bframe side = tower;
+            float a = t->heading + k * WG_PI / 2;
+            side.c = cosf(a);
+            side.s = sinf(a);
+            wall_at(chunk_for(tower.cx, tower.cy), &side, 0, -3.03f, -1.0f, 1.0f, h + 13.5f, h + 16.5f, -1, 0x2A2A34u, -1e9f);
+        }
+        wall_at(chunk_for(tower.cx, tower.cy), &tower, 0, -3.03f, -1.0f, 1.0f, h, h + 3.4f, -1, 0x6A4028u, -1e9f);
+        cone(tower.cx, tower.cy, h + 18.0f, h + 30.0f, 3.4f, 8, copper);
+        variant = WG_HIGH_ONLY;
+        clock_face(&tower, 0, -3.06f, h + 10.5f, 1.4f);
+        blob(tower.cx, tower.cy, h + 30.3f, 0.35f, 0.35f, 0xF2C230u);
+        (void)x0;
+        (void)y0;
+        break;
+    }
+    case 1: {
+        /* A water tower: a round tank on four legs, a cone of a roof, a red band round it. */
+        const uint32_t tank = 0xBFE0F0u, legs = 0x8A8F99u;
+        variant = WG_LOW_ONLY;
+        block(f.cx, f.cy, 0.8f, 0.8f, t->heading, 14.0f, legs, legs, 0, 0);
+        fbox(m, &f, 0, 0, 5.0f, 5.0f, h + 14.0f, h + 20.5f, tank, tank);
+        pyramid(f.cx, f.cy, t->heading, 5.0f, h + 20.5f, h + 23.5f, 0xE8402Au);
+        add_box(f.cx, f.cy, 4.0f, 4.0f, t->heading);
+        variant = WG_MEDIUM_UP;
+        for (k = 0; k < 4; k++) {
+            bframe l = sub_frame(&f, k & 1 ? 3.5f : -3.5f, k & 2 ? 3.5f : -3.5f);
+            trunk(l.cx, l.cy, h - 0.3f, h + 14.2f, 0.35f, 6, legs);
+        }
+        frustum(f.cx, f.cy, h + 13.6f, h + 14.2f, 3.5f, 5.6f, 14, legs);
+        trunk(f.cx, f.cy, h + 14.2f, h + 17.0f, 5.6f, 14, tank);
+        trunk(f.cx, f.cy, h + 17.0f, h + 18.0f, 5.62f, 14, 0xE8402Au);
+        trunk(f.cx, f.cy, h + 18.0f, h + 20.5f, 5.6f, 14, tank);
+        cone(f.cx, f.cy, h + 20.5f, h + 23.5f, 6.0f, 14, 0xE8402Au);
+        variant = WG_HIGH_ONLY;                      /* braces between the legs */
+        for (k = 0; k < 4; k++) {
+            bframe side = f;
+            float a = t->heading + k * WG_PI / 2;
+            side.c = cosf(a);
+            side.s = sinf(a);
+            wall_at(m, &side, 0, -3.5f, -3.5f, 3.5f, h + 6.8f, h + 7.2f, -1, legs, -1e9f);
+            wall_at(m, &side, 0, -3.5f, -3.5f, 3.5f, h + 10.8f, h + 11.2f, -1, legs, -1e9f);
+        }
+        blob(f.cx, f.cy, h + 23.7f, 0.4f, 0.4f, 0xF2C230u);
+        break;
+    }
+    case 2: {
+        /* A town hall: cream walls, a hipped roof, a portico of columns, a clock tower on top. */
+        const uint32_t cream = 0xF0E2C0u, roof = 0x7A3A2Au, white = 0xF6F4EEu;
+        bframe hall = sub_frame(&f, 0, 2.0f);
+        variant = WG_LOW_ONLY;
+        block(hall.cx, hall.cy, 12.0f, 7.0f, t->heading, 11.0f, cream, roof, 1, 1);
+        fbox(chunk_for(hall.cx, hall.cy), &hall, 0, 0, 3.0f, 3.0f, h + 11.0f, h + 20.0f, cream, cream);
+        pyramid(hall.cx, hall.cy, t->heading, 3.3f, h + 20.0f, h + 24.0f, roof);
+        variant = WG_MEDIUM_UP;
+        m = chunk_for(hall.cx, hall.cy);
+        bshadow(&hall, 12.0f, 7.0f, 11.0f);
+        fbox(m, &hall, 0, 0, 12.0f, 7.0f, h - 0.5f, h + 9.0f, cream, roof);
+        slope_at(m, &hall, -12.4f, 12.4f, -7.4f, h + 8.8f, -2.0f, h + 12.0f, roof);
+        slope_at(m, &hall, -12.4f, 12.4f, 7.4f, h + 8.8f, 2.0f, h + 12.0f, roof);
+        top_at(m, &hall, -12.4f, 12.4f, -2.0f, 2.0f, h + 12.0f, roof);
+        for (k = 0; k < 5; k++) {                    /* windows, two floors */
+            float a = -10.0f + k * 5.0f;
+            wall_at(m, &hall, 0, -7.03f, a - 0.8f, a + 0.8f, h + 1.2f, h + 3.4f, -1, 0x8FCBEFu, -1e9f);
+            wall_at(m, &hall, 0, -7.03f, a - 0.8f, a + 0.8f, h + 5.0f, h + 7.4f, -1, 0x8FCBEFu, -1e9f);
+        }
+        for (k = 0; k < 4; k++) {                    /* the portico: four columns, a pediment */
+            bframe col = sub_frame(&hall, -3.6f + k * 2.4f, -8.4f);
+            trunk(col.cx, col.cy, h, h + 6.0f, 0.4f, 6, white);
+        }
+        fbox(m, &hall, 0, -8.2f, 4.6f, 1.3f, h + 6.0f, h + 6.8f, white, white);
+        {
+            float p[3][3], out[3];
+            bpoint(&hall, -4.6f, -9.5f, h + 6.8f, p[0]);
+            bpoint(&hall, 4.6f, -9.5f, h + 6.8f, p[1]);
+            bpoint(&hall, 0, -9.5f, h + 8.6f, p[2]);
+            fdir(&hall, 1, -1, out);
+            face(m, p, 3, out, white, -1e9f);
+            slope_at(m, &hall, -4.8f, 4.8f, -9.5f, h + 6.8f, -9.5f, h + 8.6f, roof);
+        }
+        fbox(m, &hall, 0, 0, 3.0f, 3.0f, h + 9.0f, h + 20.0f, cream, cream);
+        cone(hall.cx, hall.cy, h + 20.0f, h + 24.0f, 3.6f, 4, roof);
+        for (k = 0; k < 4; k++) {
+            bframe side = hall;
+            float a = t->heading + k * WG_PI / 2;
+            side.c = cosf(a);
+            side.s = sinf(a);
+            clock_face(&side, 0, -3.04f, h + 16.5f, 1.7f);
+        }
+        variant = WG_HIGH_ONLY;
+        blob(hall.cx, hall.cy, h + 24.3f, 0.4f, 0.4f, 0xF2C230u);
+        fbox(m, &hall, 0, -10.6f, 4.0f, 1.0f, h - 0.3f, h + 0.25f, 0xD8D0C0u, 0xE6E0D4u);   /* steps */
+        break;
+    }
+    default: {
+        /* A windmill: a round white tower, a dark cap, four sails facing the street. */
+        const uint32_t white = 0xF4F0E6u, cap = 0x9A3A2Au, sail = 0xF6F4EEu, wood = 0x7A5230u;
+        bframe hub = sub_frame(&f, 0, -4.2f);
+        float p[4][3], out[3];
+        variant = WG_LOW_ONLY;
+        block(f.cx, f.cy, 4.0f, 4.0f, t->heading, 14.0f, white, white, 1, 1);
+        pyramid(f.cx, f.cy, t->heading, 4.0f, h + 14.0f, h + 18.0f, cap);
+        variant = WG_MEDIUM_UP;
+        frustum(f.cx, f.cy, h - 0.3f, h + 14.0f, 5.0f, 3.4f, 12, white);
+        cone(f.cx, f.cy, h + 13.8f, h + 18.0f, 3.9f, 12, cap);
+        wall_at(m, &f, 0, -4.86f, -0.9f, 0.9f, h, h + 2.4f, -1, 0x6A4028u, -1e9f);
+        wall_at(m, &f, 0, -4.4f, -0.6f, 0.6f, h + 7.0f, h + 8.4f, -1, 0x8FCBEFu, -1e9f);
+        for (k = 0; k < 4; k++) {                    /* the sails, a cross turned a little, both LOW and up */
+            float a = 0.35f + k * WG_PI / 2, ca = cosf(a), sa = sinf(a), hy = h + 14.0f;
+            int pass;
+            for (pass = 0; pass < 2; pass++) {
+                variant = pass ? WG_MEDIUM_UP : WG_LOW_ONLY;
+                bpoint(&hub, 1.0f * ca - 0.8f * sa, 0, hy + 1.0f * sa + 0.8f * ca, p[0]);
+                bpoint(&hub, 10.0f * ca - 0.8f * sa, 0, hy + 10.0f * sa + 0.8f * ca, p[1]);
+                bpoint(&hub, 10.0f * ca + 0.8f * sa, 0, hy + 10.0f * sa - 0.8f * ca, p[2]);
+                bpoint(&hub, 1.0f * ca + 0.8f * sa, 0, hy + 1.0f * sa - 0.8f * ca, p[3]);
+                fdir(&f, 1, -1, out);
+                face(chunk_for(hub.cx, hub.cy), p, 4, out, pass ? sail : white, -1e9f);
+                fdir(&f, 1, 1, out);
+                face(chunk_for(hub.cx, hub.cy), p, 4, out, pass ? sail : white, -1e9f);
+            }
+            variant = WG_MEDIUM_UP;                  /* the spar down its middle */
+            bpoint(&hub, 0.0f * ca - 0.15f * sa, -0.05f, hy - 0.15f * ca, p[0]);
+            bpoint(&hub, 10.5f * ca - 0.15f * sa, -0.05f, hy + 10.5f * sa + 0.15f * ca, p[1]);
+            bpoint(&hub, 10.5f * ca + 0.15f * sa, -0.05f, hy + 10.5f * sa - 0.15f * ca, p[2]);
+            bpoint(&hub, 0.0f * ca + 0.15f * sa, -0.05f, hy + 0.15f * ca, p[3]);
+            fdir(&f, 1, -1, out);
+            face(chunk_for(hub.cx, hub.cy), p, 4, out, wood, -1e9f);
+        }
+        blob(hub.cx, hub.cy, h + 14.0f, 0.6f, 0.6f, wood);
+        break;
+    }
+    }
+    variant = WG_SHARED;
+    (void)x;
+    (void)y;
+}
 
 /* A street of town t along u (across = 0) or v (across = 1) at `at`,
  * from -l to l; the two through the middle stop at the ring. */
@@ -1232,7 +1996,7 @@ static void roundabout(const place *t)
 
 static void build_town(const place *t)
 {
-    int n = town_blocks(t), i, j, k;
+    int n = town_blocks(t), i, j;
     for (i = -n; i <= n; i++) {                   /* streets */
         town_street(t, 0, i * GRID, n * GRID, 0.12f);
         town_street(t, 1, i * GRID, n * GRID, 0.13f);     /* crossings: not coplanar */
@@ -1259,27 +2023,82 @@ static void build_town(const place *t)
                 }
         variant = WG_SHARED;
     }
-    for (j = -n; j < n; j++)                      /* buildings, set back from the streets */
-        for (i = -n; i < n; i++) {
-            float bu = (i + 0.5f) * GRID, bv = (j + 0.5f) * GRID, rr = sqrtf(bu * bu + bv * bv);
-            int count = 1 + (int)dgk_rng_below(&rng, 3);
-            if (rr > t->r || frand() < 0.12f)
-                continue;
-            for (k = 0; k < count; k++) {
-                float w = 9 + frand() * 10, d = 8 + frand() * 8, x, y;
-                float ou = (count == 1 ? 0 : (k - (count - 1) / 2.0f) * 18.0f), ov = (frand() - 0.5f) * 10;
-                float tall = 4 + frand() * (rr < t->r * 0.4f ? 8 : 4);    /* toy-low: the camera looks over them */
-                uint32_t wall = house_walls[dgk_rng_below(&rng, 6)], roof = house_roofs[dgk_rng_below(&rng, 6)];
-                town_frame(t, bu + ou, bv + ov, &x, &y);
-                if (road_distance(x, y) < DGK_MAX(w, d) / 2 + 9.0f)          /* the main roads cut through */
-                    continue;
-                variant = WG_LOW_ONLY;
-                block(x, y, w / 2, d / 2, t->heading, tall, wall, roof, 1, 1);
-                variant = WG_MEDIUM_UP;
-                house(x, y, w / 2, d / 2, t->heading, tall, wall, roof);
-                variant = WG_SHARED;
+    {
+        /* The blocks inside the town: shops in the middle four (round the roundabout); of the others the
+         * landmark in the best (near the middle, clear of main roads), the park in the next not beside it;
+         * terraces in the rest, along all four sides. */
+        int mark_i = 99, mark_j = 99, park_i = 99, park_j = 99, pass;
+        for (pass = 0; pass < 2; pass++) {
+            float best = -1e9f;
+            int bi = 99, bj = 99;
+            for (j = -n; j < n; j++)
+                for (i = -n; i < n; i++) {
+                    float bu = (i + 0.5f) * GRID, bv = (j + 0.5f) * GRID, cx, cy, clear, score;
+                    if ((i == -1 || i == 0) && (j == -1 || j == 0))
+                        continue;
+                    if (sqrtf(bu * bu + bv * bv) > t->r || (i == mark_i && j == mark_j))
+                        continue;
+                    if (pass && abs(i - mark_i) <= 1 && abs(j - mark_j) <= 1)
+                        continue;
+                    town_frame(t, bu, bv, &cx, &cy);
+                    clear = DGK_MIN(road_distance(cx, cy), 40.0f);
+                    score = clear * 2.0f - sqrtf(bu * bu + bv * bv) * 0.25f;
+                    if (clear >= 22.0f && score > best) {
+                        best = score;
+                        bi = i;
+                        bj = j;
+                    }
+                }
+            if (pass) {
+                park_i = bi;
+                park_j = bj;
+            } else {
+                mark_i = bi;
+                mark_j = bj;
             }
         }
+        for (j = -n; j < n; j++)
+            for (i = -n; i < n; i++) {
+                float u0 = i * GRID, u1 = u0 + GRID, v0 = j * GRID, v1 = v0 + GRID, bu = u0 + GRID / 2, bv = v0 + GRID / 2;
+                float half_ns = GRID / 2 - ROW_SET - ROW_DEPTH - 0.5f, half_ew = GRID / 2 - ROW_SET;
+                int shops = (i == -1 || i == 0) && (j == -1 || j == 0), side;
+                if (sqrtf(bu * bu + bv * bv) > t->r)
+                    continue;
+                pavements(t, u0, u1, v0, v1);
+                if (i == park_i && j == park_j) {
+                    park(t, u0, u1, v0, v1);
+                    block_hedge(t, u0, u1, v0, v1, 0);
+                    continue;
+                }
+                if (i == mark_i && j == mark_j) {
+                    landmark(t, u0, u1, v0, v1, (int)(t - places));
+                    block_hedge(t, u0, u1, v0, v1, (u0 + u1) * 0.5f);
+                    continue;
+                }
+                for (side = 0; side < 4; side++) {
+                    /* The row facing the street at v0, v1, u0, u1: its frame turned so that its front is -v. */
+                    static const float turn[4] = { 0.0f, WG_PI, -WG_PI / 2, WG_PI / 2 };
+                    bframe f;
+                    float ru = side < 2 ? bu : side == 2 ? u0 + ROW_SET + ROW_DEPTH / 2 : u1 - ROW_SET - ROW_DEPTH / 2;
+                    float rv = side >= 2 ? bv : side == 0 ? v0 + ROW_SET + ROW_DEPTH / 2 : v1 - ROW_SET - ROW_DEPTH / 2;
+                    float half = side < 2 ? half_ns : half_ew;
+                    f.c = cosf(t->heading + turn[side]);
+                    f.s = sinf(t->heading + turn[side]);
+                    town_frame(t, ru, rv, &f.cx, &f.cy);
+                    terrace_row(t, &f, -half, half, shops);
+                }
+                if (!shops)
+                    garden_hedges(t, u0, u1, v0, v1);
+            }
+        {
+            static const char *const kinds[4] = { "a church", "a water tower", "a town hall", "a windmill" };
+            float mx, my, px, py;
+            town_frame(t, (mark_i + 0.5f) * GRID, (mark_j + 0.5f) * GRID, &mx, &my);
+            town_frame(t, (park_i + 0.5f) * GRID, (park_j + 0.5f) * GRID, &px, &py);
+            printf("fwgen: town %d: %s at (%.0f, %.0f), the park at (%.0f, %.0f), heading %.0f\n", (int)(t - places),
+                   kinds[(int)(t - places) % 4], mx, my, px, py, t->heading * 57.29578f);
+        }
+    }
 }
 
 static void depot_frame(const place *d, float u, float v, float *x, float *y)
@@ -1665,7 +2484,7 @@ static void terrain_piece(cmesh *c, const tvert *v, int n, int depth)
  * between fields, chords round a place's grass), so the patchwork's edges
  * run true rather than in 16 m steps. The cells' split is the one
  * world_height reads (0-1-2, 0-2-3). */
-#define CHUNK_CELLS 8                    /* WG_CHUNK / WG_CELL: checked in build_terrain */
+#define CHUNK_CELLS 4                    /* WG_CHUNK / WG_CELL: checked in build_terrain */
 
 static void build_terrain(void)
 {
@@ -2295,7 +3114,7 @@ static int write_pack(const char *path, const wg_depot *depots)
     {
         wg_world h;
         memset(&h, 0, sizeof h);
-        h.version = 1; h.seed = seed_g; h.chunks = WG_CHUNKS; h.hn = WG_HN;
+        h.version = WG_VERSION; h.seed = seed_g; h.chunks = WG_CHUNKS; h.hn = WG_HN;
         h.size = WG_SIZE; h.chunk = WG_CHUNK; h.cell = WG_CELL; h.unit = WG_UNIT;
         pakw_section(w, WG_WORLD, &h, sizeof h);
     }

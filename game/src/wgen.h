@@ -11,8 +11,9 @@
 
 #define WG_PI 3.14159265f
 #define WG_SIZE 4096.0f
-#define WG_CHUNK 128.0f                 /* metres */
-#define WG_CHUNKS 32                    /* per side */
+#define WG_CHUNK 64.0f                  /* metres: culled whole, so small (version 2; 128 m in 1) */
+#define WG_CHUNKS 64                    /* per side */
+#define WG_VERSION 2
 #define WG_CELL 16.0f                   /* heightfield spacing */
 #define WG_HN 257                       /* heightfield samples per side */
 #define WG_UNIT 32.0f                   /* chunk-local vertex units per metre */

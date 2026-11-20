@@ -345,6 +345,45 @@ Pentium II 266 by the usual ratio. `-trace N` logs an FW-CARS line (how
 many move, their speed, knocks, turns, give-ways); `-park X:Y:H` starts
 the game with the rig standing there.
 
+## Towns (tools/fwgen.c, 2026-11-21)
+
+Owner: "add as much detail as you can"; LOW stays as it was (the G200).
+A town is a grid of 64 m blocks between its streets. In each block inside
+the town:
+
+- **Terraces** on all four sides, facing the streets: 9 m back from a
+  street's middle (4.5 m of street, 2 of pavement, 2.5 of front garden),
+  9 m deep, back gardens between them. A row is cut into houses 6-10 m
+  wide, each its own wall, roof and door colour and height (eaves 4.8 to
+  6.2 m, a pitched roof along the row), with a door, a window beside it,
+  windows above, a low hedge or white wall along its front garden with a
+  path to the door; a chimney on a third of them, a tree in a fifth of the
+  back gardens. HIGH adds white frames round the windows, a box of flowers
+  under the front one, a hood over the door, a dormer on a third, the
+  windows at the back, the other chimneys and garden trees. A house is
+  left out unless every corner of it and its front garden is 6 m off a
+  main road's middle line (measured to the road's segments) and off the
+  roundabout. LOW draws each run of houses side by side as one block, which
+  is the run's collision box at every detail.
+- **Shops** in the four blocks round the roundabout: taller (7 to 9.5 m),
+  flat roofs, a shop window and door, an awning in a bright colour (HIGH:
+  white stripes on it), a sign, the flats' windows above.
+- **Pavements** along every block's sides, raised stone (HIGH: a kerb on
+  the street's side), none across a main road; a hedge down the middle of
+  the back gardens.
+- **A landmark** in the block nearest the middle that main roads leave
+  clear, a different one in each town: a church with a spire (towns 0 and
+  4), a water tower (1), a town hall with a portico and a clock tower (2), a
+  windmill with its sails (3); and **a park** in the next block (not beside
+  it): paths corner to corner, a fountain where they cross, flower beds,
+  trees round it, benches at HIGH. Both behind a low hedge, on lawns, with
+  trees at their corners. Their buildings, the fountain and the trees are
+  solid: at LOW boxes, pyramids and four-sided spires (4 triangles a tree).
+
+With 64 m chunks (the pack's version 2) a town view at MEDIUM is about
+4,400 to 5,400 triangles, at HIGH about 10,000, at LOW about 1,230 (1,685
+before the towns, with 128 m chunks).
+
 ## The generated roads (tools/fwgen.c)
 
 Towns are joined by a minimum spanning tree and each town's two nearest

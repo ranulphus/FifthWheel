@@ -167,6 +167,24 @@ uncounted, for one commit):
 | MEDIUM | 3,696 / 6,791 | 3,726 / 6,303 |
 | HIGH | 4,723 / 7,789 | 4,401 / 7,273 |
 
+Fuller towns and 64 m chunks (2026-11-21). A chunk is culled whole, and
+with 128 m ones a view sent DOS-GL several times the ground it showed: the
+first cut of the fuller towns came to 14,219 triangles a frame in a town at
+MEDIUM. With 64 m chunks (4,096 of them, 3 to 5 more draws a frame) the
+same frame is 6,317, and with MEDIUM's houses leaner (chimneys, garden trees
+and back windows mostly HIGH's) 5,173. Headless, mean / most:
+
+| Preset | FW1 | A whole job |
+|---|---|---|
+| LOW | 968 / 1,287 | 1,100 / 1,591 |
+| MEDIUM | 3,370 / 5,344 | 2,786 / 6,573 |
+| HIGH | 4,888 / 9,502 | 3,776 / 13,634 |
+
+LOW is about 30% cheaper than before (the smaller chunks), the towns
+costing it nothing; MEDIUM is cheaper on average and as dear at its worst
+(a town); HIGH spends its room in the towns. The pack grew from 10.5 MB to
+14.1 MB.
+
 Traffic (2026-11-20) adds a car's mesh where one is in sight: 50
 triangles at LOW, 190 at MEDIUM, 466 at HIGH, and a 10-triangle shadow; on
 FW1 and the job none came into view (the means moved by under 10). The

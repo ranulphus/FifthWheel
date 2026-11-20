@@ -25,13 +25,15 @@ generated world (below) has the same `FWCO`, `FWPA` and `FWSP`.
 
 ### The generated world (`tools/fwgen.c`, `build/data/WORLD.PAK`; game/src/wgen.h)
 
-4 x 4 km from (0, 0) to (4096, 4096), in 32 x 32 chunks of 128 m.
+4 x 4 km from (0, 0) to (4096, 4096), in 64 x 64 chunks of 64 m (version 2;
+version 1 had 32 x 32 of 128 m: a chunk is culled whole, and the larger ones
+sent DOS-GL several times the ground in view).
 `make data-check` requires seed 1 to give `data/golden/world.sha`'s hash
 when the generator is built at -O0 and at -O2.
 
 | Section | Layout |
 |---|---|
-| `WRLD` | u32 version (1), seed, chunks per side (32), heightfield samples per side (257); float world size, chunk size, heightfield spacing (16 m), vertex units per metre (32) |
+| `WRLD` | u32 version (2), seed, chunks per side (64), heightfield samples per side (257); float world size, chunk size, heightfield spacing (16 m), vertex units per metre (32) |
 | `CIDX` | per chunk, row-major from the south-west: u32 first vertex, vertices, first index, triangles; s16 lowest and highest height (decimetres) |
 | `CVRT` | vertices: s16 x, y, z, pad (chunk-local GL coordinates, 32 per metre: x - chunk x, height, chunk y - y), u8 r, g, b, a (lighting baked in) |
 | `CTRI` | u16 indices, chunk-local |

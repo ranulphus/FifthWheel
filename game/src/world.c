@@ -82,8 +82,9 @@ int world_load(world *w, const char *path)
         w->tris = (const uint16_t *)dgk_pak_section(&w->pak, WG_CTRIS, NULL);
         w->height = (const int16_t *)dgk_pak_section(&w->pak, WG_HEIGHT, NULL);
         w->variants = (const wg_variant *)dgk_pak_section(&w->pak, WG_CVARIANT, NULL);
-        if (!w->chunks || !w->verts || !w->tris || !w->height || !d || w->hdr->version != 1) {
-            dgk_log("FW-ERROR %s: not a version 1 world", path);
+        if (!w->chunks || !w->verts || !w->tris || !w->height || !d || w->hdr->version != WG_VERSION ||
+            w->hdr->chunks != WG_CHUNKS) {
+            dgk_log("FW-ERROR %s: not a version %d world", path, WG_VERSION);
             world_free(w);
             return -1;
         }
