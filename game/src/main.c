@@ -699,7 +699,12 @@ static void draw(void *u, float alpha)
             dgk_test_snapshot(name);                    /* the world and the lorry, no HUD */
         return;
     }
-    hud_draw(g);
+    /* The sound test's frames are the world without the HUD. 86Box records the WAV in real time, and its
+     * Matrox draws the HUD's textured quads (some 50,000 filtered, blended pixels a frame) so slowly that the
+     * recording lost nearly all the sound (2026-11-20; on a card it costs about a millisecond). The picture
+     * is nothing to that check. */
+    if (!g->soundtest)
+        hud_draw(g);
     menu_draw_overlay(g);
 }
 

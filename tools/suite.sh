@@ -81,7 +81,9 @@ sound() {  # NAME SNDCARD BLASTER
     local st w u
     # At LOW: the picture is nothing to this check, and 86Box records the WAV in
     # real time, so a dearer frame (the new look at MEDIUM) starved the recording
-    # now and then (2 tones missing, the driver playing every chunk).
+    # now and then (2 tones missing, the driver playing every chunk). For the same
+    # reason the sound test draws no HUD (its textured quads, 2026-11-20: the
+    # recording all but silent, 2 loud windows of 1,270).
     st=$(run "$1" --args="-test -fixed -detail low -soundtest" --sound "$2" --pre "SET BLASTER=$3" --wav)
     w=$("$DEV" python3 "$MGAHAL/tools/loopa/wavcheck.py" "$out/$1/audio.wav" --tone 440 --tone 329 --tone 416 \
         --tone 1002 --tone 784 --tone 1900 2>&1)
