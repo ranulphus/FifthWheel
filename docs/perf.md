@@ -167,6 +167,12 @@ uncounted, for one commit):
 | MEDIUM | 3,696 / 6,791 | 3,726 / 6,303 |
 | HIGH | 4,723 / 7,789 | 4,401 / 7,273 |
 
+Traffic (2026-11-20) adds a car's mesh where one is in sight: 50
+triangles at LOW, 190 at MEDIUM, 466 at HIGH, and a 10-triangle shadow; on
+FW1 and the job none came into view (the means moved by under 10). The
+simulation's cost: about 6.5 us a tick on the host for 12 cars (24 for
+40), against 16 for the rest of it.
+
 FW1 no longer compares with the rows above: its tour starts at another
 town (town 0), runs the other way round and goes round the roundabouts;
 MEDIUM's worst frame is a stretch west of town 0 that the old FW1 never

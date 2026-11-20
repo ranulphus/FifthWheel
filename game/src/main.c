@@ -206,6 +206,7 @@ static void detail_apply(game *g)
         lorry_build(&g->lorry, g->det.models);
         career_style(g);
     }
+    traffic_build(g->det.models);
     fx_caps(&g->fxs, g->det.coins, g->det.confetti, g->det.dust);
     g->cam.zoom = DGK_MIN(g->cam.zoom, g->det.zoom_max);
 }
@@ -278,15 +279,16 @@ static int init(void *u)
         dgk_log("FW-ERROR -autojob needs a world with depots");
         return -1;
     }
-    if (g->posed) {                                  /* -pose: a box trailer behind, held at the place */
+    if (g->posed || g->parked) {                     /* -pose: a box trailer behind, held at the place */
         rig_init(&g->r, g->pose[0], g->pose[1], g->pose[2] * WG_PI / 180.0f);
-        g->r.v = g->pose[3];
+        g->r.v = g->posed ? g->pose[3] : 0;
     }
     g->r_prev = g->r;
     g->cam.zoom = 1;
     camera_reset(&g->cam, &g->r);
     g->cam_prev = g->cam;
     autopilot_reset(&g->ap, &g->r, &g->w);
+    traffic_init(&g->traffic, &g->w, g->r.x, g->r.y, g->w.chunked ? g->ncars : 0);
     lorry_build(&g->lorry, 0);                       /* at the detail's roundness once it is known */
     ui_init();                                       /* the HUD's texture */
     if (dgk_font_load(&g->font, &fw_font) != 0)
@@ -513,9 +515,9 @@ static void tick(void *u)
     } else if (g->mode == MODE_TOUR || g->mode == MODE_JOB) {
         rig_input a;
         if (g->mode == MODE_TOUR)
-            autopilot_drive(&g->ap, &g->r, &g->w, &a);
+            autopilot_drive(&g->ap, &g->r, &g->w, &g->traffic, &a);
         else
-            jobpilot_drive(&g->jp, &g->jobs, &g->r, &g->w, &a);
+            jobpilot_drive(&g->jp, &g->jobs, &g->r, &g->w, &g->traffic, &a);
         f.steer = (int8_t)(a.steer * 127.0f);
         f.accel = (uint8_t)(a.accel * 255.0f);
         f.decel = (uint8_t)(a.decel * 255.0f);
@@ -539,6 +541,7 @@ static void tick(void *u)
         jobs_props(&g->jobs, &g->w, g->r.x, g->r.y);
     }
     rig_step(&g->r, &in, 1.0f / DGK_TICK_HZ, &g->w);
+    traffic_tick(&g->traffic, &g->w, &g->r, 1.0f / DGK_TICK_HZ);
     if (g->has_jobs)
         job_events(g);
     {
@@ -558,7 +561,7 @@ static void tick(void *u)
     }
     if (g->mode == MODE_TOUR && g->replay_path) {
         rig_input unused;
-        autopilot_drive(&g->ap, &g->r, &g->w, &unused);      /* keeps counting laps */
+        autopilot_drive(&g->ap, &g->r, &g->w, NULL, &unused);  /* keeps counting laps */
     }
     if (g->r.jackknifes != g->jackknifes_seen) {
         g->jackknifes_seen = g->r.jackknifes;
@@ -571,7 +574,7 @@ static void tick(void *u)
         }
         dgk_log("FW-EVENT jackknife tick=%lu speed=%.1f", (unsigned long)dgk_app.ticks, g->r.v);
     }
-    h = rig_hash(&g->r, 2166136261u);
+    h = traffic_hash(&g->traffic, rig_hash(&g->r, 2166136261u));
     if (g->has_jobs) {
         h = dgk_fnv1a(h, &g->jobs.state, sizeof g->jobs.state);
         h = dgk_fnv1a(h, &g->jobs.money, sizeof g->jobs.money);
@@ -584,6 +587,7 @@ static void tick(void *u)
         dgk_log("FW-TRACE t=%lu x=%.2f y=%.2f h=%.3f th=%.3f v=%.2f ax=%.2f ay=%.2f hits=%d",
                 (unsigned long)dgk_app.ticks + 1, g->r.x, g->r.y, g->r.heading, g->r.trailer_heading, g->r.v, ax, ay,
                 g->r.hits);
+        traffic_log(&g->traffic);
     }
     /* In a test, a line every 10 s of the game's time: a long run in 86Box (a haul drawn at a few frames a
      * second) is otherwise silent long enough for the harness to call it a hang. */
@@ -674,12 +678,15 @@ static void draw(void *u, float alpha)
             route_draw(&g->jobs, &r, &g->w, dgk_app.ticks);
             bay_draw(&g->jobs, &r, &g->w, dgk_app.ticks);
         }
+        float reach = g->det.far * 0.65f;
         lorry_shadows_begin();
         lorry_shadow_rig(&r, &g->w);
         for (i = 0; i < n; i++)
             lorry_shadow_trailer(standing[i]->x, standing[i]->y, standing[i]->heading, &g->w);
+        traffic_shadows(&g->traffic, &g->w, alpha, r.x, r.y, reach);
         lorry_shadows_end();
         lorry_draw(&g->lorry, &r, &g->w, &g->fxs.sway);
+        traffic_draw(&g->traffic, &g->w, alpha, r.x, r.y, reach);
         for (i = 0; i < n; i++)
             lorry_draw_trailer(&g->lorry, standing[i]->type, standing[i]->x, standing[i]->y, standing[i]->heading,
                                &g->w);
@@ -769,6 +776,7 @@ int main(int argc, char **argv)
     static const dgk_app_desc probe = { "Fifth Wheel probe", init_probe, NULL, draw_probe, NULL };
     int i;
     g.job_to = -1;
+    g.ncars = TRAFFIC_CARS;
     g.start_money = -1;
     g.detail_chosen = -1;
     g.zoom_wanted = -1;
@@ -803,6 +811,8 @@ int main(int argc, char **argv)
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!strcmp(a, "-autopilot"))
             g.mode = MODE_TOUR;
+        else if (!strcmp(a, "-cars") && v)
+            g.ncars = atoi(argv[++i]);
         else if (!strcmp(a, "-autojob"))
             g.mode = MODE_JOB;
         else if (!strcmp(a, "-job") && v)
@@ -813,6 +823,8 @@ int main(int argc, char **argv)
             g.dockpose = 1;
         else if (!strcmp(a, "-pose") && v)
             g.posed = sscanf(argv[++i], "%f:%f:%f:%f", &g.pose[0], &g.pose[1], &g.pose[2], &g.pose[3]) == 4;
+        else if (!strcmp(a, "-park") && v)
+            g.parked = sscanf(argv[++i], "%f:%f:%f", &g.pose[0], &g.pose[1], &g.pose[2]) == 3;
         else if (!strcmp(a, "-soundtest"))
             g.soundtest = 1;
         else if (!strcmp(a, "-fxtest"))

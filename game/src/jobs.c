@@ -25,49 +25,93 @@ static void graph(const world *w, const wg_graph **g, const wg_node **n, const w
     *g = world_graph(w, n, e, p);
 }
 
-/* Shortest road from node a to node b: the edges, in order; their count. */
+/* A road's way at a node (unit, about 24 m of it): leaving the node, or (in) arriving at it. */
+#define JOBS_MAX_EDGES 64
+static void way_at(const wg_edge *e, const float *p, int at_a, int in, float *dx, float *dy)
+{
+    int k = DGK_MIN(3, (int)e->npoints - 1), f = (int)e->first_point, l = (int)(e->first_point + e->npoints - 1);
+    int from = at_a ? f : l, to = at_a ? f + k : l - k;
+    float x = p[to * 2] - p[from * 2], y = p[to * 2 + 1] - p[from * 2 + 1], len = sqrtf(x * x + y * y) + 1e-6f;
+    *dx = (in ? -x : x) / len;
+    *dy = (in ? -y : y) / len;
+}
+
+/* Shortest road from node a to node b: the edges, in order (a road may come twice); their count (-1: none).
+ * It never turns back at a junction: a fork's branches leave it at a narrow angle, and from one to the other
+ * is a hairpin no lorry takes; it goes on and round a roundabout instead (back the way it came only there).
+ * Dijkstra over the roads each way (state 2e: along e from its a to its b; 2e + 1: back), a depot a dead end. */
 static int shortest(const world *w, int a, int b, int *out_edges, float *metres)
 {
     const wg_graph *g;
     const wg_node *n;
     const wg_edge *e;
     const float *p;
-    float dist[MAX_NODES];
-    int prev_edge[MAX_NODES], done[MAX_NODES] = { 0 }, i, k, count = 0, at;
+    float dist[2 * JOBS_MAX_EDGES], best = 1e30f;
+    int prev[2 * JOBS_MAX_EDGES], done[2 * JOBS_MAX_EDGES] = { 0 }, ns, i, k, s, end = -1, count = 0;
     graph(w, &g, &n, &e, &p);
-    for (i = 0; i < (int)g->nnodes; i++) {
-        dist[i] = 1e30f;
-        prev_edge[i] = -1;
+    if (metres)
+        *metres = 0;
+    if (a == b)
+        return 0;
+    if ((int)g->nedges > JOBS_MAX_EDGES) {
+        dgk_log("FW-ERROR jobs: %u roads, room for %d", (unsigned)g->nedges, JOBS_MAX_EDGES);
+        return -1;
     }
-    dist[a] = 0;
-    for (k = 0; k < (int)g->nnodes; k++) {
-        int u = -1;
-        for (i = 0; i < (int)g->nnodes; i++)
-            if (!done[i] && (u < 0 || dist[i] < dist[u]))
-                u = i;
+    ns = 2 * (int)g->nedges;
+    for (s = 0; s < ns; s++) {
+        int leaves = s & 1 ? (int)e[s / 2].b : (int)e[s / 2].a;
+        dist[s] = leaves == a ? e[s / 2].length : 1e30f;
+        prev[s] = -1;
+    }
+    for (k = 0; k < ns; k++) {
+        int u = -1, v, ui;
+        float ix, iy;
+        for (s = 0; s < ns; s++)
+            if (!done[s] && (u < 0 || dist[s] < dist[u]))
+                u = s;
         if (u < 0 || dist[u] >= 1e29f)
             break;
         done[u] = 1;
+        ui = u / 2;
+        v = u & 1 ? (int)e[ui].a : (int)e[ui].b;           /* where it arrives */
+        if (v == b && dist[u] < best) {
+            best = dist[u];
+            end = u;
+        }
+        if (n[v].kind == WG_DEPOT)
+            continue;
+        way_at(&e[ui], p, (int)e[ui].a == v, 1, &ix, &iy);
         for (i = 0; i < (int)g->nedges; i++) {
-            int v = (int)e[i].a == u ? (int)e[i].b : (int)e[i].b == u ? (int)e[i].a : -1;
-            if (v >= 0 && dist[u] + e[i].length < dist[v]) {
-                dist[v] = dist[u] + e[i].length;
-                prev_edge[v] = i;
+            float ox, oy;
+            int t;
+            if ((int)e[i].a != v && (int)e[i].b != v)
+                continue;
+            t = 2 * i + ((int)e[i].a == v ? 0 : 1);
+            if (i == ui && n[v].kind != WG_TOWN)
+                continue;
+            if (n[v].kind == WG_JUNCTION) {
+                way_at(&e[i], p, (int)e[i].a == v, 0, &ox, &oy);
+                if (ix * ox + iy * oy < -0.5f)              /* turning back more than 120 degrees */
+                    continue;
+            }
+            if (dist[u] + e[i].length < dist[t]) {
+                dist[t] = dist[u] + e[i].length;
+                prev[t] = u;
             }
         }
     }
+    if (end < 0)
+        return -1;
     if (metres)
-        *metres = dist[b];
-    for (at = b; at != a && prev_edge[at] >= 0 && count < MAX_ROUTE_EDGES; count++) {
-        out_edges[count] = prev_edge[at];
-        at = (int)e[prev_edge[at]].a == at ? (int)e[prev_edge[at]].b : (int)e[prev_edge[at]].a;
-    }
+        *metres = best;
+    for (s = end; s >= 0 && count < MAX_ROUTE_EDGES; s = prev[s])
+        out_edges[count++] = s / 2;
     for (i = 0; i < count / 2; i++) {                /* reversed: from a to b */
         int t = out_edges[i];
         out_edges[i] = out_edges[count - 1 - i];
         out_edges[count - 1 - i] = t;
     }
-    return at == a ? count : -1;
+    return count;
 }
 
 static int nearest_node(const world *w, float x, float y)
@@ -117,6 +161,12 @@ static void route_from(jobs *j, const world *w, int at, int depot)
             j->nroute++;
         }
         at = forward ? (int)ed->b : (int)ed->a;
+    }
+    {
+        /* In the left lane. */
+        static float centre[ROUTE_MAX][2];
+        memcpy(centre, j->route, sizeof(float) * 2 * (size_t)j->nroute);
+        wg_offset((const float (*)[2])centre, j->nroute, WG_LANE, 0, j->route);
     }
 }
 

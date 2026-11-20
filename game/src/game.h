@@ -6,6 +6,7 @@
 #include "dgk/dgk.h"
 #include "dgk/replay.h"
 #include "autopilot.h"
+#include "traffic.h"
 #include "camera.h"
 #include "career.h"
 #include "menu.h"
@@ -27,6 +28,7 @@ typedef struct game {
     int job_from, job_to, job_bay;  /* -job D:T:B (job_to -1: none) */
     int dockpose;                   /* -dockpose */
     int posed;                      /* -pose X:Y:H:V: the rig held there, the camera told it moves at V */
+    int parked;                     /* -park X:Y:H: the game starts with the rig standing there (tests) */
     float pose[4];
     int calibrate_only, joylog;     /* -calibrate (then quit), -joylog */
     dgk_cfg cfg;                    /* the settings file */
@@ -55,6 +57,8 @@ typedef struct game {
     rig r, r_prev;
     camera cam, cam_prev;
     autopilot ap;
+    traffic traffic;            /* the cars on the roads */
+    int ncars;                  /* -cars N (0: none); TRAFFIC_CARS */
     jobs jobs;
     int has_jobs;               /* the world has depots, and this is not the tour */
     jobpilot jp;

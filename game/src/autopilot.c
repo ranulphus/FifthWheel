@@ -29,7 +29,7 @@ void autopilot_reset(autopilot *a, const rig *r, const world *w)
     a->speed = 14.0f;
 }
 
-void autopilot_drive(autopilot *a, const rig *r, const world *w, rig_input *in)
+void autopilot_drive(autopilot *a, const rig *r, const world *w, const traffic *t, rig_input *in)
 {
     float look = 10.0f + 0.6f * fabsf(r->v), dx = 0, dy = 0, alpha, curve, want;
     int i, n = w->npath, target = a->next, prev = a->next;
@@ -70,6 +70,18 @@ void autopilot_drive(autopilot *a, const rig *r, const world *w, rig_input *in)
     /* A hairpin (the tour turning back through a town) slower still: at 9 m/s the trailer swings wide into
      * the houses. */
     want = curve > 1.4f ? 5.0f : curve > 0.3f ? 9.0f : a->speed;
+    /* A car in its lane ahead: stop 7 m behind it (the bumper is 4.9 m ahead of the rear axle). */
+    {
+        float gap = t ? traffic_gap(t, w->path, n, a->next, 1, r->x, r->y, 60.0f) : 60.0f;
+        float stop = sqrtf(2.0f * 1.5f * DGK_MAX(0.0f, gap - 12.0f));
+        if (gap < 60.0f && stop < want) {
+            want = stop;
+            in->accel = r->v < want - 0.5f ? DGK_CLAMP((want - r->v) * 0.4f, 0.0f, 1.0f) : 0;
+            in->decel = r->v > want + 0.3f ? DGK_CLAMP((r->v - want) * 0.5f, 0.0f, 1.0f) : 0;
+            in->handbrake = 0;
+            return;
+        }
+    }
     in->accel = r->v < want - 0.5f ? DGK_CLAMP((want - r->v) * 0.4f, 0.0f, 1.0f) : 0;
     in->decel = r->v > want + 1.5f ? DGK_CLAMP((r->v - want) * 0.2f, 0.0f, 0.6f) : 0;
     in->handbrake = 0;

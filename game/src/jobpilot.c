@@ -197,7 +197,7 @@ static float steer_to_input(float delta, const rig *r)
 }
 
 /* Forward pure pursuit along the path; returns the metres left. */
-static float drive_path(jobpilot *p, const rig *r, rig_input *in)
+static float drive_path(jobpilot *p, const rig *r, const traffic *t, rig_input *in)
 {
     float look = 9.0f + 0.5f * fabsf(r->v), dx, dy, alpha, want, left;
     int target, k, m;
@@ -239,6 +239,13 @@ static float drive_path(jobpilot *p, const rig *r, rig_input *in)
         want = DGK_MIN(want, DGK_MAX(1.0f, sqrtf(2.0f * 1.2f * (left - 1.5f))));
     else
         want = 0;
+    if (t && want > 0) {                             /* a car in its lane ahead: 7 m behind it */
+        float gap = traffic_gap(t, &p->path[0][0], p->npath, p->next, 0, r->x, r->y, 60.0f);
+        if (gap < 60.0f)
+            want = DGK_MIN(want, sqrtf(2.0f * 1.2f * DGK_MAX(0.0f, gap - 12.0f)));
+        if (want < 0.05f)
+            want = 0;
+    }
     if (want > 0)
         pedals(r, want, in);
     else
@@ -246,7 +253,7 @@ static float drive_path(jobpilot *p, const rig *r, rig_input *in)
     return left;
 }
 
-void jobpilot_drive(jobpilot *p, const jobs *j, const rig *r, const world *w, rig_input *in)
+void jobpilot_drive(jobpilot *p, const jobs *j, const rig *r, const world *w, const traffic *t, rig_input *in)
 {
     in->steer = 0;
     in->accel = in->decel = 0;
@@ -278,7 +285,7 @@ void jobpilot_drive(jobpilot *p, const jobs *j, const rig *r, const world *w, ri
         break;
     }
     case JP_DRIVE:
-        if (drive_path(p, r, in) < 1.5f && fabsf(r->v) < 0.1f) {
+        if (drive_path(p, r, t, in) < 1.5f && fabsf(r->v) < 0.1f) {
             p->phase = JP_REVERSE;
             dgk_log("FW-PILOT staged: lat=%.2f gap=%.1f angle=%.1f articulation=%.1f", j->lat, j->gap,
                     j->angle * 180.0f / WG_PI, rig_articulation(r) * 180.0f / WG_PI);

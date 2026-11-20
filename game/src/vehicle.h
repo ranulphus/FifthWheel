@@ -57,6 +57,7 @@ void rig_trailer_rear(const rig *r, float *rx, float *ry);      /* the middle of
 /* A trailer standing alone with its kingpin at (kx, ky): its outline from
  * 2 m behind the kingpin (room for a tractor backing under it) to its back. */
 void rig_parked_box(float kx, float ky, float heading, obb *b);
+void rig_boxes(const rig *r, obb *tractor, obb *trailer);  /* what collides: the trailer's only with one */
 void rig_step(rig *r, const rig_input *in, float dt, const world *w);
 /* Where the back corners go if the rig reverses `metres` with the front
  * wheels held where they are: n + 1 points each, from where they are now

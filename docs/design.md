@@ -257,7 +257,11 @@ cancelling are input like the pedals, so replays carry them.
 - **Where to go:** before coupling, a gold arrow spins and bobs over the
   waiting trailer's nose; within 150 m of the bay, over the bay, and while
   docking a gold outline pulses round the bay on the ground (guides.c).
-- **The route:** the shortest way over the road graph (Dijkstra). The HUD's
+- **The route:** the shortest way over the road graph (Dijkstra over each
+  road both ways), in the left lane. It never turns back at a junction (a
+  fork's branches meet at a narrow angle: from one to the other is a
+  hairpin no lorry takes) and goes on and round a roundabout instead; back
+  the way it came only round a roundabout. The HUD's
   arrow points along it and the minimap draws it; more than 60 m off it,
   it is worked out again from the nearest junction. On the road ahead, gold
   chevrons point the way (`route_draw`, guides.c): one at each road point
@@ -292,6 +296,54 @@ on the trailer's axle gives the trailer's wanted curvature; the kingpin
 kinematics turn that into a wanted articulation; the tractor steers for
 the yaw rate that holds it. `make jobsweep` runs it on every depot pair
 and bay.
+
+## Traffic (game/src/traffic.c)
+
+A dozen toy cars (owner, 2026-11-20: "a few, about 12"; `-cars N` for
+tests, up to 40), the same at every detail: they are the simulation, in
+FW-HASH, and only their look follows the detail (LOW 50 triangles a car,
+boxes; MEDIUM 190; HIGH 466, for the Radeon). Everything keeps left
+(`WG_LANE`, 2.25 m left of the road's middle: wgen.h's `wg_offset`): the
+cars, the tour (offset as the world loads; the rig starts in its lane)
+and every job's route, so the autopilots too; round a roundabout,
+clockwise, that is its outer lane.
+
+A car drives from one town's ring to the next, through the junctions, on
+roads that do not end at a depot (those are pruned until every node left
+has two roads), never turning back at a fork. It is kinematic: pure
+pursuit along its lane (a 4.5 m turning radius), 13 m/s on the open road,
+8 or 5.5 for bends, 7 round a ring. It stops behind whatever is in its
+lane ahead (a car within 1.9 m of its lane's line, any of seven points
+down the lorry within 2.6 m), planning to stop at 5 m/s^2. At a
+roundabout it gives way, at a stop line 31 m from the town's middle, to a
+car on the ring within 18 m of its way in or to the lorry on the ring
+near it; once over the line it goes on. On a ring it lets the lorry join
+(any of the lorry within 7 m of its next 14 m), unless the lorry has
+stood still 2.5 s, waiting for it. Two cars each in the other's way (a
+fork's merge) settle it by number. Held up by the lorry for 6 s off a
+roundabout, a car turns round, back to the town it came from in the
+other lane (once till it reaches a town; one spawned mid-road cannot);
+after 15 s anywhere it goes, and comes back on a road 250 m or more from
+the lorry.
+
+The lorry knocks a car it drives into (owner: "bump and damage"): the car
+is pushed out of it, sent off ahead and to its side at 1.3 and 0.6 times
+the closing speed, spinning, slides to a stop (7 m/s^2) and finds its
+lane again; the lorry takes half a point of damage a m/s of closing (a
+third of a wall's), loses up to a quarter of its speed and counts a hit
+(the cab jolts, dust flies). Touched again while it slides it is shoved
+on, no more damage. The autopilots stop 7 m behind a car in their lane
+(`traffic_gap`).
+
+Checks (2026-11-20): every job is delivered with no damage and no knock
+(168 of 168); the tour laps without a hit with 12 cars and with 40; with
+the lorry parked in a lane 10 minutes, 40 cars queue, turn round (8 to 10)
+or go (0 to 3) and none is stuck; a lorry driven blind down the road's
+middle among 40 knocks three cars in a lap, once each (21 damage). The
+cars cost the simulation about 6.5 us a tick on the host, 1-2% of a
+Pentium II 266 by the usual ratio. `-trace N` logs an FW-CARS line (how
+many move, their speed, knocks, turns, give-ways); `-park X:Y:H` starts
+the game with the rig standing there.
 
 ## The generated roads (tools/fwgen.c)
 

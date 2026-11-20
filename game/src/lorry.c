@@ -451,6 +451,11 @@ void lorry_shadow_trailer(float kx, float ky, float heading, const world *w)
     shadow(w, kx, ky, heading, -RIG_TRAILER_REAR, 1.0f, 1.28f);
 }
 
+void lorry_shadow_footprint(const world *w, float x, float y, float heading, float a0, float a1, float half)
+{
+    shadow(w, x, y, heading, a0, a1, half);
+}
+
 void lorry_shadows_end(void)
 {
     glEnd();

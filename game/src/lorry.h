@@ -39,6 +39,8 @@ void lorry_draw_trailer(lorry_meshes *m, int type, float kx, float ky, float hea
 void lorry_shadows_begin(void);
 void lorry_shadow_rig(const rig *r, const world *w);
 void lorry_shadow_trailer(float kx, float ky, float heading, const world *w);
+/* Any footprint: from a0 to a1 metres along `heading` from (x, y), `half` wide either side (the cars'). */
+void lorry_shadow_footprint(const world *w, float x, float y, float heading, float a0, float a1, float half);
 void lorry_shadows_end(void);
 
 #endif

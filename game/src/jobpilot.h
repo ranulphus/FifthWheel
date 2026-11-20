@@ -14,6 +14,7 @@
 #define FW_JOBPILOT_H
 
 #include "jobs.h"
+#include "traffic.h"
 
 #define JP_PATH_MAX (ROUTE_MAX + 64)
 
@@ -27,7 +28,8 @@ typedef struct jobpilot {
 } jobpilot;
 
 void jobpilot_reset(jobpilot *p, const jobs *j);
-void jobpilot_drive(jobpilot *p, const jobs *j, const rig *r, const world *w, rig_input *in);
+/* t: the cars, to stop behind one in its lane on the road (NULL: none). */
+void jobpilot_drive(jobpilot *p, const jobs *j, const rig *r, const world *w, const traffic *t, rig_input *in);
 /* Where a lone tractor waits to take a depot's trailer: straight ahead of
  * it, lined up (its rear axle 9 m ahead of the kingpin). */
 void jobpilot_start(const jobs *j, int depot, float *x, float *y, float *heading);

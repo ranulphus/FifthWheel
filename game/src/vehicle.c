@@ -114,6 +114,12 @@ static void trailer_box(const rig *r, obb *b)
     b->cy = hy - 5.8f * sinf(r->trailer_heading);
 }
 
+void rig_boxes(const rig *r, obb *tractor, obb *trailer)
+{
+    tractor_box(r, tractor);
+    trailer_box(r, trailer);
+}
+
 void rig_parked_box(float kx, float ky, float heading, obb *b)
 {
     b->angle = heading;

@@ -109,4 +109,25 @@ static inline int wg_ring_arc(float cx, float cy, float x0, float y0, float x1, 
     return n;
 }
 
+/* Traffic keeps left: a lane's middle WG_LANE metres left of the road's
+ * centre line (on a roundabout, going round clockwise, that is its outer
+ * lane). wg_offset moves each of a line's n points `off` metres to its left
+ * (to the right if negative), across the mean of the directions either side
+ * of it; closed: the line loops. in and out are not the same. */
+#define WG_LANE 2.25f
+static inline void wg_offset(const float (*in)[2], int n, float off, int closed, float (*out)[2])
+{
+    int i;
+    for (i = 0; i < n; i++) {
+        int a = i > 0 ? i - 1 : closed ? n - 1 : 0, b = i + 1 < n ? i + 1 : closed ? 0 : n - 1;
+        float dx = in[b][0] - in[a][0], dy = in[b][1] - in[a][1], l = sqrtf(dx * dx + dy * dy);
+        out[i][0] = in[i][0];
+        out[i][1] = in[i][1];
+        if (l > 1e-4f) {
+            out[i][0] -= dy / l * off;
+            out[i][1] += dx / l * off;
+        }
+    }
+}
+
 #endif

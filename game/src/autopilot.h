@@ -5,6 +5,7 @@
 #define FW_AUTOPILOT_H
 
 #include "vehicle.h"
+#include "traffic.h"
 
 typedef struct autopilot {
     int next;                   /* path point being approached */
@@ -13,6 +14,7 @@ typedef struct autopilot {
 } autopilot;
 
 void autopilot_reset(autopilot *a, const rig *r, const world *w);
-void autopilot_drive(autopilot *a, const rig *r, const world *w, rig_input *in);
+/* t: the cars, to stop behind one in its lane (NULL: none). */
+void autopilot_drive(autopilot *a, const rig *r, const world *w, const traffic *t, rig_input *in);
 
 #endif

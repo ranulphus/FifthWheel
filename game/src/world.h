@@ -39,8 +39,9 @@ typedef struct world {
     int *bucket_first, *bucket_items;    /* box indices by bucket */
     obb props[WORLD_PROPS];              /* set by the game; collide like the pack's boxes */
     int nprops;
-    const float *path;
+    const float *path;                   /* the tour; in the generated world, its left lane (lane, owned) */
     int npath;
+    float *lane;
     float spawn_x, spawn_y, spawn_heading;
     int drawn_chunks, culled_chunks;     /* last frame: drawn, and in reach but out of view */
 } world;
