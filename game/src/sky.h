@@ -16,7 +16,16 @@ void sky_draw(float view_pitch);
  * picture's top edge is, at most `far`: as far as the world need be drawn. */
 float sky_seen(float view_pitch, float eye_height, float far);
 /* Then: fog on for the world and the lorries if the ground the camera sees
- * reaches towards the far plane; 1 if it is. */
+ * reaches towards the far plane; 1 if it is. DOS-GL's fog multiplies the
+ * triangles the card draws (on the G400 MEDIUM's 1,583 a frame became 8,056
+ * and its frame rate fell from 72.7 to 21.7): the presets' `fog` keeps it for
+ * a card that fogs for nothing. */
 int  sky_fog(float view_pitch, float eye_height, float far);
+/* Instead: haze on the screen, after the world and the lorries, before the
+ * HUD: the horizon's colour over the rows where the ground lies from half
+ * the far plane (clear) to 0.95 of it (solid), as the fog would have it, and
+ * fading a little way up into the sky over things that stand above the
+ * horizon. Three overlay quads. */
+void sky_haze(float view_pitch, float eye_height, float far);
 
 #endif

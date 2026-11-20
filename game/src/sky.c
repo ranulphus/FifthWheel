@@ -55,3 +55,49 @@ int sky_fog(float view_pitch, float eye_height, float far)
     glEnable(GL_FOG);
     return 1;
 }
+
+/* The overlay's row where the ground lies `d` metres from the eye (or, d
+ * 0, the horizon), seen eye_height above it at view_pitch. */
+static float ground_row(float view_pitch, float eye_height, float d)
+{
+    float below = d > 0 ? atanf(eye_height / d) : 0;
+    return 240.0f - 240.0f * tanf(view_pitch - below) / tanf(CAMERA_FOVY * 0.5f * DEG);
+}
+
+void sky_haze(float view_pitch, float eye_height, float far)
+{
+    static const float at[4] = { 0.0f, 0.95f, 0.72f, 0.5f }, alpha[4] = { 1.0f, 1.0f, 0.5f, 0.0f };
+    float y[4], top;
+    int k;
+    if (sky_seen(view_pitch, eye_height, far) < far * 0.5f)
+        return;                                      /* the camera does not see that far */
+    for (k = 0; k < 4; k++)
+        y[k] = ground_row(view_pitch, eye_height, at[k] ? far * at[k] : 0);
+    top = y[0] - 24.0f;
+    dgk_gfx_overlay_begin();
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBegin(GL_QUADS);
+    dgk_gfx_draws++;
+    /* Into the sky a little, over the tops of what stands above the horizon. */
+    glColor4ub((GLubyte)(SKY_HORIZON >> 16), (GLubyte)(SKY_HORIZON >> 8), (GLubyte)SKY_HORIZON, 0);
+    glVertex2f(0, top);
+    glVertex2f(640, top);
+    glColor4ub((GLubyte)(SKY_HORIZON >> 16), (GLubyte)(SKY_HORIZON >> 8), (GLubyte)SKY_HORIZON, 255);
+    glVertex2f(640, y[0]);
+    glVertex2f(0, y[0]);
+    for (k = 0; k < 3; k++) {
+        glColor4ub((GLubyte)(SKY_HORIZON >> 16), (GLubyte)(SKY_HORIZON >> 8), (GLubyte)SKY_HORIZON,
+                   (GLubyte)(255.0f * alpha[k]));
+        glVertex2f(0, y[k]);
+        glVertex2f(640, y[k]);
+        glColor4ub((GLubyte)(SKY_HORIZON >> 16), (GLubyte)(SKY_HORIZON >> 8), (GLubyte)SKY_HORIZON,
+                   (GLubyte)(255.0f * alpha[k + 1]));
+        glVertex2f(640, y[k + 1]);
+        glVertex2f(0, y[k + 1]);
+    }
+    glEnd();
+    glDisable(GL_BLEND);
+    dgk_gfx_overlay_end();
+}
+

@@ -163,10 +163,15 @@ frames a second on a Pentium II 266 with a G200.
   km/h (LOW 52, MEDIUM 24, HIGH 20 degrees), closer and looking a little
   higher as it comes down, back up quickly when the rig slows (coupling
   and docking keep their 75-degree view). At MEDIUM and HIGH the horizon
-  comes into the picture: the sky is a gradient above it (sky.c), and
-  linear fog in the horizon's colour over the last half of the view ends
-  the world in haze. LOW never comes low enough for either (DOS-GL's fog
-  costs most on the G200). The world is drawn as far round the target as
+  comes into the picture: the sky is a gradient above it (sky.c), and a
+  haze in the horizon's colour, drawn on the screen over the rows where the
+  ground lies from half the far plane to 0.95 of it (and a little way up
+  into the sky), ends the world as fog would. GL fog stays a preset's
+  choice (`fog` in BUDGET.CFG) for a card that fogs for nothing: DOS-GL
+  cuts a fogged triangle up until one fog factor a triangle follows GL's
+  per-pixel fog, and on the G400 that made MEDIUM's 1,583 triangles a
+  frame 8,056 and its 72.7 frames a second 21.7 (2026-11-20). LOW never
+  comes low enough for either. The world is drawn as far round the target as
   the camera sees, and no less than 0.65 of the far plane; so LOW's lower
   view costs nothing (FW1 1,448 triangles a frame, against 1,440).
 - **Light** on the world is baked (a warm sun from the north-west, strong

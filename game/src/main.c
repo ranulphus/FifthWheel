@@ -635,6 +635,7 @@ static int parked_near(const game *g, const rig *r, const parked **out)
 static void draw(void *u, float alpha)
 {
     game *g = (game *)u;
+    float view_pitch = 1.0f, view_eye = 30.0f;     /* the camera, for the haze after the world */
     if (dgk_app.frame_us && governor_frame(&g->gov, dgk_app.frame_us / 1000.0f))
         detail_apply(g);                             /* looks only: never the simulation */
     if (g->gar.open) {
@@ -655,8 +656,11 @@ static void draw(void *u, float alpha)
         float pitch, eye_h;
         camera_apply(&g->cam, &g->cam_prev, alpha, (float)dgk_app.width / dgk_app.height, world_height(&g->w, tx, ty),
                      g->det.far, &pitch, &eye_h);
+        view_pitch = pitch;
+        view_eye = eye_h;
         sky_draw(pitch);
-        sky_fog(pitch, eye_h, g->det.far);
+        if (g->det.fog)
+            sky_fog(pitch, eye_h, g->det.far);
         /* As far round the target as the camera sees ahead of the eye (the eye is behind it), and no less than
          * 0.65 of the far plane (the sides of a steep view); the view's planes cull the rest. */
         world_draw(&g->w, tx, ty, DGK_MAX(g->det.far * 0.65f, sky_seen(pitch, eye_h, g->det.far)));
@@ -682,6 +686,8 @@ static void draw(void *u, float alpha)
         target_arrow_draw(&g->jobs, &r, &g->w, dgk_app.ticks);
     fx_draw_world(&g->fxs, &g->cam);
     glDisable(GL_FOG);
+    if (!g->det.fog)
+        sky_haze(view_pitch, view_eye, g->det.far);
     if (g->rearcam)
         guides_draw(&r, &g->w);
     if (g->tourshots) {
