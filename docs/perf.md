@@ -165,3 +165,48 @@ triangles a frame), the far plane and pitch_min, all in BUDGET.CFG or the
 pack's runs. HIGH is for the Radeon and can grow.
 86Box draws the haul at MEDIUM, with fog, at a few frames a second; that is
 86Box, not a measurement.
+
+## On real cards (2026-11-20)
+
+bench-g400 (the IBM PC 300PL: a Pentium II, a G400 on the 440BX's AGP at
+1x, under GLOS 7a89adc), RetroGPU main b090479; every run's DGL-WARP line
+failures=0, the old build and the new in one GLOS boot, each test twice
+(the pairs agreed within 0.2%). FW1's command line (`-fixed -novsync
+-autopilot -frames 3000`), frames a second, mean / 99th percentile ms:
+
+| Build, preset | fps | p99 ms | triangles a frame (the game's; the WARP's) |
+|---|---|---|---|
+| main (the old look), MEDIUM | 118.7 | 10.2 | 1,470; 950 |
+| main, LOW | 120.2 | 10.4 | 1,424 |
+| polish, LOW | 117.0 | 10.5 | 1,500 |
+| polish, MEDIUM with GL fog | 21.6 | 88.6 | 3,522; 8,056 |
+| polish, MEDIUM without fog (now: the haze) | 72.7 | 23.8 | 3,522; 1,583 |
+| polish, MEDIUM, camera held high (`pitch_min` 52) | 84.8 | 20.5 | 2,954; 1,552 |
+| polish, HIGH (zoom far) with GL fog | 21.5 | 86.8 | 4,402 |
+| polish, HIGH, camera held high | 77.0 | 21.8 | 3,437 |
+
+LOW costs what it did (3% slower, its 2% more triangles). GL fog was the
+cost of the new look, not its triangles: DOS-GL cuts a fogged triangle up
+until one fog factor a triangle follows GL's per-pixel fog, five times the
+triangles here. Without it MEDIUM runs at 72.7 fps on a G400, the low
+camera's longer view costing 14% over the high one.
+
+The P3 (bench B: a Pentium III with a RIVA TNT2 M64 under GLOS 7a89adc,
+DOS-GL's TNT2 back end, RetroGPU main b090479), the same job (the pairs
+agreed within 0.1%):
+
+| Build, preset | fps | p99 ms |
+|---|---|---|
+| main (the old look), MEDIUM | 170.7 | 7.5 |
+| main, LOW | 170.5 | 7.5 |
+| polish, LOW | 160.9 | 7.5 |
+| polish, MEDIUM with GL fog | 70.8 | 24.9 |
+| polish, MEDIUM without fog (now: the haze) | 112.0 | 11.9 |
+| polish, HIGH (zoom far) with GL fog | 60.2 | 27.9 |
+
+The TNT2 fogs more cheaply (1.6 times the frame, against the G400's 3.3),
+and without fog MEDIUM runs at 112 fps there. LOW is 6% slower than the
+old look on the P3, 3% on the 300PL. The haze build (1a6e46f) itself is
+yet to be timed on either; it adds three overlay quads to the runs
+"without fog" above.
+
