@@ -58,8 +58,12 @@ that pin.
 
 ## Memory
 
-- [ ] A 32 MB machine: the game starts and plays (86Box with 32 MB: the
-      heap is about 7 MB, 21 MB left free).
+- [ ] A 32 MB machine: the game starts and plays. In 86Box with 32 MB
+      (the new look's 10 MB pack, 2026-11-20): the heap is 10.3 MB with
+      18.1 MB left free on plain DOS (`make suite CHECKS=mem`), and 10.2 MB
+      with 12.4 MB free in a window under GLOS (its games case run once at
+      32 MB, a G200, the SB16 through GLOS's mixer: the drive's hashes as
+      on plain DOS, no sound chunk underran).
 - [ ] Under EMM386 or another memory manager, and in a Windows 9x DOS box
       if it should work there at all: note what happens.
 
