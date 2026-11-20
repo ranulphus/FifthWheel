@@ -670,6 +670,56 @@ static void warehouse(float cx, float cy, float hl, float hw, float angle, float
     }
 }
 
+/* ---- painted digits ------------------------------------------------------------- */
+
+/* The digits of data/font5x7.txt (the HUD's font), copied: '#' ink. */
+static const char *const digit_rows[10][7] = {
+    { ".###.", "#...#", "#..##", "#.#.#", "##..#", "#...#", ".###." },
+    { "..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###." },
+    { ".###.", "#...#", "....#", "...#.", "..#..", ".#...", "#####" },
+    { "####.", "....#", "....#", ".###.", "....#", "....#", "####." },
+    { "...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#." },
+    { "#####", "#....", "####.", "....#", "....#", "#...#", ".###." },
+    { "..##.", ".#...", "#....", "####.", "#...#", "#...#", ".###." },
+    { "#####", "....#", "...#.", "..#..", ".#...", ".#...", ".#..." },
+    { ".###.", "#...#", "#...#", ".###.", "#...#", "#...#", ".###." },
+    { ".###.", "#...#", "#...#", ".####", "....#", "...#.", ".##.." }
+};
+
+/* Paint the number n's digits: each row's runs of ink a quad, `px` metres a
+ * pixel, the glyphs' left top at `o` (GL), along `right` and down `down`
+ * (unit GL vectors), facing `out`, in colour rgb; a pixel's gap between
+ * digits. */
+static void paint_number(int n, const float *o, const float *right, const float *down, const float *out,
+                         float px, uint32_t rgb)
+{
+    char s[8];
+    int len = snprintf(s, sizeof s, "%d", n), k, r, c;
+    cmesh *m;
+    float cx = o[0] + right[0] * len * 3 * px, cz = o[2] + right[2] * len * 3 * px;
+    m = chunk_for(cx, -cz);
+    for (k = 0; k < len; k++)
+        for (r = 0; r < 7; r++)
+            for (c = 0; c < 5; c++) {
+                const char *row = digit_rows[s[k] - '0'][r];
+                int e, i;
+                float p[4][3], a0, a1;
+                if (row[c] != '#' || (c > 0 && row[c - 1] == '#'))
+                    continue;
+                for (e = c; e < 5 && row[e] == '#'; e++)
+                    continue;
+                a0 = (k * 6 + c) * px;
+                a1 = (k * 6 + e) * px;
+                for (i = 0; i < 3; i++) {
+                    p[0][i] = o[i] + right[i] * a0 + down[i] * r * px;
+                    p[1][i] = o[i] + right[i] * a1 + down[i] * r * px;
+                    p[2][i] = o[i] + right[i] * a1 + down[i] * (r + 1) * px;
+                    p[3][i] = o[i] + right[i] * a0 + down[i] * (r + 1) * px;
+                }
+                face(m, p, 4, out, rgb, -1e9f);
+            }
+}
+
 /* ---- roads ------------------------------------------------------------------------ */
 
 #define MAX_EDGES 64
@@ -944,7 +994,7 @@ static void road_ribbon(const float (*p)[3], int n, float half, const paint *pt,
         }
         if (pt && pt->edges) {                       /* edge lines: MEDIUM and HIGH */
             int save = variant, e;
-            variant = WG_HIGH_ONLY;
+            variant = WG_MEDIUM_UP;
             for (e = -1; e <= 1; e += 2) {
                 float o0 = e * (1.0f - 0.45f / half), o1 = e * (1.0f - 0.27f / half);
                 float m[4][3] = { { p[i][0] + nx0 * o0, p[i][2] + lift + 0.06f, -(p[i][1] + ny0 * o0) },
@@ -1034,6 +1084,8 @@ static void street(float x0, float y0, float x1, float y1, float h, float lift)
     road_ribbon((const float (*)[3])s, n + 1, 4.5f, NULL, lift);
 }
 
+static void lamp(float x, float y, float tall, float ax, float ay);
+
 static void build_town(const place *t)
 {
     int n = town_blocks(t), i, j, k;
@@ -1045,6 +1097,27 @@ static void build_town(const place *t)
         town_frame(t, -n * GRID, i * GRID, &x0, &y0);
         town_frame(t, n * GRID, i * GRID, &x1, &y1);
         street(x0, y0, x1, y1, t->h, 0.13f);     /* crossings: not coplanar */
+    }
+    {
+        /* HIGH: lamp posts along the streets every 48 m, by turns either side, off the main roads. */
+        int a, q, nq = (int)(n * GRID / 48.0f);
+        variant = WG_HIGH_ONLY;
+        for (i = -n; i <= n; i++)
+            for (a = 0; a < 2; a++)
+                for (q = -nq; q < nq; q++) {
+                    float u = (q + 0.5f) * 48.0f, side = (q & 1) ? 5.8f : -5.8f, lx, ly, ix, iy;
+                    if (a == 0) {
+                        town_frame(t, i * GRID + side, u, &lx, &ly);
+                        town_frame(t, i * GRID + side * 0.8f, u, &ix, &iy);
+                    } else {
+                        town_frame(t, u, i * GRID + side, &lx, &ly);
+                        town_frame(t, u, i * GRID + side * 0.8f, &ix, &iy);
+                    }
+                    if (road_distance(lx, ly) < 8.0f)
+                        continue;
+                    lamp(lx, ly, 5.0f, ix - lx, iy - ly);
+                }
+        variant = WG_SHARED;
     }
     for (j = -n; j < n; j++)                      /* buildings, set back from the streets */
         for (i = -n; i < n; i++) {
@@ -1062,7 +1135,7 @@ static void build_town(const place *t)
                     continue;
                 variant = WG_LOW_ONLY;
                 block(x, y, w / 2, d / 2, t->heading, tall, wall, roof, 1, 1);
-                variant = WG_HIGH_ONLY;
+                variant = WG_MEDIUM_UP;
                 house(x, y, w / 2, d / 2, t->heading, tall, wall, roof);
                 variant = WG_SHARED;
             }
@@ -1087,7 +1160,26 @@ static void level_depot(const place *d)
     }
 }
 
-static void build_depot(const place *d, wg_depot *out)
+static void hedge_stretch(float ax, float ay, float ah, float bx, float by, float bh, uint32_t col);
+static void trunk(float x, float y, float z0, float z1, float r, int n, uint32_t rgb);
+
+/* A lamp post for MEDIUM and HIGH: a slim pole to `tall`, an arm and a lit
+ * head, at (x, y) on the ground; nothing collides with it. */
+static void lamp(float x, float y, float tall, float ax, float ay)
+{
+    float g = ground(x, y), hx = x + ax, hy = y + ay, p[4][3], up[3] = { 0, 1, 0 }, down[3] = { 0, -1, 0 };
+    cmesh *m = chunk_for(x, y);
+    trunk(x, y, g - 0.2f, g + tall, 0.09f, 4, 0x55606Cu);
+    p[0][0] = hx - 0.35f; p[0][1] = g + tall - 0.1f; p[0][2] = -(hy - 0.35f);
+    p[1][0] = hx + 0.35f; p[1][1] = g + tall - 0.1f; p[1][2] = -(hy - 0.35f);
+    p[2][0] = hx + 0.35f; p[2][1] = g + tall - 0.1f; p[2][2] = -(hy + 0.35f);
+    p[3][0] = hx - 0.35f; p[3][1] = g + tall - 0.1f; p[3][2] = -(hy + 0.35f);
+    face(m, p, 4, down, 0xFFF4C0u, -1e9f);         /* the lamp, lit, seen from below and beside */
+    p[0][1] = p[1][1] = p[2][1] = p[3][1] = g + tall + 0.15f;
+    face(m, p, 4, up, 0x45505Cu, -1e9f);
+}
+
+static void build_depot(const place *d, wg_depot *out, int number)
 {
     float h = d->h, c[4][2], x, y;
     static const float cu[4] = { -48, 48, 48, -48 }, cv[4] = { -35, -35, 35, 35 };
@@ -1106,7 +1198,7 @@ static void build_depot(const place *d, wg_depot *out)
     depot_frame(d, 0, 45, &x, &y);                          /* the warehouse */
     variant = WG_LOW_ONLY;
     block(x, y, 42, 10, d->heading, 7, 0xE4E0D6u, 0x3A6FD8u, 1, 1);
-    variant = WG_HIGH_ONLY;
+    variant = WG_MEDIUM_UP;
     warehouse(x, y, 42, 10, d->heading, 7, 0xE4E0D6u, 0x3A6FD8u);
     variant = WG_SHARED;
     for (i = 0; i < WG_BAYS; i++) {
@@ -1135,6 +1227,62 @@ static void build_depot(const place *d, wg_depot *out)
         /* Docked: the trailer's rear at the dock face, pointing out of the bay. */
         depot_frame(d, u, 33.5f, &out->bay[i][0], &out->bay[i][1]);
         out->bay[i][2] = d->heading - WG_PI / 2;
+    }
+    {
+        /* Each bay's number painted in it, between its lines, where the reversing camera still sees it with a
+         * trailer half in (every detail: it says which bay is which), and the depot's on the warehouse's face,
+         * left of the docks, as the HUD numbers them. */
+        float c = cosf(d->heading), sn = sinf(d->heading), o[3], right[3], down[3], up[3] = { 0, 1, 0 }, x0, y0;
+        right[0] = c; right[1] = 0; right[2] = -sn;
+        down[0] = sn; down[1] = 0; down[2] = c;
+        for (i = 0; i < WG_BAYS; i++) {
+            depot_frame(d, (i - 1) * 16.0f - 1.05f, 30.0f, &x0, &y0);
+            o[0] = x0; o[1] = h + 0.2f; o[2] = -y0;
+            paint_number(i + 1, o, right, down, up, 0.42f, 0xF4F4F0u);
+        }
+        {
+            /* On the wall, facing the apron: the depot's number, and each bay's above its door (where the
+             * reversing camera looks). */
+            float wdown[3] = { 0, -1, 0 }, wout[3];
+            wout[0] = sn; wout[1] = 0; wout[2] = c;
+            depot_frame(d, -33.0f, 34.95f, &x0, &y0);
+            o[0] = x0; o[1] = h + 6.6f; o[2] = -y0;
+            paint_number(number, o, right, wdown, wout, 0.34f, 0x2A4A8Au);
+            for (i = 0; i < WG_BAYS; i++) {
+                depot_frame(d, (i - 1) * 16.0f - 0.7f, 34.95f, &x0, &y0);
+                o[0] = x0; o[1] = h + 6.5f; o[2] = -y0;
+                paint_number(i + 1, o, right, wdown, wout, 0.28f, 0xF2B01Eu);
+            }
+        }
+    }
+    {
+        /* MEDIUM and HIGH: a hedge round the yard, open at the gate, and lamps at the apron's corners. */
+        static const float corner[5][2] = { { -8, -50 }, { -62, -50 }, { -62, 57 }, { 62, 57 }, { 62, -50 } };
+        int e;
+        variant = WG_MEDIUM_UP;
+        for (e = 0; e < 5; e++) {
+            float a[2], b[2], l;
+            int n, q;
+            a[0] = corner[e][0];
+            a[1] = corner[e][1];
+            b[0] = e < 4 ? corner[e + 1][0] : 8.0f;
+            b[1] = e < 4 ? corner[e + 1][1] : -50.0f;
+            l = sqrtf((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]));
+            n = (int)ceilf(l / 16.0f);
+            for (q = 0; q < n; q++) {
+                float ax, ay, bx, by;
+                depot_frame(d, a[0] + (b[0] - a[0]) * q / n, a[1] + (b[1] - a[1]) * q / n, &ax, &ay);
+                depot_frame(d, a[0] + (b[0] - a[0]) * (q + 1) / n, a[1] + (b[1] - a[1]) * (q + 1) / n, &bx, &by);
+                hedge_stretch(ax, ay, ground(ax, ay), bx, by, ground(bx, by), 0x3E8C36u);
+            }
+        }
+        for (k = 0; k < 4; k++) {
+            float lx, ly, ix, iy;
+            depot_frame(d, (k & 1) ? 47.0f : -47.0f, (k & 2) ? 30.0f : -36.0f, &lx, &ly);
+            depot_frame(d, (k & 1) ? 46.0f : -46.0f, (k & 2) ? 29.0f : -35.0f, &ix, &iy);
+            lamp(lx, ly, 6.5f, (ix - lx) * 1.2f, (iy - ly) * 1.2f);
+        }
+        variant = WG_SHARED;
     }
     /* A trailer waiting at the apron's left edge, nose to the right (+u):
      * the rest of the apron stays clear for turning round to a bay. */
@@ -1420,8 +1568,8 @@ static void build_terrain(void)
                             int q[4];
                             t1[0] = t[0]; t1[1] = t[1]; t1[2] = t[2];
                             t2[0] = t[0]; t2[1] = t[2]; t2[2] = t[3];
-                            terrain_piece(&chunks[WG_HIGH_ONLY][cy * WG_CHUNKS + cx], t1, 3, 0);
-                            terrain_piece(&chunks[WG_HIGH_ONLY][cy * WG_CHUNKS + cx], t2, 3, 0);
+                            terrain_piece(&chunks[WG_MEDIUM_UP][cy * WG_CHUNKS + cx], t1, 3, 0);
+                            terrain_piece(&chunks[WG_MEDIUM_UP][cy * WG_CHUNKS + cx], t2, 3, 0);
                             for (k = 0; k < 4; k++) {
                                 float pp[3];
                                 pp[0] = t[k].x;
@@ -1457,55 +1605,112 @@ static void build_terrain(void)
         }
 }
 
-/* Hedges along the fields' boundaries (MEDIUM and HIGH's run; nothing
- * collides with them): a mound 1.5 m across and 1 m high, smooth-shaded
- * (three edges, so 4 triangles), on each stretch the cuts found, kept off
- * the roads (8 m) and the places' grass, with a gap now and then. */
+/* A stretch of hedge from (ax, ay) at height ah to (bx, by) at bh: a mound
+ * 1.5 m across and 1 m high, smooth-shaded (three edges, so 4 triangles),
+ * into the current run. Nothing collides with it. */
 #define HEDGE_EDGES 3
-static void build_hedges(void)
+static void hedge_stretch(float ax, float ay, float ah, float bx, float by, float bh, uint32_t col)
 {
     static const float prof[HEDGE_EDGES][2] = { { -0.75f, -0.2f }, { 0.0f, 1.0f }, { 0.75f, -0.2f } };
     static const float pn[HEDGE_EDGES][2] = { { -0.8f, 0.6f }, { 0.0f, 1.0f }, { 0.8f, 0.6f } };
-    int h, k, made = 0;
-    variant = WG_HIGH_ONLY;
+    float dx = bx - ax, dy = by - ay, l = sqrtf(dx * dx + dy * dy), nx, ny;
+    int va[HEDGE_EDGES], vb[HEDGE_EDGES], k;
+    cmesh *c;
+    if (l < 0.5f)
+        return;
+    nx = -dy / l;
+    ny = dx / l;
+    c = chunk_for((ax + bx) * 0.5f, (ay + by) * 0.5f);
+    for (k = 0; k < HEDGE_EDGES; k++) {
+        float p[3], n[3];
+        n[0] = nx * pn[k][0];
+        n[1] = pn[k][1];
+        n[2] = -ny * pn[k][0];
+        p[0] = ax + nx * prof[k][0];
+        p[1] = ah + prof[k][1];
+        p[2] = -(ay + ny * prof[k][0]);
+        va[k] = smooth_vertex(c, p, n, col, 0.8f);
+        p[0] = bx + nx * prof[k][0];
+        p[1] = bh + prof[k][1];
+        p[2] = -(by + ny * prof[k][0]);
+        vb[k] = smooth_vertex(c, p, n, col, 0.8f);
+    }
+    for (k = 0; k + 1 < HEDGE_EDGES; k++) {
+        cmesh_tri(c, va[k], vb[k], vb[k + 1]);
+        cmesh_tri(c, va[k], vb[k + 1], va[k + 1]);
+    }
+}
+
+/* Hedges along the fields' boundaries (MEDIUM and HIGH's run): on each
+ * stretch the cuts found, kept off the roads (8 m) and the places' grass,
+ * with a gap now and then. */
+static void build_hedges(void)
+{
+    int h, made = 0;
+    variant = WG_MEDIUM_UP;
     for (h = 0; h < nhedge; h++) {
         const tvert *a = &hedge[h][0], *b = &hedge[h][1];
-        float dx = b->x - a->x, dy = b->y - a->y, l = sqrtf(dx * dx + dy * dy), nx, ny, mx, my;
-        int va[HEDGE_EDGES], vb[HEDGE_EDGES];
-        cmesh *c;
-        uint32_t col;
-        if (l < 0.5f)
+        float mx = (a->x + b->x) * 0.5f, my = (a->y + b->y) * 0.5f;
+        if ((b->x - a->x) * (b->x - a->x) + (b->y - a->y) * (b->y - a->y) < 0.25f)
             continue;
-        mx = (a->x + b->x) * 0.5f;
-        my = (a->y + b->y) * 0.5f;
         if (road_distance(mx, my) < 8.0f || hash2((int)mx, (int)my, 91) % 9 == 0)
             continue;
-        nx = -dy / l;
-        ny = dx / l;
-        col = (hash2((int)(mx / 40), (int)(my / 40), 92) & 1) ? 0x3A8A34u : 0x478F3Au;
-        c = chunk_for(mx, my);
-        for (k = 0; k < HEDGE_EDGES; k++) {
-            float p[3], n[3];
-            n[0] = nx * pn[k][0];
-            n[1] = pn[k][1];
-            n[2] = -ny * pn[k][0];
-            p[0] = a->x + nx * prof[k][0];
-            p[1] = a->h + prof[k][1];
-            p[2] = -(a->y + ny * prof[k][0]);
-            va[k] = smooth_vertex(c, p, n, col, 0.8f);
-            p[0] = b->x + nx * prof[k][0];
-            p[1] = b->h + prof[k][1];
-            p[2] = -(b->y + ny * prof[k][0]);
-            vb[k] = smooth_vertex(c, p, n, col, 0.8f);
-        }
-        for (k = 0; k + 1 < HEDGE_EDGES; k++) {
-            cmesh_tri(c, va[k], vb[k], vb[k + 1]);
-            cmesh_tri(c, va[k], vb[k + 1], va[k + 1]);
-        }
+        hedge_stretch(a->x, a->y, a->h, b->x, b->y, b->h,
+                      (hash2((int)(mx / 40), (int)(my / 40), 92) & 1) ? 0x3A8A34u : 0x478F3Au);
         made++;
     }
     variant = WG_SHARED;
     printf("fwgen: %d stretches of hedge\n", made);
+}
+
+/* A roadside spot fit to plant: not on a place's grass, nor near another
+ * road (or this one, closer than 6 m), nor in a depot's yard. */
+static int verge_ok(float x, float y)
+{
+    int i;
+    for (i = 0; i < nplaces; i++) {
+        float dx = x - places[i].x, dy = y - places[i].y;
+        if (dx * dx + dy * dy < (places[i].r + 30) * (places[i].r + 30))
+            return 0;
+    }
+    return !in_depot(x, y) && road_distance(x, y) > 6.0f;
+}
+
+/* MEDIUM and HIGH's run: bushes along the roads' verges, now and then, by
+ * a hash of where they are (the world's random sequence is left as it
+ * was). Nothing collides with them. */
+static void build_roadside(void)
+{
+    static const uint32_t bush[3] = { 0x3E9E3Au, 0x2F8A38u, 0x55B045u };
+    int e, i, s, bushes = 0;
+    variant = WG_MEDIUM_UP;
+    for (e = 0; e < nedges; e++)
+        for (i = (int)edges[e].first_point + 1; i + 1 < (int)(edges[e].first_point + edges[e].npoints); i++) {
+            float dx = pts[i + 1][0] - pts[i - 1][0], dy = pts[i + 1][1] - pts[i - 1][1], l = sqrtf(dx * dx + dy * dy);
+            float nx, ny;
+            if (l < 0.01f)
+                continue;
+            nx = -dy / l;
+            ny = dx / l;
+            for (s = -1; s <= 1; s += 2) {
+                uint32_t h = hash2(i * 2 + (s > 0), e, 301);
+                if (h % 100 < 24) {                  /* a bush, or two */
+                    float o = 7.5f + (h >> 8) % 25 / 10.0f, x = pts[i][0] + nx * o * s, y = pts[i][1] + ny * o * s;
+                    float r = 0.8f + (h >> 16) % 6 / 10.0f;
+                    if (verge_ok(x, y)) {
+                        blob(x, y, ground(x, y) + r * 0.6f, r * 1.2f, r, bush[(h >> 20) % 3]);
+                        bushes++;
+                        if ((h >> 24) % 3 == 0) {
+                            float x2 = x + dx / l * 1.6f, y2 = y + dy / l * 1.6f;
+                            blob(x2, y2, ground(x2, y2) + r * 0.45f, r, r * 0.8f, bush[((h >> 20) + 1) % 3]);
+                            bushes++;
+                        }
+                    }
+                }
+            }
+        }
+    variant = WG_SHARED;
+    printf("fwgen: %d bushes\n", bushes);
 }
 
 static void build_trees(void)
@@ -1542,7 +1747,7 @@ static void build_trees(void)
                 quad(v[3], v[0], v[4], v[7], col, -1);
             }
             /* MEDIUM and HIGH: a round crown, a little wider than tall, on a round trunk. */
-            variant = WG_HIGH_ONLY;
+            variant = WG_MEDIUM_UP;
             trunk(x, y, g - 0.3f, g + 2.2f + s * 0.4f, 0.32f, 5, 0x7A5230u);
             blob(x, y, g + 1.8f + s * 1.25f, s * 1.25f, s * 1.15f, col);
         } else {                                                     /* cone: a four-sided spire */
@@ -1556,7 +1761,7 @@ static void build_trees(void)
             quad(v[3], v[0], v[4], v[4], col, -1);
             add_box(x, y, 0.5f, 0.5f, 0);
             /* MEDIUM and HIGH: a pine, two smooth tiers on a stub of trunk. */
-            variant = WG_HIGH_ONLY;
+            variant = WG_MEDIUM_UP;
             trunk(x, y, g - 0.3f, g + 1.2f, 0.3f, 5, 0x6A4628u);
             cone(x, y, g + 0.6f, g + 0.6f + (top - g) * 0.62f, s * 1.25f, 7, mb_shade(col, 0.92f));
             cone(x, y, g + 0.6f + (top - g) * 0.36f, top + 0.4f, s * 0.95f, 7, col);
@@ -1733,7 +1938,7 @@ static int write_pack(const char *path, const wg_depot *depots)
     size_t cap_v = 0, cap_t = 0, nv = 0, nt = 0;
     int c, i, n;
     wg_variant *var = (wg_variant *)calloc(WG_CHUNKS * WG_CHUNKS, sizeof *var);
-    size_t run_tris[WG_VARIANTS] = { 0, 0, 0 };
+    size_t run_tris[WG_VARIANTS] = { 0, 0, 0, 0 };
     for (c = 0; c < WG_CHUNKS * WG_CHUNKS; c++) {
         /* The chunk's three runs one after another (LOW's, the shared, MEDIUM and HIGH's), each's indices
          * moved past the vertices before it. */
@@ -1790,6 +1995,7 @@ static int write_pack(const char *path, const wg_depot *depots)
         }
         index[c].nverts = (uint32_t)base;
         var[c].low_tris = (uint32_t)chunks[WG_LOW_ONLY][c].ntris;
+        var[c].medium_tris = (uint32_t)chunks[WG_MEDIUM_UP][c].ntris;
         var[c].high_tris = (uint32_t)chunks[WG_HIGH_ONLY][c].ntris;
         index[c].hmin = (int16_t)floorf((base ? hmin : 0) * 10);
         index[c].hmax = (int16_t)ceilf((base ? hmax : 0) * 10);
@@ -1859,10 +2065,10 @@ static int write_pack(const char *path, const wg_depot *depots)
         sp[2] = atan2f(tour[n + 1][1] - tour[n][1], tour[n + 1][0] - tour[n][0]);
         pakw_section(w, WG_SPAWN, sp, sizeof sp);
     }
-    printf("fwgen: %lu vertices, %lu triangles in %d chunks (LOW only %lu, shared %lu, MEDIUM and HIGH only %lu), "
-           "%d boxes, %d roads (%d points), %d depots\n", (unsigned long)nv, (unsigned long)nt, WG_CHUNKS * WG_CHUNKS,
-           (unsigned long)run_tris[WG_LOW_ONLY], (unsigned long)run_tris[WG_SHARED],
-           (unsigned long)run_tris[WG_HIGH_ONLY], nboxes, nedges, npts, ndepots);
+    printf("fwgen: %lu vertices, %lu triangles in %d chunks (LOW only %lu, shared %lu, MEDIUM and HIGH %lu, HIGH only "
+           "%lu), %d boxes, %d roads (%d points), %d depots\n", (unsigned long)nv, (unsigned long)nt,
+           WG_CHUNKS * WG_CHUNKS, (unsigned long)run_tris[WG_LOW_ONLY], (unsigned long)run_tris[WG_SHARED],
+           (unsigned long)run_tris[WG_MEDIUM_UP], (unsigned long)run_tris[WG_HIGH_ONLY], nboxes, nedges, npts, ndepots);
     free(index);
     free(verts);
     free(tris);
@@ -1920,7 +2126,7 @@ int main(int argc, char **argv)
             build_town(&places[i]);
     for (i = ntowns; i < nplaces; i++) {
         float s[2][3];
-        build_depot(&places[i], &depots[i - ntowns]);
+        build_depot(&places[i], &depots[i - ntowns], i - ntowns + 1);
         depots[i - ntowns].node = (uint32_t)i;
         depot_frame(&places[i], 0, -52, &s[0][0], &s[0][1]);        /* the gate to the apron */
         depot_frame(&places[i], 0, -34, &s[1][0], &s[1][1]);
@@ -1928,6 +2134,7 @@ int main(int argc, char **argv)
         road_ribbon((const float (*)[3])s, 2, 4.5f, NULL, 0.14f);
     }
     build_hedges();
+    build_roadside();
     build_trees();
     add_box(WG_SIZE / 2, -1, WG_SIZE / 2, 1, 0);          /* the world's edge */
     add_box(WG_SIZE / 2, WG_SIZE + 1, WG_SIZE / 2, 1, 0);

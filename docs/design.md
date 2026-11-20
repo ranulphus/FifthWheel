@@ -117,7 +117,8 @@ frames a second on a Pentium II 266 with a G200.
   triangles, so the ground is where it was; at LOW such a cell is whole,
   in its middle's colour, in 16 m steps as before. The pack keeps both
   (`CVAR`, docs/formats.md): each chunk's triangles are LOW's run, the
-  shared run and MEDIUM and HIGH's run, one draw call either way. The
+  shared run, MEDIUM and HIGH's run and HIGH's own, one draw call at any
+  detail. The
   shared terrain has 37% of the faceted terrain's vertices (DOS-GL
   transforms each once), and fwgen keeps each run's identical vertices once
   (the corners the road's quads and the cut terrain's pieces share: a
@@ -155,6 +156,16 @@ frames a second on a Pentium II 266 with a G200.
   take the ground's own colour, darker. A town's streets are laid in 16 m
   pieces: one quad from end to end went to the chunk holding its middle and
   was drawn only while that chunk was in view, at every detail.
+- **Depots** have each bay's number painted in it (between its lines, near
+  the dock, where the reversing camera sees it) and over its door, and the
+  depot's own number on the warehouse's face, in the HUD's font, at every
+  detail; at MEDIUM and HIGH a hedge round the yard, open at the gate, and
+  lamps at the apron's corners.
+- **Verges and towns:** at MEDIUM and HIGH, bushes along the roads (1,095,
+  one or two round blobs 7.5 to 10 m from the road's middle, off the
+  places' grass and the other roads); at HIGH alone, lamp posts along the
+  towns' streets every 48 m. Nothing collides with them, so the drive is
+  the same at every detail.
 - **Roads** at MEDIUM and HIGH have a white line along each edge; at every
   detail the centre's dashes (and the edge lines) stop 25 m short of a
   town's middle, where the roads meet and run over one another.

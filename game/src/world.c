@@ -245,11 +245,14 @@ void world_draw(world *w, float x, float y, float r)
             const wg_chunk *c = &w->chunks[cy * WG_CHUNKS + cx];
             const wg_vertex *v = w->verts + c->first_vertex;
             uint32_t first = 0, n = c->ntris;
-            if (w->variants) {                       /* this detail's runs: LOW's and the shared, or those and the rest */
+            if (w->variants) {                       /* this detail's runs, one stretch of them (wgen.h) */
                 const wg_variant *var = &w->variants[cy * WG_CHUNKS + cx];
-                if (w->models)
+                if (w->models == 0)
+                    n = c->ntris - var->medium_tris - var->high_tris;
+                else {
                     first = var->low_tris;
-                n = c->ntris - (w->models ? var->low_tris : var->high_tris);
+                    n = c->ntris - var->low_tris - (w->models == 1 ? var->high_tris : 0);
+                }
             }
             if (!n)
                 continue;

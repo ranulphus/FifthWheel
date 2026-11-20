@@ -43,14 +43,16 @@ typedef struct wg_chunk {
     int16_t hmin, hmax;                 /* decimetres: the chunk's height range, for culling */
 } wg_chunk;
 
-/* A chunk's triangles in three runs: the first low_tris drawn only at LOW
- * (detail.h's models 0: the plainer world), the last high_tris only at
- * MEDIUM and HIGH, those between by both. Without the section, all. */
+/* A chunk's triangles in four runs, one after another: low_tris drawn only
+ * at LOW (detail.h's models 0: the plainer world), then those every detail
+ * draws, then medium_tris at MEDIUM and HIGH (models 1 and 2), then
+ * high_tris at HIGH alone (models 2). Each detail draws one stretch of them.
+ * Without the section, all. */
 typedef struct wg_variant {
-    uint32_t low_tris, high_tris;
+    uint32_t low_tris, medium_tris, high_tris;
 } wg_variant;
 
-enum { WG_LOW_ONLY, WG_SHARED, WG_HIGH_ONLY, WG_VARIANTS };   /* the runs, as fwgen builds them */
+enum { WG_LOW_ONLY, WG_SHARED, WG_MEDIUM_UP, WG_HIGH_ONLY, WG_VARIANTS };   /* the runs, as fwgen builds them */
 
 typedef struct wg_vertex {
     int16_t x, y, z, pad;               /* chunk-local GL coordinates, WG_UNIT per metre */

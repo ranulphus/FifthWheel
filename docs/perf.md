@@ -148,14 +148,16 @@ most:
 
 | Preset | FW1 (`-autopilot -frames 3000`) | A whole job (`-autojob`) |
 |---|---|---|
-| LOW (`models` 0, `pitch_min` 52) | 1,500 / 1,992 | 1,459 / 2,102 |
-| MEDIUM (`models` 1, `pitch_min` 24) | 3,514 / 5,100 | 3,277 / 5,834 |
-| HIGH (`models` 2, `pitch_min` 20) | 4,289 / 6,480 | 3,867 / 6,804 |
+| LOW (`models` 0, `pitch_min` 52) | 1,500 / 1,992 | 1,505 / 2,102 |
+| MEDIUM (`models` 1, `pitch_min` 24) | 3,792 / 5,500 | 3,659 / 6,762 |
+| HIGH (`models` 2, `pitch_min` 20) | 4,730 / 7,060 | 4,339 / 8,004 |
 
-The presets' cards (the owner, 2026-11-19): LOW the G200, MEDIUM the G400,
-G450 and TNT2, HIGH the Radeon 7200 and 7500 (to come in DOS-GL; their
-hardware transforms vertices, so HIGH's triangles will cost the CPU
-little). LOW costs what it did: the pack's LOW run keeps its plainer world
+(With the depots' numbers, hedges and lamps, the verges' bushes at MEDIUM
+and HIGH and the towns' lamps at HIGH, 2026-11-20: MEDIUM's FW1 mean 278
+more than the 3,514 timed on the G400 below, about 67 fps there by its
+triangles.)
+
+LOW costs what it did: the pack's LOW run keeps its plainer world
 (its mean rose 4% only because a town's streets, which had been drawn
 only while one chunk of them was in view, now always are). The P3 with a
 TNT2 M64 ran the old look at 167 fps; MEDIUM wants measuring there and on
