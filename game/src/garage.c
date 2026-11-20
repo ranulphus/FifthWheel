@@ -1,5 +1,6 @@
 /* garage.c - the garage's showroom and shop (see garage.h). */
 #include "garage.h"
+#include "ui.h"
 #include "dgk/app.h"
 #include "dgk/gfx.h"
 #include "dgk/log.h"
@@ -184,19 +185,18 @@ void garage_draw(const garage *g, const career *c, lorry_meshes *m, const dgk_fo
     showroom_draw(m, spin, rarity_rgba[it->rarity], it->kind == KIND_LICENCE ? (int)it->value : -1);
     /* The shop. */
     dgk_gfx_overlay_begin();
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    rect(0, 0, 640, 76, 0x000000A0u, 0x00000060u);
-    rect(110, 356, 420, 112, 0x000000B0u, 0x000000D0u);
-    glDisable(GL_BLEND);
-    dgk_text(font, 18, 10, 1.5f, 0xFFD23FFFu, "GARAGE");
-    snprintf(line, sizeof line, "$%lu", (unsigned long)c->money);
-    dgk_text(font, 620 - dgk_text_width(font, 1.5f, line), 10, 1.5f, 0xFFD23FFFu, line);
-    for (k = 0; k < KINDS; k++)                       /* the categories, the shown one lit */
-        dgk_text(font, 30 + k * 120, 48, 1.0f, k == g->kind ? 0xFFFFFFFFu : 0x8A8F99FFu, kind_name[k]);
-    rect(30 + g->kind * 120, 66, dgk_text_width(font, 1.0f, kind_name[g->kind]), 3, 0xFFD23FFFu, 0xFFD23FFFu);
-    /* The item: its rarity's colour along the card's top, its name, its state. */
-    rect(110, 356, 420, 6, rarity_rgba[it->rarity], rarity_rgba[it->rarity]);
+    /* The header: the name, the money by its coin, the categories (the shown one on a gold pill). */
+    ui_panel(8, 6, 624, 68, 12.0f, UI_PANEL, UI_RIM);
+    dgk_text(font, 22, 12, 1.5f, 0xFFD23FFFu, "GARAGE");
+    snprintf(line, sizeof line, "%lu", (unsigned long)c->money);
+    ui_coin(610 - dgk_text_width(font, 1.5f, line) - 14, 22, 10);
+    dgk_text(font, 614 - dgk_text_width(font, 1.5f, line), 12, 1.5f, 0xFFD23FFFu, line);
+    ui_panel(22 + g->kind * 120, 42, dgk_text_width(font, 1.0f, kind_name[g->kind]) + 16, 24, 12.0f, 0x3D63B0F0u,
+             UI_GOLD);
+    for (k = 0; k < KINDS; k++)
+        dgk_text(font, 30 + k * 120, 48, 1.0f, k == g->kind ? UI_GOLD : 0xC8D0E0FFu, kind_name[k]);
+    /* The item's card, rimmed in its rarity's colour: its name, its state. */
+    ui_panel(110, 352, 420, 116, 14.0f, UI_PANEL, rarity_rgba[it->rarity]);
     centred(font, 372, 2.0f, rarity_rgba[it->rarity], it->name);
     centred(font, 408, 1.0f, rarity_rgba[it->rarity], rarity_name[it->rarity]);
     if (career_fitted(c, g->shown[g->kind]) && it->kind != KIND_LICENCE)

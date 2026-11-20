@@ -3,6 +3,7 @@
  * go; the job board at a depot; a round minimap of the roads with the
  * route; a docking gauge; big callouts. */
 #include "game.h"
+#include "ui.h"
 #include "dgk/gfx.h"
 #include <GL/gl.h>
 #include <math.h>
@@ -32,10 +33,7 @@ static void bar(float x, float y, float w, float h, uint32_t rgba)
 
 static void panel(float x, float y, float w, float h)
 {
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    bar(x, y, w, h, 0x00000080u);
-    glDisable(GL_BLEND);
+    ui_panel(x, y, w, h, 8.0f, UI_PANEL, UI_RIM);
 }
 
 void hud_callout(game *g, const char *text, const char *text2, uint32_t rgba)
@@ -200,17 +198,9 @@ static void minimap(const game *g)
         mm_mark(g, g->w.depots[dest].x, g->w.depots[dest].y, 4.0f, 0xFF5030FFu, 1);
     /* The rig: an arrow the way it faces. */
     arrow(MM_X, MM_Y, bearing(g, cosf(g->r.heading), sinf(g->r.heading)), 6.0f, 0xFFFFFFFFu);
-    /* The rim. */
-    glLineWidth(2.0f);
-    colour(0xFFFFFFFFu);
-    glBegin(GL_LINES);
-    dgk_gfx_draws++;
-    for (i = 0; i < 24; i++) {
-        glVertex2f(MM_X + MM_R * cosf(i * WG_PI / 12), MM_Y + MM_R * sinf(i * WG_PI / 12));
-        glVertex2f(MM_X + MM_R * cosf((i + 1) * WG_PI / 12), MM_Y + MM_R * sinf((i + 1) * WG_PI / 12));
-    }
-    glEnd();
-    glLineWidth(1.0f);
+    /* The rim: white inside a deep blue ring. */
+    ui_ring(MM_X, MM_Y, MM_R, MM_R + 3, 0xFFFFFFFFu, 32);
+    ui_ring(MM_X, MM_Y, MM_R + 3, MM_R + 6, 0x1C2E5AFFu, 32);
 }
 
 /* ---- the reversing camera ----------------------------------------------- */
@@ -398,6 +388,42 @@ static void job_panel(game *g)
         arrow(320, 40, bearing(g, tx - g->r.x, ty - g->r.y), 16.0f, 0xFFD23FFFu);
 }
 
+/* ---- the speedometer ------------------------------------------------------- */
+
+/* A round dial: the revs as a coloured arc round its edge, a needle for the
+ * speed (0 to 100 km/h over 240 degrees), the speed in big figures, the
+ * gear in a gold badge; the damage as a bar beside it. */
+static void speedo(game *g, const char *gear)
+{
+    const float x = 72, y = 404, r = 54, a0 = 210.0f * WG_PI / 180.0f, a1 = -30.0f * WG_PI / 180.0f;
+    float kmh = fabsf(g->r.v) * 3.6f, rev = DGK_CLAMP((g->r.rpm - 600.0f) / 1600.0f, 0.0f, 1.0f), w;
+    char line[16];
+    int k;
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    ui_disc(x + 3, y + 4, r + 4, 0x00000050u, 28);  /* its shadow */
+    glDisable(GL_BLEND);
+    ui_disc(x, y, r + 4, 0xFFFFFFFFu, 28);
+    ui_disc(x, y, r, 0x1C2E5AFFu, 28);
+    ui_arc(x, y, r - 10, r - 3, a0, a1, 0x2E4478FFu, 24);             /* the revs' track */
+    ui_arc(x, y, r - 10, r - 3, a0, a0 + (a1 - a0) * rev, g->r.rpm > 1900 ? 0xFF5030FFu : 0x5FD05AFFu, 24);
+    for (k = 0; k <= 5; k++) {                          /* a tick every 20 km/h */
+        float a = a0 + (a1 - a0) * k / 5.0f;
+        ui_arc(x, y, r - 18, r - 12, a - 0.025f, a + 0.025f, 0xFFFFFFC0u, 1);
+    }
+    ui_needle(x, y, a0 + (a1 - a0) * DGK_MIN(kmh / 100.0f, 1.0f), r - 12, 0xFF8A1EFFu);
+    ui_disc(x, y, 6, 0xFFFFFFFFu, 12);
+    snprintf(line, sizeof line, "%.0f", kmh);
+    w = dgk_text_width(&g->font, 1.5f, line);
+    dgk_text(&g->font, x - w / 2, y + 12, 1.5f, 0xFFFFFFFFu, line);
+    dgk_text(&g->font, x - dgk_text_width(&g->font, 0.5f, "KM/H") / 2, y + 36, 0.5f, 0x9FC8FFFFu, "KM/H");
+    ui_disc(x + 62, y + 10, 18, 0xFFFFFFFFu, 16);     /* the gear's badge, a medallion on the dial's rim */
+    ui_disc(x + 62, y + 10, 15, UI_GOLD, 16);
+    dgk_text(&g->font, x + 62 - dgk_text_width(&g->font, 1.5f, gear) / 2, y, 1.5f, 0x1C2E5AFFu, gear);
+    dgk_text(&g->font, 156, 430, 1.0f, g->r.damage > 50 ? 0xFF6040FFu : 0xFFFFFFFFu, "DAMAGE");
+    ui_bar(156, 450, 86, 10, g->r.damage / 100.0f, g->r.damage > 50 ? 0xFF5030FFu : 0xFFB030FFu);
+}
+
 void hud_draw(game *g)
 {
     char line[64], gbuf[12];
@@ -410,21 +436,19 @@ void hud_draw(game *g)
     dgk_gfx_overlay_begin();
     if (g->rearcam)
         rear_cam(g);
-    panel(18, 424, 204, 40);
-    bar(22, 452, 196 * DGK_CLAMP((g->r.rpm - 600.0f) / 1600.0f, 0.0f, 1.0f), 8,
-        g->r.rpm > 1900 ? 0xFF5030FFu : 0x9FFFB0FFu);
-    snprintf(line, sizeof line, "%3.0f KM/H  GEAR %s", fabsf(g->r.v) * 3.6f, gear);
-    dgk_text(&g->font, 24, 428, 1.0f, 0xFFFFFFFFu, line);
-    snprintf(line, sizeof line, "DAMAGE %3.0f%%", g->r.damage);
-    dgk_text(&g->font, 24, 400, 1.0f, g->r.damage > 50 ? 0xFF6040FFu : 0xFFFFFFFFu, line);
+    speedo(g, gear);
     if (g->mode == MODE_TOUR) {
         snprintf(line, sizeof line, "AUTOPILOT  LAP %d", g->ap.laps + 1);
         dgk_text(&g->font, 20, 16, 1.0f, 0xFFD23FFFu, line);
     } else if (g->mode == MODE_JOB)
         dgk_text(&g->font, 20, 16, 1.0f, 0xFFD23FFFu, "AUTOPILOT");
     if (g->has_jobs) {
-        snprintf(line, sizeof line, "$%d", (int)(g->fxs.money_shown + 0.5f));
-        dgk_text(&g->font, 620 - dgk_text_width(&g->font, 1.5f, line), 12, 1.5f, 0xFFD23FFFu, line);
+        float mw;
+        snprintf(line, sizeof line, "%d", (int)(g->fxs.money_shown + 0.5f));
+        mw = dgk_text_width(&g->font, 1.5f, line);
+        ui_panel(596 - mw - 22, 8, mw + 44, 28, 14.0f, UI_PANEL, UI_RIM);
+        ui_coin(596 - mw - 6, 22, 10);
+        dgk_text(&g->font, 620 - 8 - mw, 12, 1.5f, UI_GOLD, line);
         if (g->cal.step == CAL_OFF) {                /* the set-up has the screen to itself */
             job_panel(g);
             minimap(g);

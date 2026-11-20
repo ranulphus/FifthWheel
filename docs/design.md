@@ -192,6 +192,20 @@ frames a second on a Pentium II 266 with a G200.
   up. DOS-GL has no OpenGL lighting; this is a few hundred dot products a
   frame.
 
+## The HUD and the menus (game/src/ui.c, hud.c, menu.c, garage.c)
+
+Cartoon like the world: deep blue rounded panels with a soft shadow and a
+light rim (`ui_panel`), the pixel font on them as before. A round
+speedometer sits bottom left: the revs as a green arc round its edge (red
+past 1,900 rpm), a needle for the speed (0 to 100 km/h over 240 degrees),
+the speed in big figures, the gear in a gold medallion on its rim, the
+damage as a rounded bar beside it. The money shows in a pill by a gold coin;
+the minimap has a white rim in a deep blue ring. In the title, pause,
+options and garage screens the chosen line sits on a lighter blue pill
+rimmed in gold, its text gold (the font's dark outline reads badly on a
+light pill); the garage's item card is rimmed in its rarity's colour. All
+immediate mode in the 640x480 overlay: a few hundred triangles.
+
 ## Shadows (game/src/lorry.c)
 
 The tractor, its trailer and the trailers standing at depots each cast a

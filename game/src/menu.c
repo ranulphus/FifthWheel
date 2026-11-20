@@ -1,5 +1,6 @@
 /* menu.c - the title, pause and options screens (see menu.h). */
 #include "game.h"
+#include "ui.h"
 #include "dgk/gfx.h"
 #include "dgk/log.h"
 #include "dgk/mix.h"
@@ -201,22 +202,35 @@ static void panel(float x, float y, float w, float h, uint32_t rgba)
     glDisable(GL_BLEND);
 }
 
+/* A menu's panel: rounded, deep blue, with a light rim (ui.h). */
+static void box(float x, float y, float w, float h)
+{
+    ui_panel(x, y, w, h, 12.0f, UI_PANEL, UI_RIM);
+}
+
+/* The chosen line's pill, behind its gold text: a lighter blue, rimmed in gold (the font's dark outline
+ * reads badly on a light pill). */
+static void pill(float x, float y, float w)
+{
+    ui_panel(x, y - 4, w, 28, 14.0f, 0x3D63B0F0u, UI_GOLD);
+}
+
 static void centred(game *g, float y, float scale, uint32_t rgba, const char *s)
 {
     dgk_text(&g->font, 320 - dgk_text_width(&g->font, scale, s) / 2, y, scale, rgba, s);
 }
 
-/* A list of items, the chosen one lit and pointed at. */
+/* A list of items, the chosen one on a gold pill. */
 static void list(game *g, const char *const *items, int n, float y)
 {
     int i;
     for (i = 0; i < n; i++) {
-        uint32_t rgba = i == g->men.cursor ? 0xFFD23FFFu : 0xFFFFFFFFu;
-        centred(g, y + i * 30, 1.5f, rgba, items[i]);
-        if (i == g->men.cursor) {
-            float w = dgk_text_width(&g->font, 1.5f, items[i]);
-            dgk_text(&g->font, 320 - w / 2 - 32, y + i * 30, 1.5f, rgba, ">");
+        int on = i == g->men.cursor;
+        if (on) {
+            float w = dgk_text_width(&g->font, 1.5f, items[i]) + 44;
+            pill(320 - w / 2, y + i * 30, w);
         }
+        centred(g, y + i * 30, 1.5f, on ? UI_GOLD : 0xFFFFFFFFu, items[i]);
     }
 }
 
@@ -224,10 +238,12 @@ static void options(game *g)
 {
     char line[48];
     int i;
-    panel(90, 100, 460, 280, 0x000000C0u);
+    box(90, 100, 460, 280);
     centred(g, 112, 2.0f, 0xFFD23FFFu, "OPTIONS");
     for (i = 0; i < OPTS; i++) {
-        uint32_t rgba = i == g->men.cursor ? 0xFFD23FFFu : 0xFFFFFFFFu;
+        uint32_t rgba = i == g->men.cursor ? UI_GOLD : 0xFFFFFFFFu;
+        if (i == g->men.cursor)
+            pill(100, 160 + i * 30, 440);
         const char *v = "";
         switch (i) {
         case OPT_DETAIL:
@@ -284,7 +300,7 @@ int menu_draw_scene(game *g, float alpha)
         char line[64];
         centred(g, 34 - b, 4.0f, 0xFFD23FFFu, "FIFTH WHEEL");
         centred(g, 100, 1.0f, 0xFFFFFFFFu, "DELIVERIES FOR A TOY LORRY");
-        panel(190, 286, 260, 168, 0x000000A0u);
+        box(170, 286, 300, 168);
         list(g, title_items, 5, 296);
         snprintf(line, sizeof line, "$%lu  %lu DELIVERED", (unsigned long)DGK_MAX(g->jobs.money, 0),
                  (unsigned long)g->car.delivered);
@@ -300,7 +316,7 @@ void menu_draw_overlay(game *g)
     if (g->men.screen == SCREEN_PAUSE) {
         dgk_gfx_overlay_begin();
         panel(0, 0, 640, 480, 0x00000070u);
-        panel(190, 150, 260, 180, 0x000000C0u);
+        box(170, 150, 300, 180);
         centred(g, 162, 2.0f, 0xFFD23FFFu, "PAUSED");
         list(g, pause_items, 4, 210);
         dgk_gfx_overlay_end();
