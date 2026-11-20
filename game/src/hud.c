@@ -11,7 +11,7 @@
 
 #define MM_X 566.0f             /* the minimap: centre, radius (pixels), pixels per metre */
 #define MM_Y 404.0f
-#define MM_R 62.0f
+#define MM_R UI_MAP_R
 #define MM_SCALE 0.22f
 
 static void colour(uint32_t rgba)
@@ -29,11 +29,13 @@ static void bar(float x, float y, float w, float h, uint32_t rgba)
     glVertex2f(x + w, y + h);
     glVertex2f(x, y + h);
     glEnd();
+    dgk_gfx_tris += 2;
 }
 
+/* The HUD's panels: plates (no shadow), over the world. */
 static void panel(float x, float y, float w, float h)
 {
-    ui_panel(x, y, w, h, 8.0f, UI_PANEL, UI_RIM);
+    ui_plate(x, y, w, h, 8.0f, UI_PANEL, UI_RIM);
 }
 
 void hud_callout(game *g, const char *text, const char *text2, uint32_t rgba)
@@ -66,6 +68,7 @@ static void arrow(float x, float y, float a, float size, uint32_t rgba)
         glVertex2f(p[3][0], p[3][1]);
         glVertex2f(p[2][0], p[2][1]);
         glEnd();
+        dgk_gfx_tris += 2;
     }
 }
 
@@ -149,17 +152,8 @@ static void minimap(const game *g)
     int i, k, dest = -1;
     if (!gr)
         return;
-    /* The disc: a fan of 24, translucent. */
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    colour(0x1E3A28B0u);
-    glBegin(GL_TRIANGLE_FAN);
-    dgk_gfx_draws++;
-    glVertex2f(MM_X, MM_Y);
-    for (i = 0; i <= 24; i++)
-        glVertex2f(MM_X + MM_R * cosf(i * WG_PI / 12), MM_Y + MM_R * sinf(i * WG_PI / 12));
-    glEnd();
-    glDisable(GL_BLEND);
+    /* The disc, translucent, in its rim: one quad of the HUD's texture. */
+    ui_map_frame(MM_X, MM_Y);
     /* Roads, every few points (the detail's step; 8 m apart), those near enough. */
     glLineWidth(2.0f);
     colour(0xC8C8D0FFu);
@@ -198,9 +192,6 @@ static void minimap(const game *g)
         mm_mark(g, g->w.depots[dest].x, g->w.depots[dest].y, 4.0f, 0xFF5030FFu, 1);
     /* The rig: an arrow the way it faces. */
     arrow(MM_X, MM_Y, bearing(g, cosf(g->r.heading), sinf(g->r.heading)), 6.0f, 0xFFFFFFFFu);
-    /* The rim: white inside a deep blue ring. */
-    ui_ring(MM_X, MM_Y, MM_R, MM_R + 3, 0xFFFFFFFFu, 32);
-    ui_ring(MM_X, MM_Y, MM_R + 3, MM_R + 6, 0x1C2E5AFFu, 32);
 }
 
 /* ---- the reversing camera ----------------------------------------------- */
@@ -395,30 +386,21 @@ static void job_panel(game *g)
  * gear in a gold badge; the damage as a bar beside it. */
 static void speedo(game *g, const char *gear)
 {
-    const float x = 72, y = 404, r = 54, a0 = 210.0f * WG_PI / 180.0f, a1 = -30.0f * WG_PI / 180.0f;
+    const float x = 72, y = 404, r = UI_DIAL_R, a0 = UI_DIAL_A0 * WG_PI / 180.0f, a1 = UI_DIAL_A1 * WG_PI / 180.0f;
     float kmh = fabsf(g->r.v) * 3.6f, rev = DGK_CLAMP((g->r.rpm - 600.0f) / 1600.0f, 0.0f, 1.0f), w;
     char line[16];
-    int k;
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    ui_disc(x + 3, y + 4, r + 4, 0x00000050u, 28);  /* its shadow */
-    glDisable(GL_BLEND);
-    ui_disc(x, y, r + 4, 0xFFFFFFFFu, 28);
-    ui_disc(x, y, r, 0x1C2E5AFFu, 28);
-    ui_arc(x, y, r - 10, r - 3, a0, a1, 0x2E4478FFu, 24);             /* the revs' track */
-    ui_arc(x, y, r - 10, r - 3, a0, a0 + (a1 - a0) * rev, g->r.rpm > 1900 ? 0xFF5030FFu : 0x5FD05AFFu, 24);
-    for (k = 0; k <= 5; k++) {                          /* a tick every 20 km/h */
-        float a = a0 + (a1 - a0) * k / 5.0f;
-        ui_arc(x, y, r - 18, r - 12, a - 0.025f, a + 0.025f, 0xFFFFFFC0u, 1);
-    }
+    /* The face, its ticks and the revs' track are one quad (ui_dial); the revs and the needle move. */
+    ui_dial(x, y);
+    if (rev > 0.01f)
+        ui_arc(x, y, r - 10, r - 3, a0, a0 + (a1 - a0) * rev, g->r.rpm > 1900 ? 0xFF5030FFu : 0x5FD05AFFu,
+               (int)(12 * rev) + 1);
     ui_needle(x, y, a0 + (a1 - a0) * DGK_MIN(kmh / 100.0f, 1.0f), r - 12, 0xFF8A1EFFu);
-    ui_disc(x, y, 6, 0xFFFFFFFFu, 12);
+    ui_disc(x, y, 6, 0xFFFFFFFFu);
     snprintf(line, sizeof line, "%.0f", kmh);
     w = dgk_text_width(&g->font, 1.5f, line);
     dgk_text(&g->font, x - w / 2, y + 12, 1.5f, 0xFFFFFFFFu, line);
     dgk_text(&g->font, x - dgk_text_width(&g->font, 0.5f, "KM/H") / 2, y + 36, 0.5f, 0x9FC8FFFFu, "KM/H");
-    ui_disc(x + 62, y + 10, 18, 0xFFFFFFFFu, 16);     /* the gear's badge, a medallion on the dial's rim */
-    ui_disc(x + 62, y + 10, 15, UI_GOLD, 16);
+    ui_medal(x + 62, y + 10);                         /* the gear's badge, on the dial's rim */
     dgk_text(&g->font, x + 62 - dgk_text_width(&g->font, 1.5f, gear) / 2, y, 1.5f, 0x1C2E5AFFu, gear);
     dgk_text(&g->font, 156, 430, 1.0f, g->r.damage > 50 ? 0xFF6040FFu : 0xFFFFFFFFu, "DAMAGE");
     ui_bar(156, 450, 86, 10, g->r.damage / 100.0f, g->r.damage > 50 ? 0xFF5030FFu : 0xFFB030FFu);
@@ -446,7 +428,7 @@ void hud_draw(game *g)
         float mw;
         snprintf(line, sizeof line, "%d", (int)(g->fxs.money_shown + 0.5f));
         mw = dgk_text_width(&g->font, 1.5f, line);
-        ui_panel(596 - mw - 22, 8, mw + 44, 28, 14.0f, UI_PANEL, UI_RIM);
+        ui_plate(596 - mw - 22, 8, mw + 44, 28, 14.0f, UI_PANEL, UI_RIM);
         ui_coin(596 - mw - 6, 22, 10);
         dgk_text(&g->font, 620 - 8 - mw, 12, 1.5f, UI_GOLD, line);
         if (g->cal.step == CAL_OFF) {                /* the set-up has the screen to itself */

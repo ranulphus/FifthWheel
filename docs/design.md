@@ -203,8 +203,18 @@ damage as a rounded bar beside it. The money shows in a pill by a gold coin;
 the minimap has a white rim in a deep blue ring. In the title, pause,
 options and garage screens the chosen line sits on a lighter blue pill
 rimmed in gold, its text gold (the font's dark outline reads badly on a
-light pill); the garage's item card is rimmed in its rarity's colour. All
-immediate mode in the 640x480 overlay: a few hundred triangles.
+light pill); the garage's item card is rimmed in its rarity's colour.
+
+The HUD's triangles cost the CPU what the world's do (perf.md), and drawn
+as polygons the round parts came to 610 a frame, half again LOW's world.
+So `ui_init` draws them once, antialiased, into a 256 x 256 texture: the
+dial (its shadow, rim, face, ticks and the revs' track), the minimap's
+frame (its translucent disc in the white and blue rim), the coin, the
+gear's medallion and a white disc. Each is one textured quad; a panel's
+corners are quarters of the disc (7 quads a layer, 3 for a pill), tinted by
+the vertex colour. Only what moves is geometry: the revs' arc (up to 12
+segments), the needle. The HUD is about 92 triangles a frame, 40 draws,
+and every shape counts its triangles in FW-STAT.
 
 ## Shadows (game/src/lorry.c)
 

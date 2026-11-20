@@ -33,6 +33,7 @@
  * Esc to quit. A joystick or wheel: steering, accelerator and brake as
  * calibrated, button 1 the handbrake, button 2 the horn. */
 #include "game.h"
+#include "ui.h"
 #include "dgk/bench.h"
 #include "guides.h"
 #include "dgk/save.h"
@@ -287,6 +288,7 @@ static int init(void *u)
     g->cam_prev = g->cam;
     autopilot_reset(&g->ap, &g->r, &g->w);
     lorry_build(&g->lorry, 0);                       /* at the detail's roundness once it is known */
+    ui_init();                                       /* the HUD's texture */
     if (dgk_font_load(&g->font, &fw_font) != 0)
         return -1;
     if (g->replay_path) {
