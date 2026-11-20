@@ -4,7 +4,7 @@
 |---|---|---|
 | DOS in 86Box | `make loopa CARD=g450` (or g200, g400) | `HX-DONE 0`: the frames ran, the snapshot was written |
 | DOS against Mesa | a DOS `-test -fixed -frames 120 -shot 119:F0` run and `build/headless/fwheel-hl` with the same options, compared with the harness's `imgcmp.py` | within conformance tolerances (RGB565 quantisation, tolerance 24, 0.5%, edges excluded) |
-| Sound | `make suite CHECKS="sb16 sbpro"` (`tools/suite.sh`): `-soundtest` (each sound in turn) through an SB16 and an SB Pro 2 (8-bit) with `--wav` | every sound's tones are in the recording (`wavcheck.py`), and `HX-TEST audio`: no chunk was played as silence (SDL patch 0005) |
+| Sound | `make suite CHECKS="sb16 sbpro"` (`tools/suite.sh`): `-soundtest` (each sound in turn, drawn at LOW: 86Box records in real time, and a dearer frame starved the recording) through an SB16 and an SB Pro 2 (8-bit) with `--wav` | every sound's tones are in the recording (`wavcheck.py`), and `HX-TEST audio`: no chunk was played as silence (SDL patch 0005) |
 | Flourishes' caps | `-test -fixed -fxtest` (headless or DOS): every flourish requested far past its pool for 2 s | `HX-TEST fx-caps`: at most 16 coins, 64 confetti and 32 dust, each pool filled |
 | Budget | any run: `FW-STAT` at the end | the triangles and draws a frame (mean and most); see `docs/perf.md` |
 | Menus | `make suite CHECKS=menus`: keys typed in Loop A from the title set the detail to high, drive, pause and quit from the pause menu; a second run reads `FWHEEL.CFG` | `FW-MENU` lines for each step and `FW-CFG detail high` in the second run |

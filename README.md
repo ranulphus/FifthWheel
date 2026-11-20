@@ -17,8 +17,17 @@ which a second game (Echoes of the Void) uses too.
 Minimum machine: Pentium II 266, Matrox G200, Sound Blaster 16 (or none),
 640x480. Faster machines and the G400/G450 get more detail.
 
-**Status:** milestone F8: hardening and a release ZIP (`make release`;
-`docs/bench.md` lists what waits on real machines). F7: a title screen, a pause menu and options
+**Status:** a new look after F8 (2026-11): cartoon and smooth in the
+manner of the N64 and GameCube rather than faceted; smooth hills, fields
+cut true with hedges along them, round trees, houses with pitched roofs,
+a rounded lorry lit as it turns, contact shadows, the route's chevrons,
+markers on the target, and a camera that comes down with speed to show
+the sky and a haze over the horizon. Each detail preset is meant for a
+card, and the game starts at the one for the card it finds: LOW for the
+G200 (the old cost: 117 fps on a G400), MEDIUM for the G400 and TNT2 (72.7
+and 112 fps), HIGH for the Radeon 7200/7500 to come (`docs/design.md`,
+"The look"; `docs/perf.md`). Before that, F8: hardening and a release ZIP
+(`make release`; `docs/bench.md` lists what waits on real machines). F7: a title screen, a pause menu and options
 (detail, screen size, vsync, volume), three detail presets with a
 governor, and the world culled to what the camera sees. Before that, F6: a career. Money earned is kept in CAREER.DAT and
 spent in the garage on paint jobs, horns, decals, licences for flatbeds

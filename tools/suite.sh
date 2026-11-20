@@ -79,7 +79,10 @@ log() { cat "$out/$1/serial.log" 2>/dev/null; }
 
 sound() {  # NAME SNDCARD BLASTER
     local st w u
-    st=$(run "$1" --args="-test -fixed -soundtest" --sound "$2" --pre "SET BLASTER=$3" --wav)
+    # At LOW: the picture is nothing to this check, and 86Box records the WAV in
+    # real time, so a dearer frame (the new look at MEDIUM) starved the recording
+    # now and then (2 tones missing, the driver playing every chunk).
+    st=$(run "$1" --args="-test -fixed -detail low -soundtest" --sound "$2" --pre "SET BLASTER=$3" --wav)
     w=$("$DEV" python3 "$MGAHAL/tools/loopa/wavcheck.py" "$out/$1/audio.wav" --tone 440 --tone 329 --tone 416 \
         --tone 1002 --tone 784 --tone 1900 2>&1)
     local wst=$?
