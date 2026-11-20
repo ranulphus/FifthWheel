@@ -8,7 +8,8 @@ const char *const grade_name[] = { "", "OK", "GOOD", "GREAT", "PERFECT" };
 const char *const trailer_name[] = { "BOX TRAILER", "FLATBED", "TANKER" };
 static const float trailer_mass[] = { 16000.0f, 20000.0f, 24000.0f };
 
-#define MAX_NODES WG_MAX_PLACES
+#define MAX_NODES WG_MAX_NODES
+#define MAX_ROUTE_EDGES 64              /* a route's roads at most (junctions cut a road in two) */
 
 static float wrap(float a)
 {
@@ -57,7 +58,7 @@ static int shortest(const world *w, int a, int b, int *out_edges, float *metres)
     }
     if (metres)
         *metres = dist[b];
-    for (at = b; at != a && prev_edge[at] >= 0 && count < 32; count++) {
+    for (at = b; at != a && prev_edge[at] >= 0 && count < MAX_ROUTE_EDGES; count++) {
         out_edges[count] = prev_edge[at];
         at = (int)e[prev_edge[at]].a == at ? (int)e[prev_edge[at]].b : (int)e[prev_edge[at]].a;
     }
@@ -95,14 +96,21 @@ static void route_from(jobs *j, const world *w, int at, int depot)
     const wg_node *n;
     const wg_edge *e;
     const float *p;
-    int edges[32], ne, i, k;
+    int edges[MAX_ROUTE_EDGES], ne, i, k;
     graph(w, &g, &n, &e, &p);
     ne = shortest(w, at, (int)w->depots[depot].node, edges, &j->route_left);
     j->nroute = j->route_next = 0;
     for (i = 0; i < ne; i++) {
         const wg_edge *ed = &e[edges[i]];
-        int forward = (int)ed->a == at;
-        for (k = i ? 1 : 0; k < (int)ed->npoints && j->nroute < ROUTE_MAX; k++) {   /* joins shared */
+        int forward = (int)ed->a == at, ring = i > 0 && n[at].kind == WG_TOWN && j->nroute > 0;
+        if (ring) {
+            /* Through a town: round its roundabout, clockwise, from the ring's point where the last road
+             * stopped to this one's. */
+            int q = forward ? (int)ed->first_point : (int)(ed->first_point + ed->npoints - 1);
+            j->nroute += wg_ring_arc(n[at].x, n[at].y, j->route[j->nroute - 1][0], j->route[j->nroute - 1][1],
+                                     p[q * 2], p[q * 2 + 1], &j->route[j->nroute], ROUTE_MAX - j->nroute);
+        }
+        for (k = i && !ring ? 1 : 0; k < (int)ed->npoints && j->nroute < ROUTE_MAX; k++) {   /* joins shared */
             int q = (int)ed->first_point + (forward ? k : (int)ed->npoints - 1 - k);
             j->route[j->nroute][0] = p[q * 2];
             j->route[j->nroute][1] = p[q * 2 + 1];
@@ -131,7 +139,7 @@ void jobs_bay(const jobs *j, const world *w, float *x, float *y, float *heading)
 void jobs_set_offer(jobs *j, const world *w, int i, int from, int to, int bay)
 {
     job *o = &j->offers[i];
-    int edges[32];
+    int edges[MAX_ROUTE_EDGES];
     o->from = from;
     o->to = to;
     o->bay = bay;

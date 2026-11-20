@@ -38,7 +38,7 @@ when the generator is built at -O0 and at -O2.
 | `CVAR` | per chunk: u32 LOW's triangles, MEDIUM and HIGH's, HIGH's: a chunk's triangles are four runs one after another, the first drawn only at LOW (the detail's `models` 0), then those every detail draws, then MEDIUM and HIGH's (`models` 1 and 2), then HIGH's alone (`models` 2); each detail draws one stretch of them; without the section every detail draws every triangle |
 | `HGHT` | s16 heights (decimetres), 257 x 257 at 16 m: the terrain's own (the game reads the ground with the terrain triangles' split) |
 | `FWCO` | collision boxes, as in the yard (buildings, docks, tree trunks, the world's edge) |
-| `GRPH` | u32 nodes, edges, points; nodes {float x, y; u32 kind (0 town, 1 depot), place}; edges {u32 a, b, first point, points; float length}; points {float x, y} (8 m apart); every depot is a dead end (one road, from its gate) |
+| `GRPH` | u32 nodes, edges, points; nodes {float x, y; u32 kind (0 town, 1 depot, 2 junction), place (a junction's 0xFFFFFFFF)}, at most `WG_MAX_NODES` (64); edges {u32 a, b, first point, points; float length}; points {float x, y} (8 m apart); every depot is a dead end (one road, from its gate); a road at a town starts or ends on its roundabout's ring (`WG_RING_R`, 24 m from the node), and a route through the town goes round the ring clockwise between them (`wg_ring_arc`) |
 | `FWDP` | u32 count; depots {float x, y, heading; bays[3] {float x, y, heading}: a docked trailer's rear; pickup {float x, y, heading}: a waiting trailer's kingpin (the apron's left edge); u32 road node} |
 | `FWPA` | the autopilot's tour: the longest loop of the road network that avoids the depots' dead ends |
 | `FWSP` | the start, on the tour |

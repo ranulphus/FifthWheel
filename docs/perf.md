@@ -157,6 +157,23 @@ and HIGH and the towns' lamps at HIGH, 2026-11-20: MEDIUM's FW1 mean 278
 more than the 3,514 timed on the G400 below, about 67 fps there by its
 triangles.)
 
+With the trunks and roundabouts (2026-11-20), and the HUD's shapes counted
+too (about 92 triangles a frame, drawn from a texture: they had been 610,
+uncounted, for one commit):
+
+| Preset | FW1 | A whole job |
+|---|---|---|
+| LOW | 1,382 / 2,033 | 1,611 / 2,131 |
+| MEDIUM | 3,696 / 6,791 | 3,726 / 6,303 |
+| HIGH | 4,723 / 7,789 | 4,401 / 7,273 |
+
+FW1 no longer compares with the rows above: its tour starts at another
+town (town 0), runs the other way round and goes round the roundabouts;
+MEDIUM's worst frame is a stretch west of town 0 that the old FW1 never
+drove. At the same places the world costs what it did: three poses on the
+road from town 0 to town 1, round 2's pack against this one, differ by
+-230 to +110 triangles at MEDIUM and HIGH and -58 to 0 at LOW.
+
 LOW costs what it did: the pack's LOW run keeps its plainer world
 (its mean rose 4% only because a town's streets, which had been drawn
 only while one chunk of them was in view, now always are). The P3 with a

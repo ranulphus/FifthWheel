@@ -67,7 +67,9 @@ void autopilot_drive(autopilot *a, const rig *r, const world *w, rig_input *in)
                           w->path[((j + 1) % n) * 2] - w->path[j * 2]);
         curve = fabsf(wrap(h1 - h0));
     }
-    want = curve > 0.3f ? 9.0f : a->speed;
+    /* A hairpin (the tour turning back through a town) slower still: at 9 m/s the trailer swings wide into
+     * the houses. */
+    want = curve > 1.4f ? 5.0f : curve > 0.3f ? 9.0f : a->speed;
     in->accel = r->v < want - 0.5f ? DGK_CLAMP((want - r->v) * 0.4f, 0.0f, 1.0f) : 0;
     in->decel = r->v > want + 1.5f ? DGK_CLAMP((r->v - want) * 0.2f, 0.0f, 0.6f) : 0;
     in->handbrake = 0;

@@ -301,6 +301,32 @@ that town and its road leaves straight for 50 m before it bends. No road
 enters a depot's yard: the generator tries wider bends, and fails rather
 than write a world where one does.
 
+Roads that leave a town within 25 degrees of one another share a trunk: a
+road out to a junction along their mean direction (up to 260 m, and under
+half the way to the nearest of them), and from there one to each. Seed 1
+has three, all Y-forks: town 1's roads to depot 6 and town 4, its roads
+to depots 9 and 10, town 4's to depots 5 and 12. A junction is a node of
+its own (kind 2, no place); its roads meet it level for 10 m.
+
+In each town's middle, where its roads had all met at one point across the
+streets, there is a roundabout: a ring 9 m wide, its centre line 24 m out
+(`WG_RING_R`), round an island kerbed red and white, with grass, a tree and
+a ring of bushes on it (a block of a tree at LOW). The island is solid to
+its kerb: four collision boxes whose union is an octagon, its corners at
+the kerb's 18 m. The town's roads stop at the ring, and so do the two
+streets through the middle; their paint stops 6 m short. A route through
+a town goes round the ring clockwise, as in Britain (`wg_ring_arc`, wgen.h):
+the tour in fwgen, a job's route in jobs.c; the minimap draws the rings.
+The trailer's axle runs 1.8 m inside the tractor's path on a 24 m ring, so
+a rig on the ring's centre line clears the kerb by about 2 m.
+
+The tour is the longest cycle through the network, starting at its town
+nearest the map's middle (town 0, where a new game starts): before, the
+start was whichever town's sum of the same cycle's lengths rounded
+longest, and moving one road moved the start. The tour autopilot slows to
+5 m/s where the path turns more than 80 degrees in the next 10 points: a
+roundabout or a town's hairpin.
+
 Towns and depots stand on flat ground: a town is levelled to its height
 36 m beyond its outer streets (its blocks too), easing back into the hills
 over 56 m, so no slope at a town's edge passes 25 degrees; a depot's yard
@@ -317,8 +343,7 @@ buried). Each terrain triangle under such a surface now has its corners
 fitted to the surface's plane (its grade carried on along it, level
 across): raised to no more than 0.3 m below it, then, for every surface
 after every raise, cut to 2 cm below it. The physics is flat, so none of
-this changes a drive: the tour's hashes and every job are as before. One
-stretch still stands up to 1.7 m above the ground the lorry rides: two
-depot roads leave town 4 30 m apart at their own heights, and each cuts
-the ground under the other (roads that leave a town at a small angle are
-to share a trunk).
+this changes a drive. Roads that left a town side by side, each at its own
+height, cut the ground from under one another, and stood up to 1.7 m
+above it (2,769 samples over 1.2 m); with the trunks the most is 0.9 m,
+none over 1.2.

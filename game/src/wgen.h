@@ -7,6 +7,7 @@
 
 #include "dgk/base.h"
 #include "dgk/pak.h"
+#include <math.h>
 
 #define WG_PI 3.14159265f
 #define WG_SIZE 4096.0f
@@ -16,8 +17,15 @@
 #define WG_HN 257                       /* heightfield samples per side */
 #define WG_UNIT 32.0f                   /* chunk-local vertex units per metre */
 #define WG_MAX_PLACES 24
+#define WG_MAX_NODES 64                 /* places and the road graph's junctions */
 
-enum { WG_TOWN, WG_DEPOT };
+enum { WG_TOWN, WG_DEPOT, WG_JUNCTION };   /* a node's kind; a junction has no place */
+
+/* A roundabout at each town's middle: its ring's centre line WG_RING_R
+ * from the town's node, where the town's roads stop; inside it an island,
+ * solid to its kerb at WG_RING_ISLAND. Traffic goes round clockwise. */
+#define WG_RING_R 24.0f
+#define WG_RING_ISLAND 18.0f
 
 /* Sections. */
 #define WG_WORLD  DGK_FOURCC('W', 'R', 'L', 'D')   /* wg_world */
@@ -80,5 +88,25 @@ typedef struct wg_depot {
     float pickup[3];                    /* where a trailer waits to be coupled */
     uint32_t node;                      /* its node in the road graph */
 } wg_depot;
+
+/* The points (at most max) strictly between two on a town's ring (its
+ * middle cx, cy), going round clockwise from (x0, y0) to (x1, y1), about
+ * every 6 m: a route through the roundabout. Returns how many. */
+static inline int wg_ring_arc(float cx, float cy, float x0, float y0, float x1, float y1, float (*out)[2], int max)
+{
+    float a0 = atan2f(y0 - cy, x0 - cx), a1 = atan2f(y1 - cy, x1 - cx), sweep = a0 - a1;
+    int m, k, n = 0;
+    while (sweep <= 0.0f)
+        sweep += 2 * WG_PI;
+    while (sweep > 2 * WG_PI)
+        sweep -= 2 * WG_PI;
+    m = (int)ceilf(sweep * WG_RING_R / 6.0f);
+    for (k = 1; k < m && n < max; k++, n++) {
+        float a = a0 - sweep * (float)k / (float)m;
+        out[n][0] = cx + WG_RING_R * cosf(a);
+        out[n][1] = cy + WG_RING_R * sinf(a);
+    }
+    return n;
+}
 
 #endif

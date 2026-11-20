@@ -168,6 +168,13 @@ static void minimap(const game *g)
             mm_line(g, q[k * 2], q[k * 2 + 1], q[m * 2], q[m * 2 + 1]);
         }
     }
+    for (i = 0; i < (int)gr->nnodes; i++) {         /* the towns' roundabouts, where their roads stop */
+        if (n[i].kind != WG_TOWN || fabsf(n[i].x - g->r.x) > reach || fabsf(n[i].y - g->r.y) > reach)
+            continue;
+        for (k = 0; k < 12; k++)
+            mm_line(g, n[i].x + WG_RING_R * cosf(k * WG_PI / 6), n[i].y + WG_RING_R * sinf(k * WG_PI / 6),
+                    n[i].x + WG_RING_R * cosf((k + 1) * WG_PI / 6), n[i].y + WG_RING_R * sinf((k + 1) * WG_PI / 6));
+    }
     glEnd();
     /* The route ahead. */
     if (g->jobs.state == JOB_HAULING || g->jobs.state == JOB_DOCKING) {

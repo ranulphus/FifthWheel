@@ -724,20 +724,12 @@ static void paint_number(int n, const float *o, const float *right, const float 
 
 #define MAX_EDGES 64
 #define MAX_POINTS 20000
-static wg_node nodes[WG_MAX_PLACES];
+static wg_node nodes[WG_MAX_NODES];
+static float node_h[WG_MAX_NODES];                /* a junction's height: its roads meet there level */
 static wg_edge edges[MAX_EDGES];
 static int nnodes, nedges;
 static float pts[MAX_POINTS][3];                 /* x, y, road height */
 static int npts;
-
-static int connected(int a, int b)
-{
-    int i;
-    for (i = 0; i < nedges; i++)
-        if (((int)edges[i].a == a && (int)edges[i].b == b) || ((int)edges[i].a == b && (int)edges[i].b == a))
-            return 1;
-    return 0;
-}
 
 static float dist2(int a, int b)
 {
@@ -797,6 +789,65 @@ static void add_road(int a, int b)
     road_attempt(a, b, -1);
     fprintf(stderr, "fwgen: the road from place %d to place %d crosses a depot\n", a, b);
     crossing_roads++;
+}
+
+/* Where the segment from p (inside) to q (outside) crosses the circle of
+ * radius r about c. */
+static void cross_circle(const float *c, const float *p, const float *q, float r, float *out)
+{
+    float dx = q[0] - p[0], dy = q[1] - p[1], fx = p[0] - c[0], fy = p[1] - c[1];
+    float A = dx * dx + dy * dy, B = 2 * (fx * dx + fy * dy), C = fx * fx + fy * fy - r * r;
+    float t = (-B + sqrtf(DGK_MAX(B * B - 4 * A * C, 0.0f))) / (2 * A);
+    out[0] = p[0] + dx * t;
+    out[1] = p[1] + dy * t;
+}
+
+/* A road's points from or to a town stop at its ring: those inside go, a
+ * point where it crosses the ring comes first (or last), and a point
+ * within 3 m of that one goes too. Returns the count left. */
+static int trim_at_rings(int first, int count, int a, int b)
+{
+    float c[2], hit[2];
+    int k, end;
+    for (end = 0; end < 2; end++) {
+        int nd = end ? b : a;
+        if (nodes[nd].kind != WG_TOWN || count < 4)
+            continue;
+        c[0] = nodes[nd].x;
+        c[1] = nodes[nd].y;
+        if (end)                                     /* reverse, trim the front, reverse back */
+            for (k = 0; k < count / 2; k++) {
+                float t0 = pts[first + k][0], t1 = pts[first + k][1];
+                pts[first + k][0] = pts[first + count - 1 - k][0];
+                pts[first + k][1] = pts[first + count - 1 - k][1];
+                pts[first + count - 1 - k][0] = t0;
+                pts[first + count - 1 - k][1] = t1;
+            }
+        for (k = 0; k < count; k++) {
+            float dx = pts[first + k][0] - c[0], dy = pts[first + k][1] - c[1];
+            if (dx * dx + dy * dy >= WG_RING_R * WG_RING_R)
+                break;
+        }
+        if (k > 0 && k < count) {
+            int keep;
+            cross_circle(c, pts[first + k - 1], pts[first + k], WG_RING_R, hit);
+            keep = (pts[first + k][0] - hit[0]) * (pts[first + k][0] - hit[0]) +
+                   (pts[first + k][1] - hit[1]) * (pts[first + k][1] - hit[1]) < 9.0f ? k + 1 : k;
+            memmove(&pts[first + 1], &pts[first + keep], sizeof pts[0] * (size_t)(count - keep));
+            count -= keep - 1;
+            pts[first][0] = hit[0];
+            pts[first][1] = hit[1];
+        }
+        if (end)
+            for (k = 0; k < count / 2; k++) {
+                float t0 = pts[first + k][0], t1 = pts[first + k][1];
+                pts[first + k][0] = pts[first + count - 1 - k][0];
+                pts[first + k][1] = pts[first + count - 1 - k][1];
+                pts[first + count - 1 - k][0] = t0;
+                pts[first + count - 1 - k][1] = t1;
+            }
+    }
+    return count;
 }
 
 /* One try at a road from node a to b: a curve through jittered points (out
@@ -863,7 +914,10 @@ static int road_attempt(int a, int b, int attempt)
         raw[n++] = ground(cp[5][0], cp[5][1]);
         npts++;
     }
-    count = npts - first;
+    count = trim_at_rings(first, npts - first, a, b);
+    npts = first + count;
+    for (i = 0; i < count; i++)
+        raw[i] = ground(pts[first + i][0], pts[first + i][1]);
     if (attempt >= 0)
         for (i = 0; i < count; i++)
             if (in_depot(pts[first + i][0], pts[first + i][1])) {
@@ -888,23 +942,25 @@ static int road_attempt(int a, int b, int attempt)
      * easing back to its own profile beyond: roads meet in a town at one
      * height and reach a depot's gate at its apron's. */
     for (end = 0; end < 2; end++) {
-        const place *pl = &places[end ? b : a];
-        float along = 0, last_on = -1;
+        /* A place's flat ground, or (a junction) the first 10 m from it, at one height. */
+        int nd = end ? b : a;
+        const place *pl = nd < nplaces ? &places[nd] : NULL;
+        float along = 0, last_on = -1, flat_h = pl ? pl->h : node_h[nd];
         for (k = 0; k < count; k++) {
             int q = end ? count - 1 - k : k, prev = end ? q + 1 : q - 1;
             float w;
             if (k)
                 along += sqrtf((pts[first + q][0] - pts[first + prev][0]) * (pts[first + q][0] - pts[first + prev][0]) +
                                (pts[first + q][1] - pts[first + prev][1]) * (pts[first + q][1] - pts[first + prev][1]));
-            if (place_flat(pl, pts[first + q][0], pts[first + q][1])) {
-                raw[q] = pl->h;
+            if (pl ? place_flat(pl, pts[first + q][0], pts[first + q][1]) : along <= 10.0f) {
+                raw[q] = flat_h;
                 last_on = along;
                 continue;
             }
             if (last_on < 0 || along - last_on >= ROAD_EASE)
                 break;
             w = 1.0f - smooth((along - last_on) / ROAD_EASE);
-            raw[q] += (pl->h - raw[q]) * w;
+            raw[q] += (flat_h - raw[q]) * w;
         }
     }
     e->a = (uint32_t)a;
@@ -1058,6 +1114,12 @@ static float road_distance(float x, float y)
 {
     float best = 1e30f;
     int i, e;
+    for (i = 0; i < ntowns; i++) {                /* a roundabout: its ring, and all inside it */
+        float dx = x - places[i].x, dy = y - places[i].y, d = sqrtf(dx * dx + dy * dy) - WG_RING_R;
+        d = DGK_MAX(d, 0.0f);
+        if (d * d < best)
+            best = d * d;
+    }
     for (e = 0; e < nedges; e++)
         for (i = (int)edges[e].first_point; i < (int)(edges[e].first_point + edges[e].npoints); i++) {
             float dx = pts[i][0] - x, dy = pts[i][1] - y, d = dx * dx + dy * dy;
@@ -1086,18 +1148,96 @@ static void street(float x0, float y0, float x1, float y1, float h, float lift)
 
 static void lamp(float x, float y, float tall, float ax, float ay);
 
+/* A street of town t along u (across = 0) or v (across = 1) at `at`,
+ * from -l to l; the two through the middle stop at the ring. */
+static void town_street(const place *t, int across, float at, float l, float lift)
+{
+    float x0, y0, x1, y1, cut = at == 0 ? WG_RING_R : 0;
+    int half;
+    for (half = 0; half < (cut > 0 ? 2 : 1); half++) {
+        float a = cut > 0 ? (half ? cut : -l) : -l, b = cut > 0 ? (half ? l : -cut) : l;
+        if (across) {
+            town_frame(t, a, at, &x0, &y0);
+            town_frame(t, b, at, &x1, &y1);
+        } else {
+            town_frame(t, at, a, &x0, &y0);
+            town_frame(t, at, b, &x1, &y1);
+        }
+        street(x0, y0, x1, y1, t->h, lift);
+    }
+}
+
+/* The roundabout in town t's middle: the ring (every detail), an island
+ * kerbed red and white with grass on top and a tree, solid to the kerb
+ * (four boxes, an octagon). */
+static void roundabout(const place *t)
+{
+    enum { SEGS = 32 };
+    float cx = t->x, cy = t->y, h = t->h, r0 = WG_RING_R - 4.5f, r1 = WG_RING_R + 4.5f, ri = WG_RING_ISLAND;
+    float apothem = ri * cosf(WG_PI / 8);
+    int k;
+    for (k = 0; k < SEGS; k++) {
+        float a0 = 2 * WG_PI * k / SEGS, a1 = 2 * WG_PI * (k + 1) / SEGS;
+        float c0 = cosf(a0), s0 = sinf(a0), c1 = cosf(a1), s1 = sinf(a1);
+        /* The ring's surface, a little above the streets and below the roads that meet it. */
+        float q[4][3] = { { cx + r0 * c0, h + 0.14f, -(cy + r0 * s0) }, { cx + r1 * c0, h + 0.14f, -(cy + r1 * s0) },
+                          { cx + r1 * c1, h + 0.14f, -(cy + r1 * s1) }, { cx + r0 * c1, h + 0.14f, -(cy + r0 * s1) } };
+        float kb[4][3] = { { cx + ri * c0, h + 0.1f, -(cy + ri * s0) }, { cx + ri * c1, h + 0.1f, -(cy + ri * s1) },
+                           { cx + ri * c1, h + 0.55f, -(cy + ri * s1) }, { cx + ri * c0, h + 0.55f, -(cy + ri * s0) } };
+        float rg = ri - 1.0f;                     /* the grass, inside the kerb's top */
+        float top[3][3] = { { cx, h + 0.55f, -cy }, { cx + rg * c1, h + 0.55f, -(cy + rg * s1) },
+                            { cx + rg * c0, h + 0.55f, -(cy + rg * s0) } };
+        float kt[4][3] = { { cx + rg * c0, h + 0.55f, -(cy + rg * s0) }, { cx + ri * c0, h + 0.55f, -(cy + ri * s0) },
+                           { cx + ri * c1, h + 0.55f, -(cy + ri * s1) }, { cx + rg * c1, h + 0.55f, -(cy + rg * s1) } };
+        uint32_t kerb = (k & 1) ? 0xF4F4F0u : 0xD8402Eu;
+        quad(q[0], q[1], q[2], q[3], 0x565B66u, 0.92f);
+        quad(kb[0], kb[1], kb[2], kb[3], kerb, -1);
+        quad(kt[0], kt[1], kt[2], kt[3], kerb, -1);
+        quad(top[0], top[2], top[1], top[1], 0x6CC24Au, -1);
+        {
+            /* MEDIUM and HIGH: a white line along the ring's inner edge. */
+            float l0 = r0 + 0.3f, l1 = r0 + 0.5f;
+            float m[4][3] = { { cx + l0 * c0, h + 0.2f, -(cy + l0 * s0) }, { cx + l1 * c0, h + 0.2f, -(cy + l1 * s0) },
+                              { cx + l1 * c1, h + 0.2f, -(cy + l1 * s1) }, { cx + l0 * c1, h + 0.2f, -(cy + l0 * s1) } };
+            variant = WG_MEDIUM_UP;
+            quad(m[0], m[1], m[2], m[3], 0xF2F2EAu, 1.0f);
+            variant = WG_SHARED;
+        }
+    }
+    for (k = 0; k < 4; k++)
+        add_box(cx, cy, apothem, apothem * tanf(WG_PI / 8), t->heading + k * WG_PI / 4);
+    /* The tree in the middle: a block at LOW, round at MEDIUM and HIGH, with a ring of round bushes. */
+    variant = WG_LOW_ONLY;
+    block(cx, cy, 0.5f, 0.5f, 0, 3.6f, 0x7A5230u, 0x7A5230u, 0, 0);
+    {
+        float s = 3.4f, c0 = h + 3.0f, c1 = c0 + 5.0f, x = cx, y = cy;
+        float v[8][3] = { { x - s, c0, -(y - s) }, { x + s, c0, -(y - s) }, { x + s, c0, -(y + s) },
+                          { x - s, c0, -(y + s) }, { x - s, c1, -(y - s) }, { x + s, c1, -(y - s) },
+                          { x + s, c1, -(y + s) }, { x - s, c1, -(y + s) } };
+        quad(v[4], v[5], v[6], v[7], 0x4CB040u, -1);
+        quad(v[0], v[1], v[5], v[4], 0x4CB040u, -1);
+        quad(v[1], v[2], v[6], v[5], 0x4CB040u, -1);
+        quad(v[2], v[3], v[7], v[6], 0x4CB040u, -1);
+        quad(v[3], v[0], v[4], v[7], 0x4CB040u, -1);
+    }
+    variant = WG_MEDIUM_UP;
+    trunk(cx, cy, h + 0.4f, h + 4.0f, 0.6f, 6, 0x7A5230u);
+    blob(cx, cy, h + 7.0f, 6.0f, 4.6f, 0x5DBB3Fu);
+    for (k = 0; k < 8; k++) {                    /* round bushes, by turns yellow-green and deep green */
+        float a = t->heading + WG_PI / 8 + k * WG_PI / 4, r = ri - 4.0f;
+        blob(cx + r * cosf(a), cy + r * sinf(a), h + 1.4f, 2.2f, 1.5f, (k & 1) ? 0x8FCF3Au : 0x3E9E3Au);
+    }
+    variant = WG_SHARED;
+}
+
 static void build_town(const place *t)
 {
     int n = town_blocks(t), i, j, k;
     for (i = -n; i <= n; i++) {                   /* streets */
-        float x0, y0, x1, y1;
-        town_frame(t, i * GRID, -n * GRID, &x0, &y0);
-        town_frame(t, i * GRID, n * GRID, &x1, &y1);
-        street(x0, y0, x1, y1, t->h, 0.12f);
-        town_frame(t, -n * GRID, i * GRID, &x0, &y0);
-        town_frame(t, n * GRID, i * GRID, &x1, &y1);
-        street(x0, y0, x1, y1, t->h, 0.13f);     /* crossings: not coplanar */
+        town_street(t, 0, i * GRID, n * GRID, 0.12f);
+        town_street(t, 1, i * GRID, n * GRID, 0.13f);     /* crossings: not coplanar */
     }
+    roundabout(t);
     {
         /* HIGH: lamp posts along the streets every 48 m, by turns either side, off the main roads. */
         int a, q, nq = (int)(n * GRID / 48.0f);
@@ -1802,9 +1942,131 @@ static void face_depots(void)
     }
 }
 
+/* The roads to build: pairs of nodes. */
+#define MAX_CONN 64
+static int conn[MAX_CONN][2], nconn;
+
+static int planned(int a, int b)
+{
+    int i;
+    for (i = 0; i < nconn; i++)
+        if ((conn[i][0] == a && conn[i][1] == b) || (conn[i][0] == b && conn[i][1] == a))
+            return 1;
+    return 0;
+}
+
+static void plan(int a, int b)
+{
+    if (nconn < MAX_CONN && a != b && !planned(a, b)) {
+        conn[nconn][0] = a;
+        conn[nconn][1] = b;
+        nconn++;
+    }
+}
+
+/* Somewhere a junction may stand: off every place's ground and depot. */
+static int junction_ok(float x, float y)
+{
+    int i;
+    if (x < 80 || y < 80 || x > WG_SIZE - 80 || y > WG_SIZE - 80 || in_depot(x, y))
+        return 0;
+    for (i = 0; i < nplaces; i++) {
+        float dx = x - places[i].x, dy = y - places[i].y, r = places[i].r + 60;
+        if (dx * dx + dy * dy < r * r)
+            return 0;
+    }
+    return 1;
+}
+
+/* Roads that leave a town within TRUNK_ANGLE of one another share their
+ * first stretch: a road to a junction out along their mean direction, and
+ * from there one to each. They ran side by side before, each at its own
+ * height, and cut the ground from under one another. */
+#define TRUNK_ANGLE (25.0f * WG_PI / 180.0f)
+
+static void share_trunks(void)
+{
+    int t;
+    for (t = 0; t < ntowns; t++) {
+        int mine[MAX_CONN], n = 0, i, j, start = 0, used[MAX_CONN] = { 0 };
+        float ang[MAX_CONN], gap = -1;
+        for (i = 0; i < nconn; i++)
+            if (conn[i][0] == t || conn[i][1] == t) {
+                int o = conn[i][0] == t ? conn[i][1] : conn[i][0];
+                mine[n] = i;
+                ang[n] = atan2f(nodes[o].y - nodes[t].y, nodes[o].x - nodes[t].x);
+                n++;
+            }
+        for (i = 1; i < n; i++)                         /* by angle */
+            for (j = i; j > 0 && ang[j - 1] > ang[j]; j--) {
+                float fa = ang[j];
+                int fm = mine[j];
+                ang[j] = ang[j - 1];
+                mine[j] = mine[j - 1];
+                ang[j - 1] = fa;
+                mine[j - 1] = fm;
+            }
+        for (i = 0; i < n; i++) {                       /* start after the widest gap, so no group wraps round */
+            float g = ang[(i + 1) % n] - ang[i] + (i + 1 == n ? 2 * WG_PI : 0);
+            if (g > gap) {
+                gap = g;
+                start = (i + 1) % n;
+            }
+        }
+        for (i = 0; i < n; i++) {
+            int first = (start + i) % n, members[MAX_CONN], m = 0, k;
+            float sx = 0, sy = 0, near = 1e9f, d, jx, jy;
+            if (used[first])
+                continue;
+            for (k = i; k < n; k++) {
+                int q = (start + k) % n;
+                float da = ang[q] - ang[first];
+                while (da < 0)
+                    da += 2 * WG_PI;
+                if (da > TRUNK_ANGLE)
+                    break;
+                members[m++] = q;
+            }
+            if (m < 2 || nnodes >= WG_MAX_NODES)
+                continue;
+            for (k = 0; k < m; k++) {
+                int c = mine[members[k]], o = conn[c][0] == t ? conn[c][1] : conn[c][0];
+                sx += cosf(ang[members[k]]);
+                sy += sinf(ang[members[k]]);
+                near = DGK_MIN(near, sqrtf(dist2(t, o)));
+            }
+            d = DGK_MIN(260.0f, near * 0.45f);
+            for (k = 0; k < 4; k++, d *= 0.75f) {
+                float l = sqrtf(sx * sx + sy * sy);
+                jx = nodes[t].x + sx / l * d;
+                jy = nodes[t].y + sy / l * d;
+                if (junction_ok(jx, jy))
+                    break;
+            }
+            if (k == 4)
+                continue;
+            nodes[nnodes].x = jx;
+            nodes[nnodes].y = jy;
+            nodes[nnodes].kind = WG_JUNCTION;
+            nodes[nnodes].place = 0xFFFFFFFFu;
+            node_h[nnodes] = ground(jx, jy);
+            for (k = 0; k < m; k++) {                   /* the town's roads to them now leave from the junction */
+                int c = mine[members[k]];
+                if (conn[c][0] == t)
+                    conn[c][0] = nnodes;
+                else
+                    conn[c][1] = nnodes;
+                used[members[k]] = 1;
+            }
+            plan(t, nnodes);
+            nnodes++;
+        }
+    }
+}
+
 static void build_network(void)
 {
-    int in_tree[WG_MAX_PLACES] = { 0 }, i, j, k;
+    int in_tree[WG_MAX_PLACES] = { 0 }, i, j, k, junctions;
     for (i = 0; i < nplaces; i++) {
         if (places[i].kind == WG_DEPOT)
             depot_frame(&places[i], 0, -52, &nodes[i].x, &nodes[i].y);    /* the depot's gate */
@@ -1828,21 +2090,19 @@ static void build_network(void)
                     bb = j;
                 }
         in_tree[bb] = 1;
-        add_road(ba, bb);
+        plan(ba, bb);
     }
-    for (i = ntowns; i < nnodes; i++) {              /* each depot a dead end off its nearest town */
+    for (i = ntowns; i < nplaces; i++) {             /* each depot a dead end off its nearest town */
         int bt = 0;
         for (j = 1; j < ntowns; j++)
             if (dist2(i, j) < dist2(i, bt))
                 bt = j;
-        add_road(bt, i);
+        plan(bt, i);
     }
-    for (i = 0; i < nnodes; i++) {                   /* towns reach their two nearest towns: loops */
+    for (i = 0; i < ntowns; i++) {                   /* towns reach their two nearest towns: loops */
         int n1 = -1, n2 = -1;
-        if (nodes[i].kind != WG_TOWN)
-            continue;
-        for (j = 0; j < nnodes; j++) {
-            if (j == i || nodes[j].kind != WG_TOWN)
+        for (j = 0; j < ntowns; j++) {
+            if (j == i)
                 continue;
             if (n1 < 0 || dist2(i, j) < dist2(i, n1)) {
                 n2 = n1;
@@ -1850,11 +2110,16 @@ static void build_network(void)
             } else if (n2 < 0 || dist2(i, j) < dist2(i, n2))
                 n2 = j;
         }
-        if (n1 >= 0 && !connected(i, n1))
-            add_road(i, n1);
-        if (n2 >= 0 && !connected(i, n2))
-            add_road(i, n2);
+        if (n1 >= 0)
+            plan(i, n1);
+        if (n2 >= 0)
+            plan(i, n2);
     }
+    share_trunks();
+    junctions = nnodes - nplaces;
+    for (i = 0; i < nconn; i++)
+        add_road(conn[i][0], conn[i][1]);
+    printf("fwgen: %d roads, %d junctions where roads leaving a town share a trunk\n", nedges, junctions);
 }
 
 /* The longest simple cycle through the network (it is small), as the tour. */
@@ -1871,7 +2136,9 @@ static void search(int at, int depth, float metres, int *used_node, int *used_ed
         other = (int)edges[e].a == at ? (int)edges[e].b : (int)edges[e].a;
         path_edges[depth] = e;
         if (other == path_nodes[0] && depth >= 2) {
-            if (metres + edges[e].length > best_metres) {
+            /* Over a metre longer: the same cycle found from another town, its length summed in another order,
+             * must not win by rounding. */
+            if (metres + edges[e].length > best_metres + 1.0f) {
                 best_metres = metres + edges[e].length;
                 best_len = depth + 1;
                 memcpy(best_cycle, path_nodes, sizeof(int) * (size_t)best_len);
@@ -1893,7 +2160,7 @@ static int ntour;
 
 static void build_tour(void)
 {
-    int start, used_node[WG_MAX_PLACES], used_edge[MAX_EDGES], i, k;
+    int start, used_node[WG_MAX_NODES], used_edge[MAX_EDGES], i, k;
     best_len = 0;
     for (start = 0; start < nnodes; start++) {
         if (nodes[start].kind != WG_TOWN)
@@ -1904,14 +2171,39 @@ static void build_tour(void)
         path_nodes[0] = start;
         search(start, 0, 0, used_node, used_edge);
     }
+    {
+        /* It starts at its town nearest the middle of the map, where the rig starts (WG_SPAWN), whatever town
+         * the search began at. */
+        int first = 0, rot[64] = { 0 }, rot_e[64] = { 0 };
+        float bd = 1e30f;
+        for (i = 0; i < best_len; i++) {
+            float dx = nodes[best_cycle[i]].x - WG_SIZE / 2, dy = nodes[best_cycle[i]].y - WG_SIZE / 2;
+            if (nodes[best_cycle[i]].kind == WG_TOWN && dx * dx + dy * dy < bd) {
+                bd = dx * dx + dy * dy;
+                first = i;
+            }
+        }
+        for (i = 0; i < best_len; i++) {
+            rot[i] = best_cycle[(first + i) % best_len];
+            rot_e[i] = cycle_edges[(first + i) % best_len];
+        }
+        memcpy(best_cycle, rot, sizeof(int) * (size_t)best_len);
+        memcpy(cycle_edges, rot_e, sizeof(int) * (size_t)best_len);
+    }
     for (i = 0; i < best_len; i++) {                 /* the cycle's roads, each the right way round */
-        const wg_edge *e = &edges[cycle_edges[i]];
-        int forward = (int)e->a == best_cycle[i];
-        for (k = 0; k + 1 < (int)e->npoints && ntour < MAX_POINTS; k++) {
+        const wg_edge *e = &edges[cycle_edges[i]], *next = &edges[cycle_edges[(i + 1) % best_len]];
+        int forward = (int)e->a == best_cycle[i], at = best_cycle[(i + 1) % best_len], ring = nodes[at].kind == WG_TOWN;
+        /* Into a town, the road's last point too (on the ring), then round to where the next road leaves it. */
+        for (k = 0; k + (ring ? 0 : 1) < (int)e->npoints && ntour < MAX_POINTS; k++) {
             int p = (int)e->first_point + (forward ? k : (int)e->npoints - 1 - k);
             tour[ntour][0] = pts[p][0];
             tour[ntour][1] = pts[p][1];
             ntour++;
+        }
+        if (ring) {
+            int q = (int)next->a == at ? (int)next->first_point : (int)(next->first_point + next->npoints - 1);
+            ntour += wg_ring_arc(nodes[at].x, nodes[at].y, tour[ntour - 1][0], tour[ntour - 1][1], pts[q][0], pts[q][1],
+                                 &tour[ntour], MAX_POINTS - ntour);
         }
     }
     printf("fwgen: tour of %d roads, %.0f m, %d points\n", best_len, best_metres, ntour);
@@ -2113,11 +2405,11 @@ int main(int argc, char **argv)
     fit_surfaces();
     build_terrain();
     for (e = 0; e < nedges; e++) {
-        /* Painted, but not in a town's middle, where roads meet and run over one another. */
+        /* Painted, but not the last few metres to a roundabout's ring or a junction, where roads meet. */
         paint pt;
         pt.dashes = pt.edges = 1;
-        pt.quiet0 = nodes[edges[e].a].kind == WG_TOWN ? 25.0f : 0.0f;
-        pt.quiet1 = nodes[edges[e].b].kind == WG_TOWN ? 25.0f : 0.0f;
+        pt.quiet0 = nodes[edges[e].a].kind == WG_TOWN ? 6.0f : nodes[edges[e].a].kind == WG_JUNCTION ? 14.0f : 0.0f;
+        pt.quiet1 = nodes[edges[e].b].kind == WG_TOWN ? 6.0f : nodes[edges[e].b].kind == WG_JUNCTION ? 14.0f : 0.0f;
         road_ribbon((const float (*)[3])&pts[edges[e].first_point], (int)edges[e].npoints, 4.5f, &pt,
                     0.16f + 0.02f * e);                     /* each road its own height: no z-fighting where they meet */
     }
