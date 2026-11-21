@@ -235,6 +235,10 @@ static void detail_start(game *g)
     dgk_log("FW-CFG detail %s (%s), governor %s", detail_name[g->detail_chosen], why, g->gov.on ? "on" : "off");
 }
 
+/* -highlights' pieces and the gaps between them (below). */
+enum { HL_COUPLE, HL_TO_TOWN, HL_TOWN, HL_TO_DOCK, HL_DOCK, HL_DONE };
+static void hl_start(game *g, const char *piece);
+
 static int init(void *u)
 {
     game *g = (game *)u;
@@ -308,7 +312,16 @@ static int init(void *u)
                                       !g->calibrate_only && !g->fxtest));
     if (g->dbtest) {
         dgk_bench_run("FWHEEL", "F2");
-        dgk_app_bench_start(g->dbtest, 30);
+        if (!g->highlights)
+            dgk_app_bench_start(g->dbtest, 30);
+    }
+    if (g->highlights) {
+        if (g->mode != MODE_JOB) {
+            dgk_log("FW-ERROR -highlights needs -autojob");
+            return -1;
+        }
+        g->hl_phase = HL_COUPLE;
+        hl_start(g, "couple");
     }
     glClearColor(((SKY_HORIZON >> 16) & 255) / 255.0f, ((SKY_HORIZON >> 8) & 255) / 255.0f, (SKY_HORIZON & 255) / 255.0f,
                  1);
@@ -411,12 +424,104 @@ static int camera_focus_for(const game *g, camera_focus *f)
     return 0;
 }
 
+static void drive_tick(game *g);
+
+/* -highlights (FW3, docs/perf.md): three pieces of a job timed, each its own DOSBench test (-dbtest NAME:
+ * NAME-couple, NAME-town, NAME-dock), the drive between them fast-forwarded (eight steps a frame, nothing drawn
+ * but a cleared screen) and not timed. The pieces come from the job, not from tick numbers: from the start to 4 s
+ * after the coupling; while within 110 m of a town's middle (the first the rig comes to, hauling); reversing, from
+ * the trailer's axle 22 m from its place in the bay to the delivery, and then it quits. */
+#define HL_TOWN_IN 110.0f
+#define HL_TOWN_OUT 120.0f
+#define HL_BAY 22.0f
+
+static void hl_start(game *g, const char *piece)
+{
+    char name[32];
+    snprintf(name, sizeof name, "%s-%s", g->dbtest ? g->dbtest : "FW3", piece);
+    dgk_log("FW-BENCH %s from step %lu", name, (unsigned long)g->steps);
+    if (g->dbtest)
+        dgk_app_bench_start(name, 30);
+    g->hl_ff = 0;
+    g->hl_mark = g->steps;
+}
+
+static void hl_stop(game *g, int next)
+{
+    char notes[64];
+    snprintf(notes, sizeof notes, "drive=autopilot steps=%lu", (unsigned long)(g->steps - g->hl_mark));
+    dgk_log("FW-BENCH piece over at step %lu (%s)", (unsigned long)g->steps, notes);
+    if (g->dbtest)
+        dgk_app_bench_stop("ok", notes);
+    g->hl_phase = next;
+    g->hl_ff = next != HL_DONE;
+}
+
+/* The town within `r` of (x, y) (its node), or -1. */
+static int town_near(const game *g, float x, float y, float r)
+{
+    const wg_node *n;
+    const wg_edge *e;
+    const float *p;
+    const wg_graph *gr = world_graph(&g->w, &n, &e, &p);
+    int i;
+    for (i = 0; gr && i < (int)gr->nnodes; i++)
+        if (n[i].kind == WG_TOWN && (n[i].x - x) * (n[i].x - x) + (n[i].y - y) * (n[i].y - y) < r * r)
+            return i;
+    return -1;
+}
+
+static void highlights(game *g)
+{
+    switch (g->hl_phase) {
+    case HL_COUPLE:
+        if (g->jobs.state >= JOB_HAULING && !g->hl_coupled)
+            g->hl_coupled = g->steps;
+        if (g->hl_coupled && g->steps - g->hl_coupled >= 240)
+            hl_stop(g, HL_TO_TOWN);
+        break;
+    case HL_TO_TOWN:
+        if (g->jobs.state == JOB_HAULING && (g->hl_town = town_near(g, g->r.x, g->r.y, HL_TOWN_IN)) >= 0) {
+            g->hl_phase = HL_TOWN;
+            hl_start(g, "town");
+        }
+        break;
+    case HL_TOWN: {
+        const wg_node *n;
+        const wg_edge *e;
+        const float *p;
+        world_graph(&g->w, &n, &e, &p);
+        if ((n[g->hl_town].x - g->r.x) * (n[g->hl_town].x - g->r.x) +
+                (n[g->hl_town].y - g->r.y) * (n[g->hl_town].y - g->r.y) > HL_TOWN_OUT * HL_TOWN_OUT)
+            hl_stop(g, HL_TO_DOCK);
+        break;
+    }
+    case HL_TO_DOCK:
+        if (g->jp.phase == JP_REVERSE) {
+            float ax, ay, bx, by, bh;
+            rig_trailer_axle(&g->r, &ax, &ay);
+            jobs_bay(&g->jobs, &g->w, &bx, &by, &bh);
+            if ((ax - bx) * (ax - bx) + (ay - by) * (ay - by) < HL_BAY * HL_BAY) {
+                g->hl_phase = HL_DOCK;
+                hl_start(g, "dock");
+            }
+        }
+        break;
+    case HL_DOCK:
+        if (g->jp.phase == JP_DONE || g->jobs.delivered > g->jp.delivered) {
+            hl_stop(g, HL_DONE);
+            dgk_app.quit = 1;
+        }
+        break;
+    default:
+        break;
+    }
+}
+
 static void tick(void *u)
 {
     game *g = (game *)u;
-    input_frame f;
-    rig_input in;
-    uint32_t h;
+    int k;
     if (g->tourshots) {                              /* pose k is drawn and saved in frame k + 1 */
         if ((int)dgk_app.ticks >= g->tourshots) {
             dgk_app.quit = 1;
@@ -503,6 +608,24 @@ static void tick(void *u)
         }
         dgk_app.quit = 1;
     }
+    /* The drive: a step a tick; fast-forwarding between the highlights' pieces (-highlights), eight. */
+    for (k = 0; k < (g->hl_ff ? 8 : 1); k++) {
+        if (k && dgk_app.quit)
+            break;
+        drive_tick(g);
+        if (g->highlights)
+            highlights(g);
+    }
+}
+
+/* One step of the drive: the inputs (the autopilots', a replay's, the player's), the rig, the cars, the job, the
+ * camera, the sounds and flourishes, the hashes and logs. */
+static void drive_tick(game *g)
+{
+    input_frame f;
+    rig_input in;
+    uint32_t h;
+    g->steps++;
     if (g->dockpose) {                               /* held still, the wheels turned */
         f.steer = 60;
         f.accel = f.decel = f.buttons = 0;
@@ -650,6 +773,13 @@ static void draw(void *u, float alpha)
     }
     if (g->cal.step == CAL_OFF && menu_draw_scene(g, alpha))
         return;
+    if (g->hl_ff) {                                  /* between the highlights' pieces: nothing to time */
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        dgk_gfx_overlay_begin();
+        dgk_text(&g->font, 230, 230, 1.0f, 0xFFFFFFFFu, "FAST FORWARD");
+        dgk_gfx_overlay_end();
+        return;
+    }
     rig r = g->r;
     r.x = g->r_prev.x + (g->r.x - g->r_prev.x) * alpha;
     r.y = g->r_prev.y + (g->r.y - g->r_prev.y) * alpha;
@@ -743,7 +873,7 @@ static void quit(void *u)
                        g->laps_wanted, g->r.damage, g->r.hits);
     if (g->replay_path)
         dgk_test_check("replay", !g->desync, "%s", g->desync ? "went elsewhere" : "the recorded state throughout");
-    if (g->dbtest) {
+    if (g->dbtest && !g->highlights) {
         char notes[64];
         snprintf(notes, sizeof notes, "drive=%s ticks=%lu",
                  g->replay_path ? "replay" : g->mode != MODE_DRIVE ? "autopilot" : "keys",
@@ -823,6 +953,8 @@ int main(int argc, char **argv)
             g.dockpose = 1;
         else if (!strcmp(a, "-pose") && v)
             g.posed = sscanf(argv[++i], "%f:%f:%f:%f", &g.pose[0], &g.pose[1], &g.pose[2], &g.pose[3]) == 4;
+        else if (!strcmp(a, "-highlights"))
+            g.highlights = 1;
         else if (!strcmp(a, "-park") && v)
             g.parked = sscanf(argv[++i], "%f:%f:%f", &g.pose[0], &g.pose[1], &g.pose[2]) == 3;
         else if (!strcmp(a, "-soundtest"))

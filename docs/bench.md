@@ -19,7 +19,12 @@ models the 18-bit fields on the G100 and G200 (RetroGPU's 86Box patch 0012), so
 Loop A shows the overflow if it comes back. Bench with a build at or after
 that pin.
 
-## Speed (DOSBench, `tools/run.py games --tests FW1,FW1L,FW1H,FWP`)
+## Speed (DOSBench, `tools/run.py games --tests FW1,FW1L,FW1H,FW3,FW3L,FW3H,FWP`)
+
+FW2, the whole mission (docs/perf.md), is the official run, by hand:
+`FWHEEL -nosound -novsync -fixed -job 6:0:0 -autojob -dbtest FW2` (with
+`-detail low` or `high` for the other presets); DOSBench runs its
+highlights, FW3 (`... -autojob -highlights -dbtest FW3`).
 
 - [ ] `FW1L` (LOW) averages 30 fps or more with p99 at or under 45 ms on
       the PII-266 with the G200. If not: the `FWP` records fit the frame
@@ -27,6 +32,10 @@ that pin.
       and the shortfall's cause is written down.
 - [ ] `FW1` (MEDIUM) and `FW1H` (HIGH, zoomed out) on the same machine and
       on the G400 and G450 machines: which preset each should default to.
+- [ ] `FW3L`, `FW3`, `FW3H` on the same machines: the town piece is the
+      heaviest (MEDIUM about 3,900 triangles a frame, HIGH 6,000); the dock
+      piece has the reversing camera and its guides. FW2 by hand once per
+      machine, at its own preset.
 - [ ] The governor (on by default when playing): driving into a town on
       the PII-266 steps down without a visible stutter, and steps back up.
 - [ ] Each screen size in the options, on each card: the picture fills the

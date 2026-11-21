@@ -29,6 +29,9 @@ typedef struct game {
     int dockpose;                   /* -dockpose */
     int posed;                      /* -pose X:Y:H:V: the rig held there, the camera told it moves at V */
     int parked;                     /* -park X:Y:H: the game starts with the rig standing there (tests) */
+    int highlights;                 /* -highlights: three pieces of the job timed (main.c, FW3) */
+    int hl_phase, hl_ff, hl_town;   /* which piece or gap; fast-forwarding; the town timed */
+    unsigned long steps, hl_mark, hl_coupled;   /* drive steps; the piece's first; the coupling's */
     float pose[4];
     int calibrate_only, joylog;     /* -calibrate (then quit), -joylog */
     dgk_cfg cfg;                    /* the settings file */

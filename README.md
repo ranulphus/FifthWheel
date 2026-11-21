@@ -41,7 +41,7 @@ loading bays, a road network levelled into gentle hills, patchwork fields,
 woods) and drawn chunk by chunk, the lorry riding its slopes. The game
 runs on DOS, Linux and headless (kinematic tractor and trailer, a six-speed
 automatic, collisions, synthesised sounds, autopilots, checked replays),
-and DOSBench times it (FW1, FWP).
+and DOSBench times it (FW1, FW3, FWP; FW2, the whole mission, by hand).
 
 ## Building
 
@@ -79,7 +79,7 @@ Command line: `-mode WxH`, `-novsync`, `-nosound`, and for tests `-frames N`,
 `-fixed` (one tick per frame), `-shot F:NAME`, `-nodraw`, `-test` (see
 `dgk/app.h` in dgk); the game adds `-world FILE` (default
 `WORLD.PAK`; the F1 test yard is `YARD.PAK`), `-autopilot` (`-laps N`),
-`-autojob` (`-job D:T:B`), `-dockpose`, `-pose X:Y:H:V` (the rig held at a place, the camera as at speed V), `-park X:Y:H` (the game starts with the rig standing there), `-cars N` (traffic: 12, 0 none, up to 40), `-soundtest`, `-calibrate`, `-joylog`, `-career FILE`, `-money N`, `-fxtest`,
+`-autojob` (`-job D:T:B`), `-dockpose`, `-pose X:Y:H:V` (the rig held at a place, the camera as at speed V), `-park X:Y:H` (the game starts with the rig standing there), `-cars N` (traffic: 12, 0 none, up to 40), `-highlights` (with `-autojob`: three pieces of the job timed, FW3), `-soundtest`, `-calibrate`, `-joylog`, `-career FILE`, `-money N`, `-fxtest`,
 `-detail low|medium|high`, `-zoom N`, `-title`,
 `-record FILE`, `-replay FILE`, `-hash`, `-trace N`, `-timedemo FILE -dbtest NAME`,
 `-probe [quick]` and `-tourshots N`.

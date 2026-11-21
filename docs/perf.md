@@ -34,9 +34,22 @@ the machinery works.
 | Test | What it measures |
 |---|---|
 | `FW1` | 3,000 frames of the autopilot touring the generated world at one tick per frame with vsync off: the game as it is, frame times and triangles per frame |
+| `FW2` | the mission: a whole job by the job autopilot, depot 6 to depot 0 bay 0 (`-job 6:0:0 -autojob`), one tick per frame, vsync off: reversing under the trailer in depot 6's yard, out through the gate, 1.65 km of road through the middle of town 4 (its roundabout, shops and church) with the traffic, into depot 0's yard, a loop round and the reverse into the bay; 12,731 frames (12,700 timed), the same at every preset |
+| `FW3-couple`, `FW3-town`, `FW3-dock` | FW2's highlights (`-highlights`), for DOSBench: the same job, its three pieces timed as three tests and the drive between them fast-forwarded (eight steps a frame, a cleared screen, not timed): the start to 4 s after the coupling (875 frames timed), within 110 m of town 4's middle (1,539), the reverse from the trailer's axle 22 m from the bay to the delivery (1,442); 5,027 frames in all. `FW3L` and `FW3H` the same at LOW and HIGH |
 | `FWP-<tris>-arr`, `-list`, `-imm` | 1,000 to 8,000 triangles of a ground grid under the game's camera through vertex arrays, display lists, immediate mode |
 | `FWP-<tris>-arr-tex` | the same, textured (nearest, RGB565) |
 | `FWP-2000-d<draws>` | 2,000 triangles split into 50 to 400 draw calls |
+
+The mission's triangles a frame (headless, mean; FW2's most in brackets):
+
+| Preset | FW2 | FW3-couple | FW3-town | FW3-dock |
+|---|---|---|---|---|
+| LOW | 1,083 (1,633) | 996 | 1,343 | 1,178 |
+| MEDIUM | 2,759 (6,474) | 1,779 | 3,926 | 2,137 |
+| HIGH | 3,774 (12,947) | 2,099 | 6,000 | 2,521 |
+
+FW2 is the official run; at 30 frames a second it takes about 7 minutes,
+so DOSBench runs FW3 (about 2 at LOW on the G200).
 
 From the FWP records a small model, frame_ms = a + b x triangles + c x
 draws + d x textured triangles, is fitted per machine and sets the presets'
