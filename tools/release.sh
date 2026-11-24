@@ -17,7 +17,7 @@ stage=build/release/FWHEEL
 rm -rf build/release
 mkdir -p "$stage" dist
 
-cp build/dos/FWHEEL.EXE build/data/WORLD.PAK "$stage/"
+cp build/dos/FWHEEL.EXE build/data/WORLD.PAK build/data/WORLDHI.PAK "$stage/"
 sed 's/\r$//; s/$/\r/' data/budget.cfg > "$stage/BUDGET.CFG"
 cp "$DJGPP_PREFIX/dos/CWSDPMI.EXE" "$stage/"
 if [ -n "${CWSDPMI_ZIP:-}" ] && [ -f "$CWSDPMI_ZIP" ]; then

@@ -62,25 +62,32 @@ build/tools/fwgen: tools/fwgen.c game/src/mesh.c $(DGK_PAKW) $(DGK)/src/base.c g
 	@mkdir -p $(dir $@)
 	$(Q)$(HOST_CC) $(TOOL_CFLAGS) -o $@ tools/fwgen.c game/src/mesh.c $(DGK_PAKW) $(DGK)/src/base.c -lm
 WORLD_SEED ?= 1
-build/data/WORLD.PAK: build/tools/fwgen
-	@mkdir -p $(dir $@)
-	$(Q)build/tools/fwgen $(WORLD_SEED) $@
-data: build/data/YARD.PAK build/data/WORLD.PAK build/data/budget.cfg
+# WORLD.PAK and, beside it, WORLDHI.PAK (HIGH's textured world), from one run (a grouped target: make 4.3).
+build/data/WORLD.PAK build/data/WORLDHI.PAK &: build/tools/fwgen
+	@mkdir -p build/data
+	$(Q)build/tools/fwgen $(WORLD_SEED) build/data/WORLD.PAK build/data/WORLDHI.PAK
+data: build/data/YARD.PAK build/data/WORLD.PAK build/data/WORLDHI.PAK build/data/budget.cfg
 build/data/budget.cfg: data/budget.cfg
 	@mkdir -p $(dir $@)
 	$(Q)cp $< $@
 # The generator is deterministic: seed 1 must give data/golden/world.sha's
-# hash when built at -O0 and at -O2. Change the golden file only on purpose.
+# hash (and worldhi.sha's for WORLDHI.PAK) when built at -O0 and at -O2.
+# Change the golden files only on purpose.
 data-check:
 	$(Q)mkdir -p build/check
 	$(Q)$(HOST_CC) $(filter-out -O2,$(TOOL_CFLAGS)) -O0 -o build/check/fwgen-O0 tools/fwgen.c game/src/mesh.c \
 	  $(DGK_PAKW) $(DGK)/src/base.c -lm
 	$(Q)$(HOST_CC) $(TOOL_CFLAGS) -o build/check/fwgen-O2 tools/fwgen.c game/src/mesh.c $(DGK_PAKW) $(DGK)/src/base.c -lm
-	$(Q)for o in O0 O2; do build/check/fwgen-$$o 1 build/check/w-$$o.pak | sed -n 's/.*hash //p' > build/check/$$o.sha; done
-	$(Q)cmp -s build/check/O0.sha build/check/O2.sha || { echo "data-check: -O0 and -O2 differ"; exit 1; }
+	$(Q)for o in O0 O2; do build/check/fwgen-$$o 1 build/check/w-$$o.pak build/check/whi-$$o.pak > build/check/$$o.log; \
+	  sed -n "s#.*/w-$$o.pak .*hash ##p" build/check/$$o.log > build/check/$$o.sha; \
+	  sed -n "s#.*/whi-$$o.pak .*hash ##p" build/check/$$o.log > build/check/$$o.hi.sha; done
+	$(Q)cmp -s build/check/O0.sha build/check/O2.sha && cmp -s build/check/O0.hi.sha build/check/O2.hi.sha \
+	  || { echo "data-check: -O0 and -O2 differ"; exit 1; }
 	$(Q)cmp -s build/check/O2.sha data/golden/world.sha \
 	  || { echo "data-check: world hash $$(cat build/check/O2.sha), golden $$(cat data/golden/world.sha)"; exit 1; }
-	$(Q)echo "data-check: world $$(cat data/golden/world.sha) at -O0 and -O2"
+	$(Q)cmp -s build/check/O2.hi.sha data/golden/worldhi.sha \
+	  || { echo "data-check: WORLDHI hash $$(cat build/check/O2.hi.sha), golden $$(cat data/golden/worldhi.sha)"; exit 1; }
+	$(Q)echo "data-check: world $$(cat data/golden/world.sha), WORLDHI $$(cat data/golden/worldhi.sha) at -O0 and -O2"
 .PHONY: data data-check
 
 # ---- DOS -------------------------------------------------------------------

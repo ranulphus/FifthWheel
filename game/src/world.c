@@ -6,6 +6,7 @@
 #include <GL/gl.h>
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 static int load_common(world *w, const char *path)
@@ -68,9 +69,44 @@ static int bucket_boxes(world *w)
     return 0;
 }
 
+int world_load_hi(world *w)
+{
+    char hp[sizeof w->file + 4];
+    const char *dot;
+    const wg_hi *h;
+    uint32_t nv = 0, nt = 0;
+    if (w->hi_state)
+        return w->hi_state > 0;
+    w->hi_state = -1;
+    if (!w->chunked)
+        return 0;
+    dot = strrchr(w->file, '.');
+    snprintf(hp, sizeof hp, "%.*sHI%s", dot ? (int)(dot - w->file) : (int)strlen(w->file), w->file, dot ? dot : "");
+    if (dgk_pak_load(&w->hipak, hp) != 0) {
+        dgk_log("FW-WORLD %s: none, so HIGH draws untextured", hp);
+        return 0;
+    }
+    h = (const wg_hi *)dgk_pak_section(&w->hipak, WG_HI_HEADER, NULL);
+    w->hi_index = (const wg_chunk *)dgk_pak_section(&w->hipak, WG_HI_INDEX, NULL);
+    w->hi_verts = (const wg_hvertex *)dgk_pak_section(&w->hipak, WG_HI_VERTS, NULL);
+    w->hi_tris = (const uint16_t *)dgk_pak_section(&w->hipak, WG_HI_TRIS, NULL);
+    dgk_pak_section(&w->pak, WG_CVERTS, &nv);
+    dgk_pak_section(&w->pak, WG_CTRIS, &nt);
+    if (!h || !w->hi_index || !w->hi_verts || !w->hi_tris || h->version != WG_HI_VERSION ||
+        h->seed != w->pak.seed || h->main_verts != nv / sizeof(wg_vertex) || h->main_tris != nt / 6) {
+        dgk_log("FW-WORLD %s: not made with %s, so HIGH draws untextured", hp, w->file);
+        dgk_pak_free(&w->hipak);
+        return 0;
+    }
+    w->hi_state = 1;
+    dgk_log("FW-WORLD %s: HIGH's textured world", hp);
+    return 1;
+}
+
 int world_load(world *w, const char *path)
 {
     memset(w, 0, sizeof *w);
+    snprintf(w->file, sizeof w->file, "%s", path);
     if (dgk_pak_load(&w->pak, path) != 0)
         return -1;
     w->hdr = (const wg_world *)dgk_pak_section(&w->pak, WG_WORLD, NULL);
@@ -82,7 +118,6 @@ int world_load(world *w, const char *path)
         w->tris = (const uint16_t *)dgk_pak_section(&w->pak, WG_CTRIS, NULL);
         w->height = (const int16_t *)dgk_pak_section(&w->pak, WG_HEIGHT, NULL);
         w->variants = (const wg_variant *)dgk_pak_section(&w->pak, WG_CVARIANT, NULL);
-        w->uv = (const float *)dgk_pak_section(&w->pak, WG_CUV, NULL);
         if (!w->chunks || !w->verts || !w->tris || !w->height || !d || w->hdr->version != WG_VERSION ||
             w->hdr->chunks != WG_CHUNKS) {
             dgk_log("FW-ERROR %s: not a version %d world", path, WG_VERSION);
@@ -135,6 +170,8 @@ void world_free(world *w)
     free(w->bucket_items);
     free(w->lane);
     dgk_pak_free(&w->pak);
+    if (w->hi_state > 0)
+        dgk_pak_free(&w->hipak);
     memset(w, 0, sizeof *w);
 }
 
@@ -256,18 +293,25 @@ void world_draw(world *w, float x, float y, float r)
     w->culled_chunks = 0;
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_COLOR_ARRAY);
-    if (w->textured) {                               /* the look test: the atlas, tinted by the colours */
+    if (w->textured) {                               /* HIGH: WORLDHI.PAK's, the atlas tinted by the colours */
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, w->atlas);
         glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
         glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+        glMatrixMode(GL_TEXTURE);                    /* its coordinates are texels */
+        glLoadIdentity();
+        glScalef(1.0f / WG_ATLAS, 1.0f / WG_ATLAS, 1.0f);
+        glMatrixMode(GL_MODELVIEW);
     }
     for (cy = cy0; cy <= cy1; cy++)
         for (cx = cx0; cx <= cx1; cx++) {
             const wg_chunk *c = &w->chunks[cy * WG_CHUNKS + cx];
             const wg_vertex *v = w->verts + c->first_vertex;
             uint32_t first = 0, n = c->ntris;
-            if (w->variants) {                       /* this detail's runs, one stretch of them (wgen.h) */
+            if (w->textured) {                       /* HIGH's, all of them */
+                first = 0;
+                n = w->hi_index[cy * WG_CHUNKS + cx].ntris;
+            } else if (w->variants) {                /* this detail's runs, one stretch of them (wgen.h) */
                 const wg_variant *var = &w->variants[cy * WG_CHUNKS + cx];
                 if (w->models == 0)
                     n = c->ntris - var->medium_tris - var->high_tris;
@@ -286,11 +330,18 @@ void world_draw(world *w, float x, float y, float r)
             glPushMatrix();
             glTranslatef(cx * WG_CHUNK, 0, -cy * WG_CHUNK);
             glScalef(1.0f / WG_UNIT, 1.0f / WG_UNIT, 1.0f / WG_UNIT);
-            glVertexPointer(3, GL_SHORT, sizeof *v, &v->x);
-            glColorPointer(4, GL_UNSIGNED_BYTE, sizeof *v, v->rgba);
-            if (w->textured)
-                glTexCoordPointer(2, GL_FLOAT, 0, w->uv + (size_t)c->first_vertex * 2);
-            glDrawElements(GL_TRIANGLES, (GLsizei)n * 3, GL_UNSIGNED_SHORT, w->tris + c->first_index + first * 3);
+            if (w->textured) {
+                const wg_chunk *hc = &w->hi_index[cy * WG_CHUNKS + cx];
+                const wg_hvertex *hv = w->hi_verts + hc->first_vertex;
+                glVertexPointer(3, GL_SHORT, sizeof *hv, &hv->x);
+                glColorPointer(4, GL_UNSIGNED_BYTE, sizeof *hv, hv->rgba);
+                glTexCoordPointer(2, GL_SHORT, sizeof *hv, &hv->s);
+                glDrawElements(GL_TRIANGLES, (GLsizei)n * 3, GL_UNSIGNED_SHORT, w->hi_tris + hc->first_index);
+            } else {
+                glVertexPointer(3, GL_SHORT, sizeof *v, &v->x);
+                glColorPointer(4, GL_UNSIGNED_BYTE, sizeof *v, v->rgba);
+                glDrawElements(GL_TRIANGLES, (GLsizei)n * 3, GL_UNSIGNED_SHORT, w->tris + c->first_index + first * 3);
+            }
             glPopMatrix();
             dgk_gfx_tris += n;
             dgk_gfx_draws++;
@@ -298,6 +349,9 @@ void world_draw(world *w, float x, float y, float r)
             dgk_service_if_due();                    /* the audio thread's turn on a slow frame (DOS) */
         }
     if (w->textured) {
+        glMatrixMode(GL_TEXTURE);
+        glLoadIdentity();
+        glMatrixMode(GL_MODELVIEW);
         glDisableClientState(GL_TEXTURE_COORD_ARRAY);
         glDisable(GL_TEXTURE_2D);
     }

@@ -45,6 +45,23 @@ when the generator is built at -O0 and at -O2.
 | `FWPA` | the autopilot's tour: the longest loop of the road network that avoids the depots' dead ends |
 | `FWSP` | the start, on the tour |
 
+### HIGH's textured world (`build/data/WORLDHI.PAK`; game/src/wgen.h)
+
+Made in the same run as WORLD.PAK (`fwgen SEED WORLD.PAK WORLDHI.PAK`), and
+loaded only for HIGH (the game looks for the pack's name with `HI` before
+its extension; without it, or not made with that WORLD.PAK, HIGH draws
+untextured). `make data-check` holds it to `data/golden/worldhi.sha`.
+
+| Section | Layout |
+|---|---|
+| `HWLD` | u32 version (1), seed, WORLD.PAK's vertex and triangle counts (its check) |
+| `HIDX` | as `CIDX`, per chunk: HIGH's triangles (the shared, MEDIUM-and-HIGH and HIGH-only runs as one) |
+| `HVRT` | 16 bytes a vertex: s16 x, y, z (as `CVRT`), s16 s, t (texels of the atlas: the texture matrix scales them by 1/512), u8 r, g, b, a, s16 pad; welded on all of them |
+| `HTRI` | u16 x 3 a triangle, chunk-local |
+
+The atlas (game/src/tex.c, drawn at start-up): 512 x 512, tiles of 128 in
+rows (wgen.h's `WG_TX_*`), a face mapping one tile inside a 4-texel margin.
+
 ## Replays (`DGKR`, dgk/replay.h)
 
 Header (16 bytes): `"DGKR"`, u16 version (1), u16 frame size, u32 ticks,

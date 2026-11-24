@@ -198,6 +198,12 @@ costing it nothing; MEDIUM is cheaper on average and as dear at its worst
 (a town); HIGH spends its room in the towns. The pack grew from 10.5 MB to
 14.1 MB.
 
+HIGH's textures (2026-11-25) draw the same triangles from WORLDHI.PAK (16.2
+MB, loaded only for HIGH: about 30 MB of world on a HIGH machine, against
+14.1 on the others), textured with one atlas, one draw a chunk as before.
+On a card the cost is texture fill and setup, which DOSBench's FWP-tex
+records measure per machine; HIGH is for the Radeons.
+
 Traffic (2026-11-20) adds a car's mesh where one is in sight: 50
 triangles at LOW, 190 at MEDIUM, 466 at HIGH, and a 10-triangle shadow; on
 FW1 and the job none came into view (the means moved by under 10). The

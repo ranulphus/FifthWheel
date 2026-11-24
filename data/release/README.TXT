@@ -71,6 +71,7 @@ FILES
 
     FWHEEL.EXE     the game
     WORLD.PAK      the world (4 x 4 km of towns, depots and roads)
+    WORLDHI.PAK    the world with textures, for the High detail only
     BUDGET.CFG     the detail presets' numbers
     CWSDPMI.EXE    the DPMI host the game needs under plain DOS
     CWSDPMI.DOC    its documentation

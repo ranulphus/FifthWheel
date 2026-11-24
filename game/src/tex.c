@@ -1,4 +1,4 @@
-/* tex.c - the textures' look test: the atlas (see tex.h). */
+/* tex.c - HIGH's textures: the atlas (see tex.h). */
 #include "tex.h"
 #include "wgen.h"
 #include <GL/gl.h>
@@ -8,6 +8,10 @@
 
 #ifndef GL_TEXTURE_MAX_LEVEL
 #define GL_TEXTURE_MAX_LEVEL 0x813D
+#endif
+#ifndef GL_TEXTURE_MAX_ANISOTROPY_EXT
+#define GL_TEXTURE_MAX_ANISOTROPY_EXT 0x84FE
+#define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT 0x84FF
 #endif
 
 #define LEVELS 3                      /* 512, 256, 128: past that the tiles' margins blur into each other */
@@ -53,11 +57,20 @@ static float shade(int tile, int x, int y)
         }
         break;
     }
-    case WG_TX_CROPS:                 /* rows of crop and furrows between them */
-        v = (q % 15) < 3 ? 0.76f : 0.95f + 0.05f * (h01(p / 3, q, 4) - 0.5f);
-        if ((q % 15) >= 6 && (q % 15) <= 10 && (p % 8) < 4)
+    case WG_TX_CROPS:                 /* rows of crop and furrows between them, one of four ways (by the field) */
+    case WG_TX_CROPS_45:
+    case WG_TX_CROPS_90:
+    case WG_TX_CROPS_135: {
+        /* Across the rows (a period of 15 that divides 120, so each way repeats with the ground's cells), and
+         * along them, for the plants' dots. */
+        int way = tile - WG_TX_CROPS;
+        int a = way == 0 ? q : way == 1 ? p + q : way == 2 ? p : p - q + 120;
+        int b = way == 0 ? p : way == 1 ? p - q + 120 : way == 2 ? q : p + q;
+        v = (a % 15) < 3 ? 0.76f : 0.95f + 0.05f * (h01(b / 3, a / 15, 4) - 0.5f);
+        if ((a % 15) >= 6 && (a % 15) <= 10 && (b % 8) < 4)
             v = 0.86f;
         break;
+    }
     case WG_TX_ASPHALT:               /* grit */
         v = h01(p, q, 5) < 0.07f ? 0.84f : h01(p, q, 6) < 0.04f ? 1.0f : 0.95f;
         break;
@@ -108,15 +121,21 @@ unsigned int tex_atlas(void)
             o[0] = o[1] = o[2] = (uint8_t)(255.0f * (v < 0 ? 0 : v > 1 ? 1 : v) + 0.5f);
             o[3] = 255;
         }
-    for (l = 1, size = WG_ATLAS / 2; l < LEVELS; l++, size /= 2)   /* each level the last's 2 x 2 means */
+    /* Each smaller level the last's 2 x 2 means, its pattern a little fainter (a fifth nearer 0.9 each level):
+     * far off, rows and tufts thinner than a pixel shimmer less. */
+    for (l = 1, size = WG_ATLAS / 2; l < LEVELS; l++, size /= 2)
         for (y = 0; y < size; y++)
             for (x = 0; x < size; x++) {
                 int c, w = size * 2;
-                for (c = 0; c < 4; c++)
-                    level[l][(y * size + x) * 4 + c] =
-                        (uint8_t)((level[l - 1][((2 * y) * w + 2 * x) * 4 + c] + level[l - 1][((2 * y) * w + 2 * x + 1) * 4 + c] +
-                                   level[l - 1][((2 * y + 1) * w + 2 * x) * 4 + c] +
-                                   level[l - 1][((2 * y + 1) * w + 2 * x + 1) * 4 + c] + 2) / 4);
+                for (c = 0; c < 4; c++) {
+                    int sum = level[l - 1][((2 * y) * w + 2 * x) * 4 + c] + level[l - 1][((2 * y) * w + 2 * x + 1) * 4 + c] +
+                              level[l - 1][((2 * y + 1) * w + 2 * x) * 4 + c] +
+                              level[l - 1][((2 * y + 1) * w + 2 * x + 1) * 4 + c];
+                    float m = sum / 4.0f;
+                    if (c < 3)
+                        m = 229.5f + (m - 229.5f) * 0.8f;
+                    level[l][(y * size + x) * 4 + c] = (uint8_t)(m + 0.5f);
+                }
             }
     glGenTextures(1, &t);
     glBindTexture(GL_TEXTURE_2D, t);
@@ -125,6 +144,15 @@ unsigned int tex_atlas(void)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, LEVELS - 1);
+    {
+        /* The ground seen at a slant: anisotropic filtering where the card has it (the Radeons, under DOS-GL). */
+        const char *ext = (const char *)glGetString(GL_EXTENSIONS);
+        if (ext && strstr(ext, "GL_EXT_texture_filter_anisotropic")) {
+            GLfloat most = 1;
+            glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &most);
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, most < 4 ? most : 4);
+        }
+    }
     for (l = 0, size = WG_ATLAS; l < LEVELS; l++, size /= 2)
         glTexImage2D(GL_TEXTURE_2D, l, GL_RGBA, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, level[l]);
     return t;

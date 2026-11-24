@@ -220,9 +220,10 @@ typedef struct cmesh {
 
 static cmesh chunks[WG_VARIANTS][WG_CHUNKS * WG_CHUNKS];
 static int variant = WG_SHARED;                   /* where quad() puts what it makes */
-/* The textures' look test: the atlas tile the next vertices map (WG_TX_PLAIN: its middle, no pattern) and where in
- * it (0..1); tex_quad: quad() and face() map their corners over the whole tile. Written only with --uv. */
-static int tex_tile = WG_TX_PLAIN, tex_quad, uv_out;
+/* HIGH's textures: the atlas tile the next vertices map (WG_TX_PLAIN: its middle, no pattern) and where in it
+ * (0..1); tex_quad: quad() and face() map their corners over the whole tile. In WORLDHI.PAK only (write_hi). */
+static int tex_tile = WG_TX_PLAIN, tex_quad;
+static uint32_t main_verts, main_tris;            /* WORLD.PAK's, for WORLDHI.PAK's check */
 static float tex_u = 0.5f, tex_v = 0.5f;
 static long total_tris;
 
@@ -2461,6 +2462,13 @@ static void add_hedge(int fa, int fb, tvert p, tvert q)
  * until each piece lies in one region's colour; each a fan of its own
  * vertices. The pieces lie on the triangle (heights interpolated), so the
  * ground is where it was. */
+/* HIGH's tile for the ground of region r: a town's or a depot's grass, or a field's crops, their rows one of four
+ * ways (by the field). */
+static int ground_tile(int r)
+{
+    return r < 0 ? WG_TX_GRASS : WG_TX_CROPS + (int)(((uint32_t)r * 2654435761u >> 13) & 3);
+}
+
 static void terrain_piece(cmesh *c, const tvert *v, int n, int depth)
 {
     tvert a[12], b[12];
@@ -2484,11 +2492,7 @@ static void terrain_piece(cmesh *c, const tvert *v, int n, int depth)
             cy += v[i].y / n;
         }
         first = c->nverts;
-        {
-            /* The look test: town grass or a field's crops, the piece's 16 m cell over a tile. */
-            int r = k == n ? reg[0] : region_at(cx, cy);
-            tex_tile = r < 0 ? WG_TX_GRASS : WG_TX_CROPS;
-        }
+        tex_tile = ground_tile(k == n ? reg[0] : region_at(cx, cy));   /* HIGH: the piece's 16 m cell over a tile */
         for (i = 0; i < n; i++) {
             float p[3];
             p[0] = v[i].x;
@@ -2554,11 +2558,7 @@ static void build_terrain(void)
     }
     for (cy = 0; cy < WG_CHUNKS; cy++)
         for (cx = 0; cx < WG_CHUNKS; cx++) {
-            /* Up to four colours meet at a sample: its vertices so far. */
-            static struct { uint32_t rgb; int idx; } seen[CHUNK_CELLS + 1][CHUNK_CELLS + 1][4];
-            static int nseen[CHUNK_CELLS + 1][CHUNK_CELLS + 1];
             cmesh *c = &chunks[WG_SHARED][cy * WG_CHUNKS + cx];
-            memset(nseen, 0, sizeof nseen);
             for (j = 0; j < CHUNK_CELLS; j++)
                 for (i = 0; i < CHUNK_CELLS; i++) {
                     static const int corner[4][2] = { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } };
@@ -2595,41 +2595,20 @@ static void build_terrain(void)
                         }
                         continue;
                     }
+                    /* The cell's own four corners, a tile over it for HIGH (shared ones cannot map their
+                     * neighbours' tiles too); WORLD.PAK's welder makes them one again (same place, colour). */
                     rgb = at[0];
-                    if (uv_out) {
-                        /* The textures' look test: the cell's own four corners, the tile over it (shared ones
-                         * cannot map their neighbours' tiles too); the same places and colours, as smooth. */
-                        tex_tile = region_at((gi + 0.5f) * WG_CELL, (gj + 0.5f) * WG_CELL) < 0 ? WG_TX_GRASS : WG_TX_CROPS;
-                        for (k = 0; k < 4; k++) {
-                            float p[3];
-                            p[0] = (gi + corner[k][0]) * WG_CELL;
-                            p[1] = h_at(gi + corner[k][0], gj + corner[k][1]);
-                            p[2] = -(gj + corner[k][1]) * WG_CELL;
-                            tex_u = (float)corner[k][0];
-                            tex_v = (float)corner[k][1];
-                            v[k] = cmesh_vertex(c, p, mb_shade(rgb, terrain_light(gi + corner[k][0], gj + corner[k][1])));
-                        }
-                        tex_tile = WG_TX_PLAIN;
-                        cmesh_tri(c, v[0], v[1], v[2]);
-                        cmesh_tri(c, v[0], v[2], v[3]);
-                        continue;
-                    }
+                    tex_tile = ground_tile(region_at((gi + 0.5f) * WG_CELL, (gj + 0.5f) * WG_CELL));
                     for (k = 0; k < 4; k++) {
-                        int li = i + corner[k][0], lj = j + corner[k][1], s;
-                        for (s = 0; s < nseen[lj][li] && seen[lj][li][s].rgb != rgb; s++)
-                            continue;
-                        if (s == nseen[lj][li]) {
-                            float p[3];
-                            p[0] = (gi + corner[k][0]) * WG_CELL;
-                            p[1] = h_at(gi + corner[k][0], gj + corner[k][1]);
-                            p[2] = -(gj + corner[k][1]) * WG_CELL;
-                            seen[lj][li][s].rgb = rgb;
-                            seen[lj][li][s].idx = cmesh_vertex(c, p, mb_shade(rgb, terrain_light(gi + corner[k][0],
-                                                                                                 gj + corner[k][1])));
-                            nseen[lj][li]++;
-                        }
-                        v[k] = seen[lj][li][s].idx;
+                        float p[3];
+                        p[0] = (gi + corner[k][0]) * WG_CELL;
+                        p[1] = h_at(gi + corner[k][0], gj + corner[k][1]);
+                        p[2] = -(gj + corner[k][1]) * WG_CELL;
+                        tex_u = (float)corner[k][0];
+                        tex_v = (float)corner[k][1];
+                        v[k] = cmesh_vertex(c, p, mb_shade(rgb, terrain_light(gi + corner[k][0], gj + corner[k][1])));
                     }
+                    tex_tile = WG_TX_PLAIN;
                     cmesh_tri(c, v[0], v[1], v[2]);
                     cmesh_tri(c, v[0], v[2], v[3]);
                 }
@@ -3122,9 +3101,8 @@ static int write_pack(const char *path, const wg_depot *depots)
     pakw *w = pakw_new(seed_g, 0);
     wg_chunk *index = (wg_chunk *)calloc(WG_CHUNKS * WG_CHUNKS, sizeof *index);
     wg_vertex *verts = NULL;
-    float *uvs = NULL;                                /* with --uv: the atlas's s, t, each vertex's */
     uint16_t *tris = NULL;
-    size_t cap_v = 0, cap_t = 0, cap_u = 0, nv = 0, nt = 0;
+    size_t cap_v = 0, cap_t = 0, nv = 0, nt = 0;
     int c, i, n;
     wg_variant *var = (wg_variant *)calloc(WG_CHUNKS * WG_CHUNKS, sizeof *var);
     size_t run_tris[WG_VARIANTS] = { 0, 0, 0, 0 };
@@ -3146,7 +3124,6 @@ static int write_pack(const char *path, const wg_depot *depots)
             for (i = 0; i < hcap; i++)
                 slot[i] = -1;
             verts = (wg_vertex *)grow(verts, &cap_v, (nv + (size_t)m->nverts) * sizeof *verts);
-            uvs = (float *)grow(uvs, &cap_u, (nv + (size_t)m->nverts) * 8);
             tris = (uint16_t *)grow(tris, &cap_t, (nt + (size_t)m->ntris) * 6);
             for (i = 0; i < m->nverts; i++) {
                 wg_vertex q;
@@ -3158,18 +3135,11 @@ static int write_pack(const char *path, const wg_depot *depots)
                 q.z = (int16_t)lrintf((oy - y) * WG_UNIT);
                 q.pad = 0;
                 memcpy(q.rgba, &m->rgba[i * 4], 4);
-                hsh = dgk_crc32(0, &q, sizeof q);
-                if (uv_out)                          /* with the atlas, the same place and colour, but not the same s, t */
-                    hsh = dgk_crc32(hsh, &m->uv[i * 2], 8);
-                hsh &= (uint32_t)(hcap - 1);
-                for (at = (int)hsh; slot[at] >= 0 && (memcmp(&verts[nv + (size_t)slot[at]], &q, sizeof q) ||
-                                                       (uv_out && memcmp(&uvs[(nv + (size_t)slot[at]) * 2], &m->uv[i * 2], 8)));
-                     at = (at + 1) & (hcap - 1))
+                hsh = dgk_crc32(0, &q, sizeof q) & (uint32_t)(hcap - 1);
+                for (at = (int)hsh; slot[at] >= 0 && memcmp(&verts[nv + (size_t)slot[at]], &q, sizeof q); at = (at + 1) & (hcap - 1))
                     continue;
                 if (slot[at] < 0) {
                     slot[at] = kept;
-                    uvs[(nv + (size_t)kept) * 2] = m->uv[i * 2];
-                    uvs[(nv + (size_t)kept) * 2 + 1] = m->uv[i * 2 + 1];
                     verts[nv + (size_t)kept++] = q;
                 }
                 remap[i] = slot[at];
@@ -3206,8 +3176,8 @@ static int write_pack(const char *path, const wg_depot *depots)
     }
     pakw_section(w, WG_CINDEX, index, sizeof *index * WG_CHUNKS * WG_CHUNKS);
     pakw_section(w, WG_CVERTS, verts, (uint32_t)(nv * sizeof *verts));
-    if (uv_out)
-        pakw_section(w, WG_CUV, uvs, (uint32_t)(nv * 8));
+    main_verts = (uint32_t)nv;
+    main_tris = (uint32_t)nt;
     pakw_section(w, WG_CTRIS, tris, (uint32_t)(nt * 6));
     pakw_section(w, WG_CVARIANT, var, sizeof *var * WG_CHUNKS * WG_CHUNKS);
     free(var);
@@ -3270,9 +3240,105 @@ static int write_pack(const char *path, const wg_depot *depots)
            (unsigned long)run_tris[WG_MEDIUM_UP], (unsigned long)run_tris[WG_HIGH_ONLY], nboxes, nedges, npts, ndepots);
     free(index);
     free(verts);
-    free(uvs);
     free(tris);
     return pakw_write(w, path);
+}
+
+/* WORLDHI.PAK: each chunk's HIGH triangles (the shared, MEDIUM-and-HIGH and HIGH-only runs, as HIGH draws them) with
+ * their places in the atlas, welded on place, colour and place in the atlas (wgen.h). */
+static int write_hi(const char *path)
+{
+    pakw *w = pakw_new(seed_g, 0);
+    wg_chunk *index = (wg_chunk *)calloc(WG_CHUNKS * WG_CHUNKS, sizeof *index);
+    wg_hvertex *verts = NULL;
+    uint16_t *tris = NULL;
+    size_t cap_v = 0, cap_t = 0, nv = 0, nt = 0;
+    wg_hi h;
+    int c, i;
+    for (c = 0; c < WG_CHUNKS * WG_CHUNKS; c++) {
+        float ox = (c % WG_CHUNKS) * WG_CHUNK, oy = (c / WG_CHUNKS) * WG_CHUNK;
+        int r, base = 0, total = 0, hcap = 1, *slot;
+        for (r = WG_SHARED; r < WG_VARIANTS; r++)
+            total += chunks[r][c].nverts;
+        while (hcap < total * 2 + 2)
+            hcap *= 2;
+        slot = (int *)malloc(sizeof(int) * (size_t)hcap);
+        for (i = 0; i < hcap; i++)
+            slot[i] = -1;
+        index[c].first_vertex = (uint32_t)nv;
+        index[c].first_index = (uint32_t)nt * 3;
+        verts = (wg_hvertex *)grow(verts, &cap_v, (nv + (size_t)total) * sizeof *verts);
+        for (r = WG_SHARED; r < WG_VARIANTS; r++) {
+            cmesh *m = &chunks[r][c];
+            int *remap = (int *)malloc(sizeof(int) * (size_t)(m->nverts + 1));
+            tris = (uint16_t *)grow(tris, &cap_t, (nt + (size_t)m->ntris) * 6);
+            for (i = 0; i < m->nverts; i++) {
+                wg_hvertex q;
+                float x = m->pos[i * 3], hh = m->pos[i * 3 + 1], y = -m->pos[i * 3 + 2];
+                uint32_t hsh;
+                int at;
+                memset(&q, 0, sizeof q);
+                q.x = (int16_t)lrintf((x - ox) * WG_UNIT);
+                q.y = (int16_t)lrintf(hh * WG_UNIT);
+                q.z = (int16_t)lrintf((oy - y) * WG_UNIT);
+                q.s = (int16_t)lrintf(m->uv[i * 2] * WG_ATLAS);
+                q.t = (int16_t)lrintf(m->uv[i * 2 + 1] * WG_ATLAS);
+                memcpy(q.rgba, &m->rgba[i * 4], 4);
+                hsh = dgk_crc32(0, &q, sizeof q) & (uint32_t)(hcap - 1);
+                for (at = (int)hsh; slot[at] >= 0 && memcmp(&verts[nv + (size_t)slot[at]], &q, sizeof q); at = (at + 1) & (hcap - 1))
+                    continue;
+                if (slot[at] < 0) {
+                    slot[at] = base;
+                    verts[nv + (size_t)base++] = q;
+                }
+                remap[i] = slot[at];
+            }
+            for (i = 0; i < m->ntris * 3; i++)
+                tris[nt * 3 + (size_t)i] = (uint16_t)remap[m->idx[i]];
+            nt += (size_t)m->ntris;
+            index[c].ntris += (uint32_t)m->ntris;
+            free(remap);
+        }
+        if (base > 65535) {
+            fprintf(stderr, "fwgen: chunk %d's HIGH has %d vertices, more than 16-bit indices reach\n", c, base);
+            exit(1);
+        }
+        index[c].nverts = (uint32_t)base;
+        nv += (size_t)base;
+        free(slot);
+    }
+    memset(&h, 0, sizeof h);
+    h.version = WG_HI_VERSION;
+    h.seed = seed_g;
+    h.main_verts = main_verts;
+    h.main_tris = main_tris;
+    pakw_section(w, WG_HI_HEADER, &h, sizeof h);
+    pakw_section(w, WG_HI_INDEX, index, (uint32_t)(WG_CHUNKS * WG_CHUNKS * sizeof *index));
+    pakw_section(w, WG_HI_VERTS, verts, (uint32_t)(nv * sizeof *verts));
+    pakw_section(w, WG_HI_TRIS, tris, (uint32_t)(nt * 6));
+    printf("fwgen: HIGH: %lu vertices, %lu triangles\n", (unsigned long)nv, (unsigned long)nt);
+    free(index);
+    free(verts);
+    free(tris);
+    return pakw_write(w, path);
+}
+
+/* A pack's size and hash (the CRC-32 of its bytes), printed: data-check compares the hash with a golden. */
+static void report(const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    if (f) {
+        static uint8_t buf[1 << 16];
+        uint32_t crc = 0;
+        size_t n;
+        long total = 0;
+        while ((n = fread(buf, 1, sizeof buf, f)) > 0) {
+            crc = dgk_crc32(crc, buf, n);
+            total += (long)n;
+        }
+        fclose(f);
+        printf("fwgen: %s %ld bytes, hash %08lx\n", path, total, (unsigned long)crc);
+    }
 }
 
 int main(int argc, char **argv)
@@ -3280,11 +3346,10 @@ int main(int argc, char **argv)
     static wg_depot depots[WG_MAX_PLACES];
     int i, e;
     FILE *f;
-    if (argc != 3 && !(argc == 4 && !strcmp(argv[3], "--uv"))) {
-        fprintf(stderr, "usage: fwgen SEED OUT.PAK [--uv]\n");
+    if (argc != 3 && argc != 4) {
+        fprintf(stderr, "usage: fwgen SEED OUT.PAK [HIGH.PAK]\n");
         return 2;
     }
-    uv_out = argc == 4;                              /* the textures' look test: the atlas's coordinates too */
     seed_g = (uint32_t)strtoul(argv[1], NULL, 0);
     dgk_rng_seed(&rng, seed_g, 7);
     make_hills();
@@ -3344,18 +3409,12 @@ int main(int argc, char **argv)
     build_tour();
     if (write_pack(argv[2], depots) != 0)
         return 1;
-    f = fopen(argv[2], "rb");
-    if (f) {
-        static uint8_t buf[1 << 16];
-        uint32_t crc = 0;
-        size_t n;
-        long total = 0;
-        while ((n = fread(buf, 1, sizeof buf, f)) > 0) {
-            crc = dgk_crc32(crc, buf, n);
-            total += (long)n;
-        }
-        fclose(f);
-        printf("fwgen: %s %ld bytes, hash %08lx\n", argv[2], total, (unsigned long)crc);
+    report(argv[2]);
+    if (argc == 4) {                                 /* HIGH's textured world beside it */
+        if (write_hi(argv[3]) != 0)
+            return 1;
+        report(argv[3]);
     }
+    (void)f;
     return 0;
 }

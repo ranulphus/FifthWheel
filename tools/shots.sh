@@ -20,15 +20,17 @@ mkdir -p $dos $hl/out
 # DOS, one boot per set of frames; the guest's C:\OUT comes back as files/.
 # The runs log nothing while they draw (86Box draws the haul at about 10
 # frames a second), so the harness waits 300 s of silence, not 60.
-for name in tour hud dock haul; do
+for name in tour hud dock haul high; do
     case $name in
     tour) args="-tourshots 10" ;;
     hud) args="-frames 61 -shot 60:H0" ;;
     dock) args="-dockpose -frames 121 -shot 120:H1" ;;
     haul) args="-autojob -frames 2401 -shot 2400:H2" ;;
+    high) args="-detail high -pose 1878:1880:90:14 -frames 181 -shot 180:H3" ;;   # HIGH's textures in a town
     esac
     "$DEV" python3 "$MGAHAL/tools/loopa/run.py" --name "fwshots-$name" --card "$card" \
-        --exe build/dos/FWHEEL.EXE --file build/data/WORLD.PAK --args="-test -fixed -nosound $args" \
+        --exe build/dos/FWHEEL.EXE --file build/data/WORLD.PAK --file build/data/WORLDHI.PAK \
+        --args="-test -fixed -nosound $args" \
         --out "$PWD/$dos/$name" --timeout 900 --idle 300 > /dev/null || true
     # The haul is cut short, so its job's own check fails; its picture is what counts.
     status=$(cat $dos/$name/status 2>/dev/null || echo none)

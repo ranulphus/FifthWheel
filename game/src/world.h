@@ -33,9 +33,15 @@ typedef struct world {
     int ndepots;
     const wg_variant *variants;          /* CVAR (NULL: every triangle for every detail) */
     int models;                          /* the detail's models: 0 draws the LOW runs, else MEDIUM and HIGH's */
-    const float *uv;                     /* the textures' look test: the atlas's s, t a vertex (CUVS; NULL: none) */
-    unsigned int atlas;                  /* its texture; drawn with it when textured is set (HIGH) */
-    int textured;
+    /* HIGH's textured world (WORLDHI.PAK beside the pack, wgen.h), loaded the first time HIGH wants it. */
+    dgk_pak hipak;
+    int hi_state;                        /* 0 not tried, 1 loaded, -1 none or unusable */
+    const wg_chunk *hi_index;
+    const wg_hvertex *hi_verts;
+    const uint16_t *hi_tris;
+    unsigned int atlas;                  /* its texture (tex.c) */
+    int textured;                        /* draw HIGH from it (main.c sets it: HIGH, and loaded) */
+    char file[160];                      /* the pack's name, for WORLDHI.PAK's */
     const obb *boxes;
     int nboxes;
     int grid_n;                          /* buckets per side */
@@ -55,6 +61,8 @@ typedef struct world {
 #define FW_FOURCC_SPAWN WG_SPAWN
 
 int  world_load(world *w, const char *path);
+/* WORLDHI.PAK, beside the pack (its name with HI before the extension), once: 1 if loaded and made with this pack. */
+int  world_load_hi(world *w);
 void world_free(world *w);
 float world_height(const world *w, float x, float y);
 /* Boxes whose buckets lie within r metres of (x, y), and props that near;

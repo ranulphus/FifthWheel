@@ -345,6 +345,37 @@ Pentium II 266 by the usual ratio. `-trace N` logs an FW-CARS line (how
 many move, their speed, knocks, turns, give-ways); `-park X:Y:H` starts
 the game with the rig standing there.
 
+## Textures at HIGH (game/src/tex.c, tools/fwgen.c, 2026-11-25)
+
+The owner asked whether HIGH's cards should have textures, "very
+cartoon-like, Nintendo-esque" ones and nothing photographic; a look test
+on four views decided it ("The textures look really good, please go with
+it"). The textures are greyscale patterns tinted by the vertex colours
+(`GL_MODULATE`), so the palette is the same and one tile serves every
+colour:
+
+- town and depot grass: soft lighter and darker patches with dark tufts;
+- fields: rows of crop with furrows between, each field's rows one of four
+  ways (0, 45, 90 or 135 degrees, by the field);
+- roads and the roundabouts' rings: grit; pavements: square slabs;
+- houses: brick or weatherboard on their fronts and backs (shops boards);
+  roofs: scalloped tiles in rows;
+- trees, bushes and hedges: clumps of leaves.
+
+One 512 x 512 atlas, drawn by code at start-up (no picture files), with
+two smaller levels whose patterns are a fifth fainter each (thin rows far
+off shimmer less), and anisotropic filtering where the card has it
+(DOS-GL's `GL_EXT_texture_filter_anisotropic`, the Radeons). Each face maps
+one tile, so the world is still drawn one call a chunk; the ground's cells
+(16 m) each map a tile, and the grass, crop, grit and slab patterns repeat
+with the cell, so they run on across them.
+
+The textured world is its own file, WORLDHI.PAK (16.2 MB, formats.md),
+loaded only for HIGH: WORLD.PAK and LOW and MEDIUM are as they were (a
+HIGH machine holds both, about 30 MB). The ground's cells have their own
+corners there (a vertex at a cell's corner cannot map four tiles);
+WORLD.PAK's welder still makes them one, so WORLD.PAK did not change.
+
 ## Towns (tools/fwgen.c, 2026-11-21)
 
 Owner: "add as much detail as you can"; LOW stays as it was (the G200).

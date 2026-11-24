@@ -203,7 +203,9 @@ static void detail_apply(game *g)
     g->det = detail_effective(g->presets, g->detail_chosen, g->gov.notch);
     g->cam.pitch_min = g->det.pitch_min * 3.14159265f / 180.0f;
     g->w.models = g->det.models;                     /* the world's runs for this detail (CVAR) */
-    g->w.textured = g->w.uv && g->w.atlas && g->det.models == 2;   /* HIGH, with the look test's pack */
+    if (g->det.models == 2 && world_load_hi(&g->w) && !g->w.atlas)
+        g->w.atlas = tex_atlas();                    /* HIGH's textures: their world loaded the first time */
+    g->w.textured = g->det.models == 2 && g->w.hi_state > 0;
     if (g->lorry.quality != g->det.models) {
         lorry_build(&g->lorry, g->det.models);
         career_style(g);
@@ -297,8 +299,6 @@ static int init(void *u)
     traffic_init(&g->traffic, &g->w, g->r.x, g->r.y, g->w.chunked ? g->ncars : 0);
     lorry_build(&g->lorry, 0);                       /* at the detail's roundness once it is known */
     ui_init();                                       /* the HUD's texture */
-    if (g->w.uv)
-        g->w.atlas = tex_atlas();                    /* the textures' look test (a pack made with fwgen --uv) */
     if (dgk_font_load(&g->font, &fw_font) != 0)
         return -1;
     if (g->replay_path) {

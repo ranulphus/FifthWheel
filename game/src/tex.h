@@ -1,6 +1,6 @@
-/* tex.h - the textures' look test (HIGH, a pack made with fwgen --uv): one
- * atlas of cartoon patterns (wgen.h's WG_TX_*), greyscale, tinted by the
- * world's vertex colours (GL_MODULATE). */
+/* tex.h - HIGH's textures (with WORLDHI.PAK, wgen.h): one atlas of cartoon
+ * patterns (WG_TX_*), greyscale, tinted by the world's vertex colours
+ * (GL_MODULATE); anisotropic filtering where the card has it. */
 #ifndef FW_TEX_H
 #define FW_TEX_H
 

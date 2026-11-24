@@ -32,7 +32,6 @@ enum { WG_TOWN, WG_DEPOT, WG_JUNCTION };   /* a node's kind; a junction has no p
 #define WG_WORLD  DGK_FOURCC('W', 'R', 'L', 'D')   /* wg_world */
 #define WG_CINDEX DGK_FOURCC('C', 'I', 'D', 'X')   /* wg_chunk[WG_CHUNKS * WG_CHUNKS], row-major from the south-west */
 #define WG_CVERTS DGK_FOURCC('C', 'V', 'R', 'T')   /* wg_vertex[] */
-#define WG_CUV    DGK_FOURCC('C', 'U', 'V', 'S')   /* optional: float s, t per CVRT vertex, in the atlas (below) */
 #define WG_CTRIS  DGK_FOURCC('C', 'T', 'R', 'I')   /* u16[] indices, chunk-local */
 #define WG_HEIGHT DGK_FOURCC('H', 'G', 'H', 'T')   /* int16[WG_HN * WG_HN], decimetres */
 #define WG_BOXES  DGK_FOURCC('F', 'W', 'C', 'O')   /* u32 n, then obb[n] (world.h) */
@@ -132,15 +131,35 @@ static inline void wg_offset(const float (*in)[2], int n, float off, int closed,
     }
 }
 
-/* The textures' look test (HIGH only; fwgen --uv, game/src/tex.c): one
- * atlas WG_ATLAS texels square, tiles of WG_TILE in rows, each face mapping
- * one tile inside a WG_GUTTER margin (no repeat: the filtering stays in it).
- * Greyscale patterns, tinted by the vertex colours. */
+/* HIGH's textured world, WORLDHI.PAK beside WORLD.PAK (fwgen writes both;
+ * the game loads it only for HIGH): each chunk's HIGH triangles again (the
+ * shared, MEDIUM-and-HIGH and HIGH-only runs as one), each vertex with its
+ * place in the atlas (game/src/tex.c). The atlas is WG_ATLAS texels square,
+ * tiles of WG_TILE in rows, each face mapping one tile inside a WG_GUTTER
+ * margin (no repeat: the filtering stays in it); greyscale cartoon patterns
+ * tinted by the vertex colours. */
+#define WG_HI_HEADER DGK_FOURCC('H', 'W', 'L', 'D')  /* wg_hi */
+#define WG_HI_INDEX  DGK_FOURCC('H', 'I', 'D', 'X')  /* wg_chunk[WG_CHUNKS * WG_CHUNKS] (hmin, hmax unused) */
+#define WG_HI_VERTS  DGK_FOURCC('H', 'V', 'R', 'T')  /* wg_hvertex[] */
+#define WG_HI_TRIS   DGK_FOURCC('H', 'T', 'R', 'I')  /* uint16[3] a triangle, chunk-local */
+#define WG_HI_VERSION 1
+
+typedef struct wg_hi {
+    uint32_t version, seed, main_verts, main_tris;   /* the WORLD.PAK made with it: its seed, its CVRT's and CTRI's counts */
+} wg_hi;
+
+typedef struct wg_hvertex {
+    int16_t x, y, z;                    /* as wg_vertex */
+    int16_t s, t;                       /* the atlas's texels (the texture matrix scales them by 1 / WG_ATLAS) */
+    uint8_t rgba[4];
+    int16_t pad;
+} wg_hvertex;
+
 #define WG_ATLAS 512
 #define WG_TILE 128
 #define WG_GUTTER 4
-enum { WG_TX_PLAIN, WG_TX_GRASS, WG_TX_CROPS, WG_TX_ASPHALT, WG_TX_BRICK, WG_TX_BOARDS, WG_TX_ROOF, WG_TX_LEAVES,
-       WG_TX_PAVING, WG_TX_COUNT };
+enum { WG_TX_PLAIN, WG_TX_GRASS, WG_TX_CROPS, WG_TX_CROPS_45, WG_TX_CROPS_90, WG_TX_CROPS_135, WG_TX_ASPHALT,
+       WG_TX_BRICK, WG_TX_BOARDS, WG_TX_ROOF, WG_TX_LEAVES, WG_TX_PAVING, WG_TX_COUNT };
 static inline void wg_tile_uv(int tile, float u, float v, float *s, float *t)
 {
     const int per = WG_ATLAS / WG_TILE;
