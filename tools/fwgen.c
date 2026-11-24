@@ -212,6 +212,7 @@ static void place_kind(int kind, int count, float spacing, float margin, float r
 
 typedef struct cmesh {
     float *pos;                                   /* GL coordinates, world */
+    float *uv;                                    /* the atlas's s, t (wgen.h; the look test) */
     uint8_t *rgba;
     uint16_t *idx;
     int nverts, ntris, cap_v, cap_t;
@@ -219,6 +220,10 @@ typedef struct cmesh {
 
 static cmesh chunks[WG_VARIANTS][WG_CHUNKS * WG_CHUNKS];
 static int variant = WG_SHARED;                   /* where quad() puts what it makes */
+/* The textures' look test: the atlas tile the next vertices map (WG_TX_PLAIN: its middle, no pattern) and where in
+ * it (0..1); tex_quad: quad() and face() map their corners over the whole tile. Written only with --uv. */
+static int tex_tile = WG_TX_PLAIN, tex_quad, uv_out;
+static float tex_u = 0.5f, tex_v = 0.5f;
 static long total_tris;
 
 static cmesh *chunk_for(float x, float y)
@@ -239,6 +244,7 @@ static void quad(const float *p0, const float *p1, const float *p2, const float 
     if (c->nverts + 4 > c->cap_v) {
         c->cap_v = c->cap_v ? c->cap_v * 2 : 1024;
         c->pos = (float *)realloc(c->pos, (size_t)c->cap_v * 12);
+        c->uv = (float *)realloc(c->uv, (size_t)c->cap_v * 8);
         c->rgba = (uint8_t *)realloc(c->rgba, (size_t)c->cap_v * 4);
     }
     if (c->ntris + 2 > c->cap_t) {
@@ -253,6 +259,14 @@ static void quad(const float *p0, const float *p1, const float *p2, const float 
         mb_quad(&b, p0, p1, p2, p3, rgb);
     else
         mb_quad_lit(&b, p0, p1, p2, p3, rgb, light);
+    {
+        static const float cu[4] = { 0, 1, 1, 0 }, cv[4] = { 0, 0, 1, 1 };
+        int k;
+        for (k = c->nverts; k < b.nverts; k++) {
+            int corner = (k - c->nverts) & 3, plain = tex_tile == WG_TX_PLAIN || !tex_quad;
+            wg_tile_uv(tex_tile, plain ? 0.5f : cu[corner], plain ? 0.5f : cv[corner], &c->uv[k * 2], &c->uv[k * 2 + 1]);
+        }
+    }
     c->nverts = b.nverts;
     c->ntris = b.ntris;
     total_tris += 2;
@@ -264,9 +278,12 @@ static int cmesh_vertex(cmesh *c, const float *p, uint32_t rgb)
     if (c->nverts + 1 > c->cap_v) {
         c->cap_v = c->cap_v ? c->cap_v * 2 : 1024;
         c->pos = (float *)realloc(c->pos, (size_t)c->cap_v * 12);
+        c->uv = (float *)realloc(c->uv, (size_t)c->cap_v * 8);
         c->rgba = (uint8_t *)realloc(c->rgba, (size_t)c->cap_v * 4);
     }
     memcpy(&c->pos[c->nverts * 3], p, 3 * sizeof(float));
+    wg_tile_uv(tex_tile, tex_tile == WG_TX_PLAIN ? 0.5f : tex_u, tex_tile == WG_TX_PLAIN ? 0.5f : tex_v,
+               &c->uv[c->nverts * 2], &c->uv[c->nverts * 2 + 1]);
     c->rgba[c->nverts * 4 + 0] = (uint8_t)(rgb >> 16);
     c->rgba[c->nverts * 4 + 1] = (uint8_t)(rgb >> 8);
     c->rgba[c->nverts * 4 + 2] = (uint8_t)rgb;
@@ -311,7 +328,8 @@ static void blob(float x, float y, float z, float rx, float rz, uint32_t rgb)
         { 11, 10, 2 }, { 10, 7, 6 }, { 7, 1, 8 }, { 3, 9, 4 }, { 3, 4, 2 }, { 3, 2, 6 }, { 3, 6, 8 },
         { 3, 8, 9 }, { 4, 9, 5 }, { 2, 4, 11 }, { 6, 2, 10 }, { 8, 6, 7 }, { 9, 8, 1 } };
     cmesh *c = chunk_for(x, y);
-    int v[12], i;
+    int v[12], i, save = tex_tile;
+    tex_tile = WG_TX_LEAVES;
     for (i = 0; i < 12; i++) {
         /* The icosahedron's y is up; its x and z lie on the ground (GL z is -y). */
         float p[3], n[3], l;
@@ -325,10 +343,13 @@ static void blob(float x, float y, float z, float rx, float rz, uint32_t rgb)
         n[0] /= l;
         n[1] /= l;
         n[2] /= l;
+        tex_u = 0.5f + ico[i][0] * 0.5f;
+        tex_v = 0.5f + ico[i][2] * 0.5f;
         v[i] = smooth_vertex(c, p, n, rgb, 0.7f);
     }
     for (i = 0; i < 20; i++)
         cmesh_tri(c, v[face[i][0]], v[face[i][1]], v[face[i][2]]);
+    tex_tile = save;
 }
 
 /* A smooth cone round (x, y): base radius r at height z0, its tip at z1, n
@@ -479,7 +500,12 @@ static void face(cmesh *m, float (*p)[3], int n, const float *out, uint32_t rgb,
     }
     light = mb_light(nx / l, ny / l, nz / l);
     for (i = 0; i < n; i++) {
+        static const float cu[4] = { 0, 1, 1, 0 }, cv[4] = { 0, 0, 1, 1 }, tu[3] = { 0, 1, 0.5f }, tv[3] = { 0, 0, 1 };
         float k = p[i][1] < foot + 0.05f ? 0.8f : 1.0f;
+        if (tex_quad) {
+            tex_u = n == 3 ? tu[i] : cu[i & 3];
+            tex_v = n == 3 ? tv[i] : cv[i & 3];
+        }
         v[i] = cmesh_vertex(m, p[i], mb_shade(rgb, light * k));
     }
     for (i = 1; i + 1 < n; i++)
@@ -957,7 +983,11 @@ static void road_ribbon(const float (*p)[3], int n, float half, const paint *pt,
                               { p[i + 1][0] - nx1, p[i + 1][2] + lift, -(p[i + 1][1] - ny1) },
                               { p[i + 1][0] + nx1, p[i + 1][2] + lift, -(p[i + 1][1] + ny1) },
                               { p[i][0] + nx0, p[i][2] + lift, -(p[i][1] + ny0) } };
+            tex_tile = WG_TX_ASPHALT;
+            tex_quad = 1;
             quad(q[0], q[1], q[2], q[3], 0x565B66u, 0.92f);
+            tex_tile = WG_TX_PLAIN;
+            tex_quad = 0;
         }
         if (pt && (along < pt->quiet0 || total - along - l < pt->quiet1)) {
             along += l;
@@ -1192,8 +1222,12 @@ static void row_house(const bframe *f, const hse *h, const hse *left, const hse 
     int i, nwin;
     m = chunk_for(at.cx, at.cy);
     /* Front and back walls; the ends where the run ends or a lower neighbour leaves them showing. */
+    tex_tile = h->shop || (h->roof & 1) ? WG_TX_BOARDS : WG_TX_BRICK;   /* the look test */
+    tex_quad = 1;
     wall_at(m, f, 0, -hw, h->a, h->b, base - 0.5f, e, -1, h->wall, base);
     wall_at(m, f, 0, hw, h->a, h->b, base - 0.5f, e, 1, h->wall, base);
+    tex_tile = WG_TX_PLAIN;
+    tex_quad = 0;
     for (i = 0; i < 2; i++) {
         const hse *nb = i ? right : left;
         float u = i ? h->b : h->a, sign = i ? 1.0f : -1.0f;
@@ -1237,8 +1271,12 @@ static void row_house(const bframe *f, const hse *h, const hse *left, const hse 
     /* The roof's two slopes, overhanging the front and back; past the run's ends a little. */
     {
         float u0 = h->a - (run_l ? 0.3f : 0.0f), u1 = h->b + (run_r ? 0.3f : 0.0f), eh = e - o * (r - e) / hw;
+        tex_tile = WG_TX_ROOF;
+        tex_quad = 1;
         slope_at(m, f, u0, u1, -hw - o, eh, 0, r, h->roof);
         slope_at(m, f, u0, u1, hw + o, eh, 0, r, h->roof);
+        tex_tile = WG_TX_PLAIN;
+        tex_quad = 0;
     }
     if (h->chimney) {                                /* at one end, on the ridge: a third of them at MEDIUM */
         float cu = h->door_left ? h->b - 0.7f : h->a + 0.7f;
@@ -1452,7 +1490,11 @@ static void pavements(const place *t, float u0, float u1, float v0, float v1)
                 p[k][1] = t->h + lift;
                 p[k][2] = -q[k][1];
             }
+            tex_tile = WG_TX_PAVING;
+            tex_quad = 1;
             face(chunk_for((q[0][0] + q[2][0]) * 0.5f, (q[0][1] + q[2][1]) * 0.5f), p, 4, up, 0xCFC9BCu, -1e9f);
+            tex_tile = WG_TX_PLAIN;
+            tex_quad = 0;
             for (k = 0; k < 2; k++) {                /* the kerb: the street side's face */
                 pk[k][0] = p[k][0];
                 pk[k][2] = p[k][2];
@@ -1954,7 +1996,11 @@ static void roundabout(const place *t)
         float kt[4][3] = { { cx + rg * c0, h + 0.55f, -(cy + rg * s0) }, { cx + ri * c0, h + 0.55f, -(cy + ri * s0) },
                            { cx + ri * c1, h + 0.55f, -(cy + ri * s1) }, { cx + rg * c1, h + 0.55f, -(cy + rg * s1) } };
         uint32_t kerb = (k & 1) ? 0xF4F4F0u : 0xD8402Eu;
+        tex_tile = WG_TX_ASPHALT;
+        tex_quad = 1;
         quad(q[0], q[1], q[2], q[3], 0x565B66u, 0.92f);
+        tex_tile = WG_TX_PLAIN;
+        tex_quad = 0;
         quad(kb[0], kb[1], kb[2], kb[3], kerb, -1);
         quad(kt[0], kt[1], kt[2], kt[3], kerb, -1);
         quad(top[0], top[2], top[1], top[1], 0x6CC24Au, -1);
@@ -2438,13 +2484,21 @@ static void terrain_piece(cmesh *c, const tvert *v, int n, int depth)
             cy += v[i].y / n;
         }
         first = c->nverts;
+        {
+            /* The look test: town grass or a field's crops, the piece's 16 m cell over a tile. */
+            int r = k == n ? reg[0] : region_at(cx, cy);
+            tex_tile = r < 0 ? WG_TX_GRASS : WG_TX_CROPS;
+        }
         for (i = 0; i < n; i++) {
             float p[3];
             p[0] = v[i].x;
             p[1] = v[i].h;
             p[2] = -v[i].y;
+            tex_u = (v[i].x - floorf(cx / WG_CELL) * WG_CELL) / WG_CELL;
+            tex_v = (v[i].y - floorf(cy / WG_CELL) * WG_CELL) / WG_CELL;
             cmesh_vertex(c, p, mb_shade(k == n ? region_colour(reg[0]) : ground_colour(cx, cy), v[i].light));
         }
+        tex_tile = WG_TX_PLAIN;
         for (i = 1; i + 1 < n; i++)
             cmesh_tri(c, first, first + i, first + i + 1);
         return;
@@ -2542,6 +2596,24 @@ static void build_terrain(void)
                         continue;
                     }
                     rgb = at[0];
+                    if (uv_out) {
+                        /* The textures' look test: the cell's own four corners, the tile over it (shared ones
+                         * cannot map their neighbours' tiles too); the same places and colours, as smooth. */
+                        tex_tile = region_at((gi + 0.5f) * WG_CELL, (gj + 0.5f) * WG_CELL) < 0 ? WG_TX_GRASS : WG_TX_CROPS;
+                        for (k = 0; k < 4; k++) {
+                            float p[3];
+                            p[0] = (gi + corner[k][0]) * WG_CELL;
+                            p[1] = h_at(gi + corner[k][0], gj + corner[k][1]);
+                            p[2] = -(gj + corner[k][1]) * WG_CELL;
+                            tex_u = (float)corner[k][0];
+                            tex_v = (float)corner[k][1];
+                            v[k] = cmesh_vertex(c, p, mb_shade(rgb, terrain_light(gi + corner[k][0], gj + corner[k][1])));
+                        }
+                        tex_tile = WG_TX_PLAIN;
+                        cmesh_tri(c, v[0], v[1], v[2]);
+                        cmesh_tri(c, v[0], v[2], v[3]);
+                        continue;
+                    }
                     for (k = 0; k < 4; k++) {
                         int li = i + corner[k][0], lj = j + corner[k][1], s;
                         for (s = 0; s < nseen[lj][li] && seen[lj][li][s].rgb != rgb; s++)
@@ -2588,11 +2660,16 @@ static void hedge_stretch(float ax, float ay, float ah, float bx, float by, floa
         p[0] = ax + nx * prof[k][0];
         p[1] = ah + prof[k][1];
         p[2] = -(ay + ny * prof[k][0]);
+        tex_tile = WG_TX_LEAVES;
+        tex_u = 0;
+        tex_v = k * 0.5f;
         va[k] = smooth_vertex(c, p, n, col, 0.8f);
         p[0] = bx + nx * prof[k][0];
         p[1] = bh + prof[k][1];
         p[2] = -(by + ny * prof[k][0]);
+        tex_u = DGK_MIN(l / 8.0f, 1.0f);
         vb[k] = smooth_vertex(c, p, n, col, 0.8f);
+        tex_tile = WG_TX_PLAIN;
     }
     for (k = 0; k + 1 < HEDGE_EDGES; k++) {
         cmesh_tri(c, va[k], vb[k], vb[k + 1]);
@@ -3045,8 +3122,9 @@ static int write_pack(const char *path, const wg_depot *depots)
     pakw *w = pakw_new(seed_g, 0);
     wg_chunk *index = (wg_chunk *)calloc(WG_CHUNKS * WG_CHUNKS, sizeof *index);
     wg_vertex *verts = NULL;
+    float *uvs = NULL;                                /* with --uv: the atlas's s, t, each vertex's */
     uint16_t *tris = NULL;
-    size_t cap_v = 0, cap_t = 0, nv = 0, nt = 0;
+    size_t cap_v = 0, cap_t = 0, cap_u = 0, nv = 0, nt = 0;
     int c, i, n;
     wg_variant *var = (wg_variant *)calloc(WG_CHUNKS * WG_CHUNKS, sizeof *var);
     size_t run_tris[WG_VARIANTS] = { 0, 0, 0, 0 };
@@ -3068,6 +3146,7 @@ static int write_pack(const char *path, const wg_depot *depots)
             for (i = 0; i < hcap; i++)
                 slot[i] = -1;
             verts = (wg_vertex *)grow(verts, &cap_v, (nv + (size_t)m->nverts) * sizeof *verts);
+            uvs = (float *)grow(uvs, &cap_u, (nv + (size_t)m->nverts) * 8);
             tris = (uint16_t *)grow(tris, &cap_t, (nt + (size_t)m->ntris) * 6);
             for (i = 0; i < m->nverts; i++) {
                 wg_vertex q;
@@ -3079,11 +3158,18 @@ static int write_pack(const char *path, const wg_depot *depots)
                 q.z = (int16_t)lrintf((oy - y) * WG_UNIT);
                 q.pad = 0;
                 memcpy(q.rgba, &m->rgba[i * 4], 4);
-                hsh = dgk_crc32(0, &q, sizeof q) & (uint32_t)(hcap - 1);
-                for (at = (int)hsh; slot[at] >= 0 && memcmp(&verts[nv + (size_t)slot[at]], &q, sizeof q); at = (at + 1) & (hcap - 1))
+                hsh = dgk_crc32(0, &q, sizeof q);
+                if (uv_out)                          /* with the atlas, the same place and colour, but not the same s, t */
+                    hsh = dgk_crc32(hsh, &m->uv[i * 2], 8);
+                hsh &= (uint32_t)(hcap - 1);
+                for (at = (int)hsh; slot[at] >= 0 && (memcmp(&verts[nv + (size_t)slot[at]], &q, sizeof q) ||
+                                                       (uv_out && memcmp(&uvs[(nv + (size_t)slot[at]) * 2], &m->uv[i * 2], 8)));
+                     at = (at + 1) & (hcap - 1))
                     continue;
                 if (slot[at] < 0) {
                     slot[at] = kept;
+                    uvs[(nv + (size_t)kept) * 2] = m->uv[i * 2];
+                    uvs[(nv + (size_t)kept) * 2 + 1] = m->uv[i * 2 + 1];
                     verts[nv + (size_t)kept++] = q;
                 }
                 remap[i] = slot[at];
@@ -3120,6 +3206,8 @@ static int write_pack(const char *path, const wg_depot *depots)
     }
     pakw_section(w, WG_CINDEX, index, sizeof *index * WG_CHUNKS * WG_CHUNKS);
     pakw_section(w, WG_CVERTS, verts, (uint32_t)(nv * sizeof *verts));
+    if (uv_out)
+        pakw_section(w, WG_CUV, uvs, (uint32_t)(nv * 8));
     pakw_section(w, WG_CTRIS, tris, (uint32_t)(nt * 6));
     pakw_section(w, WG_CVARIANT, var, sizeof *var * WG_CHUNKS * WG_CHUNKS);
     free(var);
@@ -3182,6 +3270,7 @@ static int write_pack(const char *path, const wg_depot *depots)
            (unsigned long)run_tris[WG_MEDIUM_UP], (unsigned long)run_tris[WG_HIGH_ONLY], nboxes, nedges, npts, ndepots);
     free(index);
     free(verts);
+    free(uvs);
     free(tris);
     return pakw_write(w, path);
 }
@@ -3191,10 +3280,11 @@ int main(int argc, char **argv)
     static wg_depot depots[WG_MAX_PLACES];
     int i, e;
     FILE *f;
-    if (argc != 3) {
-        fprintf(stderr, "usage: fwgen SEED OUT.PAK\n");
+    if (argc != 3 && !(argc == 4 && !strcmp(argv[3], "--uv"))) {
+        fprintf(stderr, "usage: fwgen SEED OUT.PAK [--uv]\n");
         return 2;
     }
+    uv_out = argc == 4;                              /* the textures' look test: the atlas's coordinates too */
     seed_g = (uint32_t)strtoul(argv[1], NULL, 0);
     dgk_rng_seed(&rng, seed_g, 7);
     make_hills();

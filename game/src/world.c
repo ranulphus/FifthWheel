@@ -82,6 +82,7 @@ int world_load(world *w, const char *path)
         w->tris = (const uint16_t *)dgk_pak_section(&w->pak, WG_CTRIS, NULL);
         w->height = (const int16_t *)dgk_pak_section(&w->pak, WG_HEIGHT, NULL);
         w->variants = (const wg_variant *)dgk_pak_section(&w->pak, WG_CVARIANT, NULL);
+        w->uv = (const float *)dgk_pak_section(&w->pak, WG_CUV, NULL);
         if (!w->chunks || !w->verts || !w->tris || !w->height || !d || w->hdr->version != WG_VERSION ||
             w->hdr->chunks != WG_CHUNKS) {
             dgk_log("FW-ERROR %s: not a version %d world", path, WG_VERSION);
@@ -255,6 +256,12 @@ void world_draw(world *w, float x, float y, float r)
     w->culled_chunks = 0;
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_COLOR_ARRAY);
+    if (w->textured) {                               /* the look test: the atlas, tinted by the colours */
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, w->atlas);
+        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    }
     for (cy = cy0; cy <= cy1; cy++)
         for (cx = cx0; cx <= cx1; cx++) {
             const wg_chunk *c = &w->chunks[cy * WG_CHUNKS + cx];
@@ -281,6 +288,8 @@ void world_draw(world *w, float x, float y, float r)
             glScalef(1.0f / WG_UNIT, 1.0f / WG_UNIT, 1.0f / WG_UNIT);
             glVertexPointer(3, GL_SHORT, sizeof *v, &v->x);
             glColorPointer(4, GL_UNSIGNED_BYTE, sizeof *v, v->rgba);
+            if (w->textured)
+                glTexCoordPointer(2, GL_FLOAT, 0, w->uv + (size_t)c->first_vertex * 2);
             glDrawElements(GL_TRIANGLES, (GLsizei)n * 3, GL_UNSIGNED_SHORT, w->tris + c->first_index + first * 3);
             glPopMatrix();
             dgk_gfx_tris += n;
@@ -288,6 +297,10 @@ void world_draw(world *w, float x, float y, float r)
             w->drawn_chunks++;
             dgk_service_if_due();                    /* the audio thread's turn on a slow frame (DOS) */
         }
+    if (w->textured) {
+        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+        glDisable(GL_TEXTURE_2D);
+    }
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);
 }

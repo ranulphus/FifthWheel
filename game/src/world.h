@@ -33,6 +33,9 @@ typedef struct world {
     int ndepots;
     const wg_variant *variants;          /* CVAR (NULL: every triangle for every detail) */
     int models;                          /* the detail's models: 0 draws the LOW runs, else MEDIUM and HIGH's */
+    const float *uv;                     /* the textures' look test: the atlas's s, t a vertex (CUVS; NULL: none) */
+    unsigned int atlas;                  /* its texture; drawn with it when textured is set (HIGH) */
+    int textured;
     const obb *boxes;
     int nboxes;
     int grid_n;                          /* buckets per side */
