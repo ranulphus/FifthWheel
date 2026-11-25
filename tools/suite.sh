@@ -26,7 +26,8 @@
 #                 DOS-GL; the pools hold (the detail preset's caps)
 #   menus         keys typed in 86Box: the title's options set the detail to
 #                 high, the game is driven, paused and quit from the pause
-#                 menu; a second run starts with FWHEEL.CFG's detail high
+#                 menu; a second run starts with FWHEEL.CFG's detail high,
+#                 textured (WORLDHI.PAK)
 #
 # Leaving the machine usable (each with the SB16 playing; afterwards SBCHK
 # finds its DMA stopped, VECCHK the interrupt vectors as they were before,
@@ -230,10 +231,13 @@ for c in $checks; do
     menus)
         # Down 0x150, Up 0x148, Right 0x14d, Enter 0x1c, Esc 0x01.
         k="@FW-MENU title,1:0x150,2:0x150,3:0x1c,4:0x14d,5:0x01,6:0x1c,8:0x01,9:0x148,10:0x1c"
-        st=$(run menus --cmd "FWHEEL -test -nosound -title -noexit" --cmd "FWHEEL -test -nosound -frames 30" --keys "$k")
+        # WORLDHI.PAK too: HIGH's textured world is loaded and drawn on DOS (and any GL error fails the case).
+        st=$(run menus --file build/data/WORLDHI.PAK --cmd "FWHEEL -test -nosound -title -noexit" \
+             --cmd "FWHEEL -test -nosound -frames 30" --keys "$k")
         if [ "$st" = PASS ] && log menus | grep -q "FW-MENU DETAIL high" && log menus | grep -q "FW-MENU pause" \
-           && log menus | grep -q "FW-MENU quit" && log menus | grep -q "FW-CFG detail high"; then
-            say menus "PASS (options saved, driven, paused, quit; the next run starts with detail high)"
+           && log menus | grep -q "FW-MENU quit" && log menus | grep -q "FW-CFG detail high" \
+           && log menus | grep -aq "WORLDHI.PAK: HIGH's textured world"; then
+            say menus "PASS (options saved, driven, paused, quit; the next run starts with detail high, textured)"
         else bad menus "($st; $(log menus | grep -a 'FW-MENU\|FW-CFG detail' | tr '\n' ' '))"; fi ;;
     fx)
         st=$(run fx --args="-test -fixed -nosound -fxtest")
