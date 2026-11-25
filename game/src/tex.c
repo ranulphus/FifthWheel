@@ -16,7 +16,9 @@
 
 #define LEVELS 3                      /* 512, 256, 128: past that the tiles' margins blur into each other */
 
-static uint8_t level[LEVELS][WG_ATLAS * WG_ATLAS * 4];
+/* The levels while they are drawn (malloc'd at HIGH only, and freed once GL has them: as static arrays they
+ * would cost every preset 3 MB). */
+static uint8_t *level[LEVELS];
 
 /* A repeatable hash of a texel's coordinates (and a salt), 0..1. */
 static float h01(int x, int y, int salt)
@@ -113,6 +115,12 @@ unsigned int tex_atlas(void)
 {
     GLuint t;
     int x, y, l, size;
+    for (l = 0, size = WG_ATLAS; l < LEVELS; l++, size /= 2)
+        if (!(level[l] = malloc((size_t)size * size * 4))) {
+            while (l-- > 0)
+                free(level[l]);
+            return 0;
+        }
     for (y = 0; y < WG_ATLAS; y++)
         for (x = 0; x < WG_ATLAS; x++) {
             int tile = (y / WG_TILE) * (WG_ATLAS / WG_TILE) + x / WG_TILE;
@@ -155,5 +163,9 @@ unsigned int tex_atlas(void)
     }
     for (l = 0, size = WG_ATLAS; l < LEVELS; l++, size /= 2)
         glTexImage2D(GL_TEXTURE_2D, l, GL_RGBA, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, level[l]);
+    for (l = 0; l < LEVELS; l++) {
+        free(level[l]);
+        level[l] = NULL;
+    }
     return t;
 }

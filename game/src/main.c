@@ -205,7 +205,7 @@ static void detail_apply(game *g)
     g->w.models = g->det.models;                     /* the world's runs for this detail (CVAR) */
     if (g->det.models == 2 && world_load_hi(&g->w) && !g->w.atlas)
         g->w.atlas = tex_atlas();                    /* HIGH's textures: their world loaded the first time */
-    g->w.textured = g->det.models == 2 && g->w.hi_state > 0;
+    g->w.textured = g->det.models == 2 && g->w.hi_state > 0 && g->w.atlas;
     if (g->lorry.quality != g->det.models) {
         lorry_build(&g->lorry, g->det.models);
         career_style(g);

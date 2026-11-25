@@ -6,7 +6,7 @@
 
 #include "dgk/base.h"
 
-/* Draws the atlas (and its smaller levels) and loads it; its texture name. */
+/* Draws the atlas (and its smaller levels) and loads it; its texture name, or 0 without the memory to draw it. */
 unsigned int tex_atlas(void);
 
 #endif
