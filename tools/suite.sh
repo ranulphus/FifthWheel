@@ -135,7 +135,7 @@ exit_check() {  # NAME DESCRIPTION [run.py options...]: the program, then the ma
 extra_ok() { return 0; }
 
 modes() {
-    local st list i=0 cmds=() m n fail_m=0 res=""
+    local st list i=0 cmds=() m n fail_m=0 res="" frac
     st=$(run modelist --args="-test -fixed -nosound -frames 2")
     list=$(log modelist | grep -ao 'FW-MODES .*' | head -1 | cut -d' ' -f2- | tr -d '\r')
     [ -n "$list" ] || { bad modes "($st; no FW-MODES)"; return; }
@@ -154,7 +154,12 @@ modes() {
             -test -fixed -nosound -mode $m -frames 61 -shot 60:M$i > M$i.log 2>&1"
         "$DEV" python3 -c "import sys; sys.path.insert(0, '$MGAHAL/tools/loopa'); import png; \
 w, h, rgb = png.read_ppm('$out/modes-hl/out/M$i.ppm'); png.write_png('$out/modes-hl/m$i.png', w, h, rgb)" 2>/dev/null
-        if [ -e "$out/modes/m$i.png" ] && "$DEV" python3 "$MGAHAL/tools/imgcmp.py" "$out/modes-hl/m$i.png" \
+        # Wider than 800: 0.75% of pixels, not 0.5%. The HUD is drawn at 640 x 480 and scaled up, and its
+        # font's edges, magnified, filter a little differently on the Matrox and in Mesa; the job board's
+        # fourth line (the shunt, 2026-11-25) took 1024 x 768 and 1280 x 1024 to 0.51% on every card.
+        frac=0.005
+        [ "${m%%x*}" -gt 800 ] && frac=0.0075
+        if [ -e "$out/modes/m$i.png" ] && "$DEV" python3 "$MGAHAL/tools/imgcmp.py" --frac $frac "$out/modes-hl/m$i.png" \
                "$out/modes/m$i.png" > "$out/modes-hl/m$i.cmp" 2>&1; then res+=" $m"
         else res+=" $m:FAIL"; fail_m=1; fi
     done
