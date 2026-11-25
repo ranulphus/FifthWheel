@@ -44,6 +44,8 @@ when the generator is built at -O0 and at -O2.
 | `FWDP` | u32 count; depots {float x, y, heading; bays[3] {float x, y, heading}: a docked trailer's rear; pickup {float x, y, heading}: a waiting trailer's kingpin (the apron's left edge); u32 road node} |
 | `FWPA` | the autopilot's tour: the longest loop of the road network that avoids the depots' dead ends |
 | `FWSP` | the start, on the tour |
+| `FWTN` | u32 count; towns {float x, y, heading, r; u32 blocks: its streets every `WG_GRID` (64 m) from -blocks to +blocks each way in its own frame (u along heading, v to its left), the two middle ones stopping at the roundabout; u32 road node; u32 first stop, stops (in `FWST`)} |
+| `FWST` | u32 count; parcel stops, town by town {float x, y, heading: in a street's left lane before a house's or shop's door, heading along the lane with the door on the left; u16 town, kind (0 house, 1 shop)}; none by the roundabout or on a main road. Without `FWTN` and `FWST` (an older pack) there are no parcel rounds |
 
 ### HIGH's textured world (`build/data/WORLDHI.PAK`; game/src/wgen.h)
 

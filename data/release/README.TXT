@@ -8,6 +8,14 @@ route on the minimap to another depot and reverse the trailer into a bay.
 The neater the dock, the bigger the pay. Spend it in the garage on paint,
 horns, decals, licences for flatbeds and tankers, and a bigger cab.
 
+There is always smaller work too, for slower money and no licence: shunt
+a depot's trailer into a bay and back onto its line (key 4 at the board),
+or take parcels round the nearest town in the tractor's cab (R): stop in
+the ring at each door; drops in a row on time pay a little more.
+
+Knocks add up. Past half damage every job pays less, until the garage
+mends it (REPAIRS, for money).
+
 
 WHAT IT NEEDS
 -------------
@@ -39,8 +47,11 @@ CONTROLS
     Space               handbrake
     H                   horn
     1, 2, 3             take a job from a depot's board
+    4                   shunt the yard's trailer (at a depot's board)
+    R                   start or stop a parcel round (no trailer on)
     Backspace           cancel the job (before coupling)
-    G                   the garage (stopped)
+    G                   the garage (stopped): paint, horns, decals,
+                        licences, cabs and repairs
     Z                   zoom the camera
     J                   joystick or wheel set-up
     Esc                 pause (resume, options, quit)
@@ -62,8 +73,8 @@ VOLUME       0 to 10.
 GOVERNOR     lowers the detail by itself while frames run slow.
 
 The options, and the joystick's set-up, are kept in FWHEEL.CFG. Your
-money and the garage's items are kept in CAREER.DAT; delete it to start
-a new career.
+money, the garage's items and the lorry's damage are kept in CAREER.DAT;
+delete it to start a new career.
 
 
 FILES

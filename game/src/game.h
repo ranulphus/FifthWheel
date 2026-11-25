@@ -20,7 +20,8 @@
 #include "vehicle.h"
 #include "world.h"
 
-enum { MODE_DRIVE, MODE_TOUR, MODE_JOB };   /* keys (jobs where there are depots); -autopilot; -autojob */
+enum { MODE_DRIVE, MODE_TOUR, MODE_JOB, MODE_CAREER };   /* keys (jobs where there are depots); -autopilot; -autojob;
+                                                            -autocareer */
 
 typedef struct game {
     const char *world_path, *record_path, *replay_path, *dbtest;
@@ -66,6 +67,10 @@ typedef struct game {
     int has_jobs;               /* the world has depots, and this is not the tour */
     jobpilot jp;
     int autotake;               /* -autojob: the offer to take (1-3) in the first tick */
+    int career_want, career_spend;  /* -autocareer N: deliveries to play to; -spender K: cosmetics bought first */
+    int cp_shunts, cp_mark, cp_stuck;   /* the career's autopilot: shunts in a row; jobs done; no progress */
+    int cp_rounds, cp_trips, cp_rounds_seen;   /* -rounds N: rounds wanted; depots driven to; rounds when last */
+    unsigned long cp_tick;          /* when a job was last done */
     uint32_t done_tick;         /* -autojob: when the delivery was made */
     lorry_meshes lorry;
     dgk_font font;

@@ -40,6 +40,8 @@ enum { WG_TOWN, WG_DEPOT, WG_JUNCTION };   /* a node's kind; a junction has no p
 #define WG_TOUR   DGK_FOURCC('F', 'W', 'P', 'A')   /* u32 n, then n points {float x, y}: the autopilot's tour */
 #define WG_SPAWN  DGK_FOURCC('F', 'W', 'S', 'P')   /* float x, y, heading */
 #define WG_CVARIANT DGK_FOURCC('C', 'V', 'A', 'R') /* wg_variant[WG_CHUNKS * WG_CHUNKS]: what each detail draws */
+#define WG_TOWNS  DGK_FOURCC('F', 'W', 'T', 'N')   /* u32 n, then wg_town[n] */
+#define WG_STOPS  DGK_FOURCC('F', 'W', 'S', 'T')   /* u32 n, then wg_stop[n]: by town */
 
 typedef struct wg_world {
     uint32_t version, seed, chunks, hn;
@@ -89,6 +91,26 @@ typedef struct wg_depot {
     float pickup[3];                    /* where a trailer waits to be coupled */
     uint32_t node;                      /* its node in the road graph */
 } wg_depot;
+
+/* A town's streets: a square grid in its own frame (u along its heading, v
+ * to the left of it), every WG_GRID metres from -blocks to +blocks each way;
+ * its roundabout in the middle, where the two middle streets stop at the
+ * ring. A point (u, v) is at x = x + u cos(heading) - v sin(heading),
+ * y = y + u sin(heading) + v cos(heading). */
+#define WG_GRID 64.0f
+typedef struct wg_town {
+    float x, y, heading, r;             /* r: the blocks with buildings are those whose middles are within it */
+    uint32_t blocks, node;              /* streets from -blocks to +blocks (times WG_GRID); its node in the graph */
+    uint32_t first_stop, nstops;        /* its parcel stops in FWST */
+} wg_town;
+
+/* A parcel stop: in a street's left lane before a house's or shop's door,
+ * heading along the lane (the door on the left). */
+enum { WG_STOP_HOUSE, WG_STOP_SHOP };
+typedef struct wg_stop {
+    float x, y, heading;
+    uint16_t town, kind;
+} wg_stop;
 
 /* The points (at most max) strictly between two on a town's ring (its
  * middle cx, cy), going round clockwise from (x0, y0) to (x1, y1), about

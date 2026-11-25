@@ -3,7 +3,9 @@
  * category's items, up and down change category, Enter buys the item shown
  * (and fits it) or fits one already owned, Esc leaves. What is shown is
  * tried on: paint, decals and the cab on the tractor, a licence's trailer
- * behind it, a horn sounded. Each step logs an FW-MENU line. */
+ * behind it, a horn sounded. The last category, REPAIRS, mends the rig's
+ * damage (Enter: all of it, or what the money pays for). Each step logs an
+ * FW-MENU line. */
 #ifndef FW_GARAGE_H
 #define FW_GARAGE_H
 
@@ -11,9 +13,12 @@
 #include "dgk/text.h"
 #include "lorry.h"
 
+#define GARAGE_REPAIR KINDS         /* the category after the items' */
+#define GARAGE_TABS (KINDS + 1)
+
 typedef struct garage {
     int open;
-    int kind;                       /* the category shown */
+    int kind;                       /* the category shown (GARAGE_REPAIR: the repairs) */
     int shown[KINDS];               /* the item shown in each (index into items[]) */
     float spin, spin_prev;          /* the turntable, radians */
     const char *message;            /* a flash: BOUGHT!, NOT ENOUGH MONEY ... */
@@ -21,7 +26,7 @@ typedef struct garage {
 } garage;
 
 void garage_open(garage *g, const career *c, lorry_meshes *m);
-/* One tick. Returns 1 if the career changed (bought or fitted: save it),
+/* One tick. Returns 1 if the career changed (bought, fitted or repaired: save it),
  * and sets g->open to 0 when the player leaves (the caller restyles the
  * lorry from the career then). */
 int  garage_tick(garage *g, career *c, lorry_meshes *m);

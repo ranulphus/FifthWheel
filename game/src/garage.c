@@ -24,7 +24,7 @@ static int step_item(int i, int dir)
 /* The tractor as it would look with the item shown tried on. */
 static void try_on(const garage *g, const career *c, lorry_meshes *m)
 {
-    const item *shown = &items[g->shown[g->kind]];
+    const item *shown = &items[g->shown[g->kind < KINDS ? g->kind : KIND_PAINT]];
     uint32_t paint = career_item(c, KIND_PAINT)->value;
     int decal = (int)career_item(c, KIND_DECAL)->value, cab = (int)career_item(c, KIND_CAB)->value;
     if (shown->kind == KIND_PAINT)
@@ -38,7 +38,12 @@ static void try_on(const garage *g, const career *c, lorry_meshes *m)
 
 static void log_shown(const garage *g, const career *c)
 {
-    const item *it = &items[g->shown[g->kind]];
+    const item *it;
+    if (g->kind == GARAGE_REPAIR) {
+        dgk_log("FW-MENU show REPAIRS: damage %.1f, $%d", c->damage10 / 10.0f, career_repair_cost(c));
+        return;
+    }
+    it = &items[g->shown[g->kind]];
     dgk_log("FW-MENU show %s %s (%s, $%d, %s)", kind_name[g->kind], it->name, rarity_name[it->rarity], it->price,
             career_fitted(c, g->shown[g->kind]) ? "fitted" : career_owns(c, g->shown[g->kind]) ? "owned" : "for sale");
 }
@@ -66,7 +71,7 @@ void garage_open(garage *g, const career *c, lorry_meshes *m)
 
 int garage_tick(garage *g, career *c, lorry_meshes *m)
 {
-    int changed = 0, i = g->shown[g->kind];
+    int changed = 0, i = g->shown[g->kind < KINDS ? g->kind : KIND_PAINT];
     g->spin_prev = g->spin;
     g->spin += 0.35f / DGK_TICK_HZ;                  /* a slow turn of the platform */
     if (dgk_app.key_pressed[DGK_KEY_ESCAPE]) {
@@ -74,7 +79,23 @@ int garage_tick(garage *g, career *c, lorry_meshes *m)
         dgk_log("FW-MENU garage close: money %lu", (unsigned long)c->money);
         return 0;
     }
-    if (dgk_app.key_pressed[DGK_KEY_LEFT] || dgk_app.key_pressed[DGK_KEY_RIGHT]) {
+    if (g->kind == GARAGE_REPAIR && dgk_app.key_pressed[DGK_KEY_RETURN]) {
+        int paid;
+        if (c->damage10 == 0)
+            flash(g, "NO DAMAGE", 0xFFFFFFFFu);
+        else if ((paid = career_repair(c)) > 0) {
+            flash(g, c->damage10 ? "PATCHED UP" : "GOOD AS NEW!", 0x9FFFB0FFu);
+            dgk_log("FW-MENU repair for $%d: damage %.1f, money %lu", paid, c->damage10 / 10.0f,
+                    (unsigned long)c->money);
+            changed = 1;
+        } else {
+            flash(g, "NOT ENOUGH MONEY", 0xFF5030FFu);
+            dgk_log("FW-MENU short of money to repair ($%d, have $%lu)", career_repair_cost(c),
+                    (unsigned long)c->money);
+        }
+    } else if (g->kind == GARAGE_REPAIR && (dgk_app.key_pressed[DGK_KEY_LEFT] || dgk_app.key_pressed[DGK_KEY_RIGHT])) {
+        /* (one card) */
+    } else if (dgk_app.key_pressed[DGK_KEY_LEFT] || dgk_app.key_pressed[DGK_KEY_RIGHT]) {
         g->shown[g->kind] = step_item(i, dgk_app.key_pressed[DGK_KEY_RIGHT] ? 1 : -1);
         if (g->kind == KIND_HORN) {
             sound_set_horn((int)items[g->shown[g->kind]].value);
@@ -83,7 +104,7 @@ int garage_tick(garage *g, career *c, lorry_meshes *m)
         try_on(g, c, m);
         log_shown(g, c);
     } else if (dgk_app.key_pressed[DGK_KEY_UP] || dgk_app.key_pressed[DGK_KEY_DOWN]) {
-        g->kind = (g->kind + (dgk_app.key_pressed[DGK_KEY_DOWN] ? 1 : KINDS - 1)) % KINDS;
+        g->kind = (g->kind + (dgk_app.key_pressed[DGK_KEY_DOWN] ? 1 : GARAGE_TABS - 1)) % GARAGE_TABS;
         try_on(g, c, m);
         log_shown(g, c);
     } else if (dgk_app.key_pressed[DGK_KEY_RETURN]) {
@@ -178,11 +199,14 @@ void showroom_draw(lorry_meshes *m, float spin, uint32_t rim_rgba, int trailer)
 
 void garage_draw(const garage *g, const career *c, lorry_meshes *m, const dgk_font *font, float alpha)
 {
-    const item *it = &items[g->shown[g->kind]];
+    static const char *const tab_name[GARAGE_TABS] = { "PAINT", "HORNS", "DECALS", "LICENCES", "CABS", "REPAIRS" };
+    int repair = g->kind == GARAGE_REPAIR;
+    const item *it = &items[g->shown[repair ? KIND_PAINT : g->kind]];
     float spin = g->spin_prev + (g->spin - g->spin_prev) * alpha;
     char line[64];
     int k;
-    showroom_draw(m, spin, rarity_rgba[it->rarity], it->kind == KIND_LICENCE ? (int)it->value : -1);
+    showroom_draw(m, spin, repair ? 0xC8C8D0FFu : rarity_rgba[it->rarity],
+                  !repair && it->kind == KIND_LICENCE ? (int)it->value : -1);
     /* The shop. */
     dgk_gfx_overlay_begin();
     /* The header: the name, the money by its coin, the categories (the shown one on a gold pill). */
@@ -191,10 +215,33 @@ void garage_draw(const garage *g, const career *c, lorry_meshes *m, const dgk_fo
     snprintf(line, sizeof line, "%lu", (unsigned long)c->money);
     ui_coin(610 - dgk_text_width(font, 1.5f, line) - 14, 22, 10);
     dgk_text(font, 614 - dgk_text_width(font, 1.5f, line), 12, 1.5f, 0xFFD23FFFu, line);
-    ui_panel(22 + g->kind * 120, 42, dgk_text_width(font, 1.0f, kind_name[g->kind]) + 16, 24, 12.0f, 0x3D63B0F0u,
+    ui_panel(22 + g->kind * 100, 42, dgk_text_width(font, 1.0f, tab_name[g->kind]) + 16, 24, 12.0f, 0x3D63B0F0u,
              UI_GOLD);
-    for (k = 0; k < KINDS; k++)
-        dgk_text(font, 30 + k * 120, 48, 1.0f, k == g->kind ? UI_GOLD : 0xC8D0E0FFu, kind_name[k]);
+    for (k = 0; k < GARAGE_TABS; k++)
+        dgk_text(font, 30 + k * 100, 48, 1.0f, k == g->kind ? UI_GOLD : 0xC8D0E0FFu, tab_name[k]);
+    if (repair) {
+        /* The repair card: the damage as a bar, what mending it costs. */
+        int cost = career_repair_cost(c);
+        ui_panel(110, 352, 420, 116, 14.0f, UI_PANEL, 0xC8C8D0FFu);
+        centred(font, 368, 2.0f, 0xFFFFFFFFu, "REPAIRS");
+        snprintf(line, sizeof line, "DAMAGE %d%%", (int)((c->damage10 + 9) / 10));
+        centred(font, 400, 1.0f, c->damage10 > 500 ? 0xFF6040FFu : 0xFFFFFFFFu, line);
+        ui_bar(220, 416, 200, 10, c->damage10 / 1000.0f, c->damage10 > 500 ? 0xFF5030FFu : 0xFFB030FFu);
+        if (c->damage10 == 0)
+            snprintf(line, sizeof line, "NOTHING TO MEND");
+        else if (c->money >= (uint32_t)cost)
+            snprintf(line, sizeof line, "$%d  ENTER: REPAIR", cost);
+        else
+            snprintf(line, sizeof line, "$%d  ENTER: PATCH UP ($%lu)", cost, (unsigned long)c->money);
+        centred(font, 434, 1.0f, c->money > 0 || c->damage10 == 0 ? 0xFFFFFFFFu : 0xFF8070FFu, line);
+        centred(font, 454, 1.0f, 0x9FFFB0FFu, "UP/DOWN: KIND  ESC: BACK");
+        if (g->message && dgk_app.ticks - g->message_tick < 90) {
+            float t = (dgk_app.ticks - g->message_tick) / 90.0f, s = 2.4f + 0.5f * sinf(t * 20.0f) * (1 - t);
+            centred(font, 200, s, g->message_rgba, g->message);
+        }
+        dgk_gfx_overlay_end();
+        return;
+    }
     /* The item's card, rimmed in its rarity's colour: its name, its state. */
     ui_panel(110, 352, 420, 116, 14.0f, UI_PANEL, rarity_rgba[it->rarity]);
     centred(font, 372, 2.0f, rarity_rgba[it->rarity], it->name);

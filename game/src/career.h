@@ -1,9 +1,9 @@
 /* career.h - what a player keeps between runs (CAREER.DAT, a dgk save):
- * money, deliveries, and the garage's items: paint jobs, horns, decals,
- * licences for the flatbed and the tanker, and a bigger cab. Each item has
- * a price and a rarity (its colour in the garage, from common grey to
- * legendary gold); bought, it is owned for good, and one of each kind is
- * fitted. */
+ * money, deliveries, the rig's damage, and the garage's items: paint jobs,
+ * horns, decals, licences for the flatbed and the tanker, and a bigger cab.
+ * Each item has a price and a rarity (its colour in the garage, from common
+ * grey to legendary gold); bought, it is owned for good, and one of each
+ * kind is fitted. The garage also repairs the damage, for money. */
 #ifndef FW_CAREER_H
 #define FW_CAREER_H
 
@@ -33,8 +33,11 @@ typedef struct career {
     uint32_t money, delivered, perfect, metres;
     uint32_t owned;                 /* a bit per item */
     uint32_t fitted[KINDS];         /* the item fitted, of each kind */
-    uint32_t reserved[3];
+    uint32_t damage10;              /* the rig's damage in tenths of a point, 0..1000 (0 in older saves) */
+    uint32_t reserved[2];
 } career;
+
+#define REPAIR_PER_POINT 3          /* dollars a point of damage */
 
 void career_new(career *c);         /* $250, the starting items fitted */
 int  career_owns(const career *c, int item);
@@ -44,5 +47,9 @@ int  career_buy(career *c, int item);
 int  career_fit(career *c, int item);    /* an owned one: 0, else -1 */
 uint32_t career_licences(const career *c);   /* a bit per trailer type */
 const item *career_item(const career *c, int kind);   /* the fitted one */
+int  career_repair_cost(const career *c);   /* dollars to repair all the damage */
+/* Repair as much of the damage as the money pays for (all of it if it can):
+ * the dollars spent (0: nothing to repair, or no money). */
+int  career_repair(career *c);
 
 #endif

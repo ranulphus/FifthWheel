@@ -20,6 +20,15 @@
  *   FWHEEL -autojob [-job D:T:B]         the autopilot does the shortest job on offer at
  *                                        depot 0, or the job from depot D to depot T's bay B
  *                                        (from 0; FW-JOB lines; the test: graded OK or better)
+ *   FWHEEL -autocareer N [-spender K]    a new career played by the autopilot until N depot
+ *                                        jobs are delivered: jobs where it holds the licence
+ *                                        (driving to another depot for one), licences bought
+ *                                        when it can pay, repairs; else shunts, else parcel
+ *                                        rounds (4 drops). -spender: first K cosmetics bought
+ *                                        whenever it can (the test: never stuck)
+ *   FWHEEL -autocareer 0 -rounds N       N parcel rounds by the autopilot, each from the next
+ *                                        depot in turn (the town nearest it): the streets' ways
+ *                                        in every town (the test: no knocks)
  *   FWHEEL -timedemo FILE -dbtest NAME   a replay as fast as it will go, timed
  *                                        as DOSBench test NAME (RESULTS.TXT)
  *   FWHEEL -probe [quick]                the performance probe (probe.h)
@@ -29,8 +38,8 @@
  * Playing starts at the title screen; Esc pauses (and offers the options).
  * Keys: arrows or WASD (steer, accelerate, brake; hold the brake at a stop
  * to reverse), Space the handbrake, H the horn, 1-3 take a job from the
- * board, Backspace cancel it (before coupling), G the garage (stopped), Z the zoom, J the joystick's set-up,
- * Esc to quit. A joystick or wheel: steering, accelerator and brake as
+ * board, 4 its shunt, R a parcel round (begin or end), Backspace cancel a job (before coupling), G the garage
+ * (stopped), Z the zoom, J the joystick's set-up, Esc to quit. A joystick or wheel: steering, accelerator and brake as
  * calibrated, button 1 the handbrake, button 2 the horn. */
 #include "game.h"
 #include "ui.h"
@@ -49,11 +58,13 @@
 
 extern const dgk_font_data fw_font;
 
-enum { SC_A = 4, SC_D = 7, SC_G = 10, SC_H = 11, SC_J = 13, SC_Z = 29, SC_S = 22, SC_W = 26, SC_1 = 30, SC_BACKSPACE = 42 };
+enum { SC_A = 4, SC_D = 7, SC_G = 10, SC_H = 11, SC_J = 13, SC_R = 21, SC_Z = 29, SC_S = 22, SC_W = 26, SC_1 = 30,
+       SC_BACKSPACE = 42 };
 
 /* One tick of input, as recorded. Buttons: bit 0 the handbrake, bits 1-2
  * a job taken from the board (1-3), bit 3 the job cancelled, bit 4 the
- * horn held. */
+ * horn held, bit 5 the board's shunt taken (4), bit 6 a parcel round begun
+ * or ended (R). */
 typedef struct input_frame {
     int8_t steer;               /* -127..127 */
     uint8_t accel, decel, buttons;
@@ -95,6 +106,10 @@ static void controls(game *g, input_frame *f)
         f->buttons |= 8;
     if (dgk_app.key_down[SC_H] || dgk_app.joy_down[g->jmap.horn_button])
         f->buttons |= 16;
+    if (dgk_app.key_pressed[SC_1 + JOB_SHUNT_KEY])
+        f->buttons |= 32;
+    if (dgk_app.key_pressed[SC_R])
+        f->buttons |= 64;
 }
 
 /* The career: loaded at the start of play, saved after each delivery, each
@@ -104,6 +119,7 @@ static void career_save_now(game *g, const char *why)
     if (!g->careerful)
         return;
     g->car.money = (uint32_t)DGK_MAX(g->jobs.money, 0);
+    g->car.damage10 = (uint32_t)(DGK_CLAMP(g->r.damage, 0.0f, 100.0f) * 10.0f + 0.5f);
     if (dgk_save_write(g->career_path, CAREER_MAGIC, CAREER_VERSION, &g->car, sizeof g->car) == 0)
         dgk_log("FW-CAREER saved %s (%s): money %lu, %lu delivered", g->career_path, why,
                 (unsigned long)g->car.money, (unsigned long)g->car.delivered);
@@ -273,6 +289,14 @@ static int init(void *u)
         jobpilot_start(&g->jobs, from, &x, &y, &heading);
         rig_init(&g->r, x, y, heading);
         g->r.has_trailer = 0;
+        if (g->careerful)
+            g->r.damage = DGK_MIN(g->car.damage10, 1000u) / 10.0f;   /* the damage the career left, until repaired */
+        if (g->mode == MODE_CAREER) {                /* a new career: $250, box trailers only */
+            g->jobs.money = (int)g->car.money;
+            g->jobs.licences = career_licences(&g->car);
+            jobpilot_reset(&g->jp, &g->jobs);
+            g->jp.phase = JP_DONE;
+        }
         if (g->mode == MODE_JOB) {                   /* taken in the first tick, as a key press (recorded) */
             int i, best = 0;
             for (i = 1; i < JOB_OFFERS; i++)
@@ -283,7 +307,7 @@ static int init(void *u)
         }
         if (g->dockpose)
             dock_pose(g);
-    } else if (g->mode == MODE_JOB) {
+    } else if (g->mode == MODE_JOB || g->mode == MODE_CAREER) {
         dgk_log("FW-ERROR -autojob needs a world with depots");
         return -1;
     }
@@ -364,6 +388,138 @@ static void pose(game *g, int k)
     g->cam_prev = g->cam;
 }
 
+/* ---- -autocareer: a new career played by the autopilot (the career's tests) ---- */
+
+/* At a stop: the spender's cosmetics (the cheapest it can pay for), then the licences in turn when it can pay,
+ * and repairs past 40 points. */
+static void career_shop(game *g)
+{
+    career *c = &g->car;
+    int i, best;
+    c->money = (uint32_t)DGK_MAX(g->jobs.money, 0);
+    c->damage10 = (uint32_t)(DGK_CLAMP(g->r.damage, 0.0f, 100.0f) * 10.0f + 0.5f);
+    for (;;) {
+        best = -1;
+        for (i = 0; i < nitems && g->career_spend > 0; i++)
+            if (items[i].kind != KIND_LICENCE && !career_owns(c, i) && (uint32_t)items[i].price <= c->money &&
+                (best < 0 || items[i].price < items[best].price))
+                best = i;
+        for (i = 0; i < nitems && best < 0; i++)
+            if (items[i].kind == KIND_LICENCE && !career_owns(c, i)) {
+                if ((uint32_t)items[i].price <= c->money)
+                    best = i;
+                break;
+            }
+        if (best < 0 || career_buy(c, best) != 0)
+            break;
+        if (items[best].kind != KIND_LICENCE)
+            g->career_spend--;
+        dgk_log("FW-CAREERPILOT buy %s for $%d: money %lu", items[best].name, items[best].price,
+                (unsigned long)c->money);
+    }
+    if (c->damage10 > 400) {
+        int paid = career_repair(c);
+        if (paid)
+            dgk_log("FW-CAREERPILOT repair for $%d: damage %.1f", paid, c->damage10 / 10.0f);
+    }
+    g->jobs.money = (int)c->money;
+    g->jobs.licences = career_licences(c);
+    g->r.damage = c->damage10 / 10.0f;
+}
+
+/* Stopped with nothing on: a job here if it may take this depot's trailer (the shortest); else to the
+ * nearest depot with a trailer it may take; else a shunt here (two in a row at most); else a parcel round. */
+static void career_decide(game *g, input_frame *f)
+{
+    jobs *j = &g->jobs;
+    int i, best = -1, here = j->at_depot;
+    float bd = 1e30f;
+    if (here >= 0 && j->offers_at != here)
+        return;                                      /* (the board comes next tick) */
+    if (g->cp_rounds) {
+        /* -rounds: a round, then to the next depot in turn, then a round in the town nearest it, ... */
+        if (j->rounds >= g->cp_rounds)
+            return;
+        if (g->cp_rounds_seen) {                     /* (the last thing done was a round) */
+            int d = ++g->cp_trips % g->w.ndepots;
+            g->cp_rounds_seen = 0;
+            jobs_travel(j, &g->w, &g->r, d);
+            jobpilot_travel(&g->jp, j, &g->r, &g->w, d);
+            dgk_log("FW-CAREERPILOT to depot %d for the next round", d);
+            return;
+        }
+        f->buttons |= 64;
+        g->cp_rounds_seen = 1;
+        j->round_town = j->rounds % g->w.ntowns;      /* every town in turn */
+        dgk_log("FW-CAREERPILOT parcel round from depot %d in town %d", here, j->round_town);
+        return;
+    }
+    career_shop(g);
+    if (here >= 0 && j->trailers[here].present && (j->licences >> j->trailers[here].type & 1u)) {
+        int k, b = 0;
+        for (k = 1; k < JOB_OFFERS; k++)
+            if (j->offers[k].distance < j->offers[b].distance)
+                b = k;
+        f->buttons |= (uint8_t)((b + 1) << 1);
+        g->cp_shunts = 0;
+        dgk_log("FW-CAREERPILOT job at depot %d: the %s to depot %d, money %d", here,
+                trailer_name[j->trailers[here].type], j->offers[b].to, j->money);
+        return;
+    }
+    for (i = 0; i < g->w.ndepots; i++) {
+        float dx = g->w.depots[i].x - g->r.x, dy = g->w.depots[i].y - g->r.y;
+        if (i != here && j->trailers[i].present && (j->licences >> j->trailers[i].type & 1u) &&
+            dx * dx + dy * dy < bd) {
+            bd = dx * dx + dy * dy;
+            best = i;
+        }
+    }
+    if (best >= 0) {
+        jobs_travel(j, &g->w, &g->r, best);
+        jobpilot_travel(&g->jp, j, &g->r, &g->w, best);
+        g->cp_shunts = 0;
+        dgk_log("FW-CAREERPILOT to depot %d for its %s, money %d", best, trailer_name[j->trailers[best].type],
+                j->money);
+        return;
+    }
+    if (here >= 0 && j->shunt.kind == JOB_KIND_SHUNT && g->cp_shunts < 2) {
+        f->buttons |= 32;
+        g->cp_shunts++;
+        dgk_log("FW-CAREERPILOT shunt at depot %d, money %d", here, j->money);
+        return;
+    }
+    f->buttons |= 64;
+    g->cp_shunts = 0;
+    dgk_log("FW-CAREERPILOT parcel round, money %d", j->money);
+}
+
+static void career_pilot(game *g, input_frame *f)
+{
+    jobs *j = &g->jobs;
+    rig_input a;
+    int mark = j->delivered + j->shunts + j->drops;
+    if (mark != g->cp_mark || !g->cp_tick) {
+        g->cp_mark = mark;
+        g->cp_tick = dgk_app.ticks;
+    } else if (dgk_app.ticks - g->cp_tick > 150000ul && !g->cp_stuck) {  /* 2,500 s with nothing done */
+        g->cp_stuck = 1;
+        dgk_log("FW-CAREERPILOT stuck: state %d kind %d, pilot phase %d, money %d, licences %lu", j->state,
+                j->current.kind, g->jp.phase, j->money, (unsigned long)j->licences);
+        dgk_app.quit = 1;
+    }
+    f->buttons = 0;
+    if (j->state == JOB_HAULING && j->current.kind == JOB_KIND_PARCEL && j->round_drops >= 4)
+        f->buttons |= 64;                            /* four drops: the round over */
+    else if (j->state == JOB_NONE && !j->pending && jobpilot_idle(&g->jp, &g->r) &&
+             (j->delivered < g->career_want || j->rounds < g->cp_rounds) &&
+             dgk_app.ticks > 1)                      /* (after the first tick has found the depot it is on) */
+        career_decide(g, f);
+    jobpilot_drive(&g->jp, j, &g->r, &g->w, &g->traffic, &a);
+    f->steer = (int8_t)(a.steer * 127.0f);
+    f->accel = (uint8_t)(a.accel * 255.0f);
+    f->decel = (uint8_t)(a.decel * 255.0f);
+}
+
 /* Coupling, delivery: sounds, callouts; the autojob's end. */
 static void job_events(game *g)
 {
@@ -391,6 +547,24 @@ static void job_events(game *g)
         hud_callout(g, cheer[j->grade], g->callout_buf, cheer_rgba[j->grade]);
         if (g->mode == MODE_JOB)
             g->done_tick = dgk_app.ticks;
+    } else if (j->event == JOB_EVENT_DROPPED) {
+        sound_chime(j->streak >= 3 ? GRADE_GREAT : GRADE_GOOD);
+        fx_coins(&g->fxs, DGK_CLAMP(j->earned / 8, 3, g->det.coins));
+        career_save_now(g, "parcel");
+        snprintf(g->callout_buf, sizeof g->callout_buf, "+$%d", j->earned);
+        hud_callout(g, j->streak >= 2 ? "ON A ROLL!" : "PARCEL DROPPED", g->callout_buf,
+                    j->streak >= 2 ? 0x5FD8FFFFu : 0x9FFFB0FFu);
+    } else if (j->event == JOB_EVENT_SHUNTED) {
+        static const char *const shunted[] = { "", "SHUNTED", "GOOD PARK!", "GREAT PARK!", "PERFECT PARK!" };
+        sound_chime(j->grade);
+        fx_coins(&g->fxs, DGK_CLAMP(j->earned / 10, 3, g->det.coins));
+        career_save_now(g, "shunt");
+        snprintf(g->callout_buf, sizeof g->callout_buf, "+$%d", j->earned);
+        hud_callout(g, shunted[j->grade], g->callout_buf, 0x9FFFB0FFu);
+    } else if (j->event == JOB_EVENT_ROUND_OVER) {
+        snprintf(g->callout_buf, sizeof g->callout_buf, "%d DROPS  $%d", j->round_drops, j->round_earned);
+        hud_callout(g, "ROUND OVER", g->callout_buf, 0xFFFFFFFFu);
+        career_save_now(g, "round");
     }
 }
 
@@ -555,8 +729,10 @@ static void tick(void *u)
     if (g->gar.open) {                               /* the garage: the world waits */
         int changed;
         g->car.money = (uint32_t)DGK_MAX(g->jobs.money, 0);
+        g->car.damage10 = (uint32_t)(DGK_CLAMP(g->r.damage, 0.0f, 100.0f) * 10.0f + 0.5f);
         changed = garage_tick(&g->gar, &g->car, &g->lorry);
         g->jobs.money = (int)g->car.money;           /* what was spent, before the save copies it back */
+        g->r.damage = g->car.damage10 / 10.0f;       /* and what was repaired */
         if (g->careerful)
             g->jobs.licences = career_licences(&g->car);
         if (changed)
@@ -574,6 +750,7 @@ static void tick(void *u)
     if (dgk_app.key_pressed[SC_G] && fabsf(g->r.v) < 0.5f && g->has_jobs && !g->replay_path && !g->record_path &&
         g->mode == MODE_DRIVE) {
         g->car.money = (uint32_t)DGK_MAX(g->jobs.money, 0);
+        g->car.damage10 = (uint32_t)(DGK_CLAMP(g->r.damage, 0.0f, 100.0f) * 10.0f + 0.5f);
         garage_open(&g->gar, &g->car, &g->lorry);
         return;
     }
@@ -639,7 +816,9 @@ static void drive_tick(game *g)
             dgk_app.quit = 1;
             return;
         }
-    } else if (g->mode == MODE_TOUR || g->mode == MODE_JOB) {
+    } else if (g->mode == MODE_CAREER)
+        career_pilot(g, &f);
+    else if (g->mode == MODE_TOUR || g->mode == MODE_JOB) {
         rig_input a;
         if (g->mode == MODE_TOUR)
             autopilot_drive(&g->ap, &g->r, &g->w, &g->traffic, &a);
@@ -665,6 +844,10 @@ static void drive_tick(game *g)
             jobs_take(&g->jobs, &g->w, &g->r, ((f.buttons >> 1) & 3) - 1);
         if (f.buttons & 8)
             jobs_cancel(&g->jobs);
+        if (f.buttons & 32)
+            jobs_take_shunt(&g->jobs, &g->r);
+        if (f.buttons & 64)
+            jobs_round(&g->jobs, &g->w, &g->r);
         jobs_props(&g->jobs, &g->w, g->r.x, g->r.y);
     }
     rig_step(&g->r, &in, 1.0f / DGK_TICK_HZ, &g->w);
@@ -683,6 +866,8 @@ static void drive_tick(game *g)
         sound_coin();
     if (g->r.hits != g->hits_seen) {                 /* a knock: the cab jolts, dust flies */
         g->hits_seen = g->r.hits;
+        dgk_log("FW-EVENT hit tick=%lu x=%.1f y=%.1f speed=%.1f damage=%.1f", (unsigned long)dgk_app.ticks, g->r.x,
+                g->r.y, g->r.v, g->r.damage);
         fx_bump(&g->fxs, 0.9f);
         fx_dust_at(&g->fxs, &g->w, g->r.x + 4.5f * cosf(g->r.heading), g->r.y + 4.5f * sinf(g->r.heading), 3, 2.0f);
     }
@@ -734,6 +919,11 @@ static void drive_tick(game *g)
     }
     if (g->mode == MODE_JOB && g->done_tick && dgk_app.ticks - g->done_tick >= 150)
         dgk_app.quit = 1;                            /* after the callout */
+    if (g->mode == MODE_CAREER && g->jobs.delivered >= g->career_want && g->jobs.rounds >= g->cp_rounds &&
+        g->jobs.state == JOB_NONE && !g->done_tick)
+        g->done_tick = dgk_app.ticks;
+    if (g->mode == MODE_CAREER && g->done_tick && dgk_app.ticks - g->done_tick >= 150)
+        dgk_app.quit = 1;
 }
 
 static float lerp_angle(float a, float b, float t)
@@ -872,6 +1062,15 @@ static void quit(void *u)
         dgk_test_check("job", g->jobs.delivered > 0 && g->jobs.grade >= GRADE_OK, "%s, %s in %.0f s, damage %.1f",
                        g->jobs.delivered ? "delivered" : "not delivered", grade_name[g->jobs.grade],
                        g->jobs.elapsed, g->r.damage);
+    if (g->mode == MODE_CAREER)
+        /* (-rounds: the streets' ways must not touch anything solid; a car's knock is the traffic's business) */
+        dgk_test_check("career", g->jobs.delivered >= g->career_want && g->jobs.rounds >= g->cp_rounds &&
+                       g->jobs.drops >= 4 * g->cp_rounds && !g->cp_stuck &&
+                       (!g->cp_rounds || g->r.hits == g->traffic.knocks),
+                       "%d of %d delivered, %d shunts, %d parcels in %d rounds, money %d, licences %lu, damage %.1f, "
+                       "%d knocks (%d of them cars)%s", g->jobs.delivered, g->career_want, g->jobs.shunts,
+                       g->jobs.drops, g->jobs.rounds, g->jobs.money, (unsigned long)g->jobs.licences, g->r.damage,
+                       g->r.hits, g->traffic.knocks, g->cp_stuck ? ", STUCK" : "");
     if (g->laps_wanted)
         dgk_test_check("laps", g->ap.laps >= g->laps_wanted, "%d of %d, damage %.1f, %d hits", g->ap.laps,
                        g->laps_wanted, g->r.damage, g->r.hits);
@@ -959,6 +1158,13 @@ int main(int argc, char **argv)
             g.posed = sscanf(argv[++i], "%f:%f:%f:%f", &g.pose[0], &g.pose[1], &g.pose[2], &g.pose[3]) == 4;
         else if (!strcmp(a, "-highlights"))
             g.highlights = 1;
+        else if (!strcmp(a, "-autocareer") && v) {
+            g.mode = MODE_CAREER;
+            g.career_want = atoi(argv[++i]);
+        } else if (!strcmp(a, "-spender") && v)
+            g.career_spend = atoi(argv[++i]);
+        else if (!strcmp(a, "-rounds") && v)
+            g.cp_rounds = atoi(argv[++i]);
         else if (!strcmp(a, "-park") && v)
             g.parked = sscanf(argv[++i], "%f:%f:%f", &g.pose[0], &g.pose[1], &g.pose[2]) == 3;
         else if (!strcmp(a, "-soundtest"))

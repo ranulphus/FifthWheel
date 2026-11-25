@@ -113,14 +113,16 @@ joy() {
 shop() {
     local st keys l
     # 86Box scancodes: G 0x22, Enter 0x1c, Esc 0x01; extended Right 0x14d, Down 0x150, Up 0x148.
-    # Esc leaves the garage; then Esc pauses, Up wraps to QUIT, Enter.
-    keys="@FW-PLAY ready,1:0x22,2.5:0x14d,3.5:0x1c,4.5:0x150,5.5:0x14d,6.5:0x1c,7.5:0x01,9:0x01,10:0x148,11:0x1c"
+    # Down four more to REPAIRS (nothing to mend), Enter. Esc leaves the garage; then Esc pauses, Up wraps to
+    # QUIT, Enter.
+    keys="@FW-PLAY ready,1:0x22,2.5:0x14d,3.5:0x1c,4.5:0x150,5.5:0x14d,6.5:0x1c,7:0x150,7.5:0x150,8:0x150,8.5:0x150"
+    keys="$keys,9:0x1c,10:0x01,11.5:0x01,12.5:0x148,13.5:0x1c"
     st=$(run shop --cmd "FWHEEL -test -nosound -career CAREER.DAT -money 600 -noexit" \
          --cmd "FWHEEL -test -nosound -career CAREER.DAT -frames 30" --keys "$keys")
     l=$(log shop | grep -a 'FW-CAREER loaded' | tail -1)
     if [ "$st" = PASS ] && log shop | grep -q "FW-MENU buy SKY BLUE" && log shop | grep -q "FW-MENU buy BIG AIR" \
-       && [[ $l == *"money 50,"*"paint SKY BLUE, horn BIG AIR"* ]]; then
-        say shop "PASS (bought two, saved, loaded: ${l#*: })"
+       && log shop | grep -q "FW-MENU show REPAIRS: damage 0.0" && [[ $l == *"money 50,"*"paint SKY BLUE, horn BIG AIR"* ]]; then
+        say shop "PASS (bought two, the repairs shown, saved, loaded: ${l#*: })"
     else bad shop "($st; $(log shop | grep -a 'FW-MENU buy\|FW-MENU short\|FW-CAREER' | tr '\n' ' '))"; fi
 }
 

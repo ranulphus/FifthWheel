@@ -190,7 +190,22 @@ void bay_draw(const jobs *j, const rig *r, const world *w, uint32_t ticks)
     glBegin(GL_QUADS);
     dgk_gfx_draws++;
     glColor4ub(255, 210, 63, (GLubyte)(110.0f + 120.0f * pulse));
-    for (k = 0; k < 4; k++) {
+    k = 0;
+    if (j->current.kind == JOB_KIND_PARCEL) {
+        /* A parcel stop: a ring on the street the cab stops in (4 m, the drop's reach), breathing a little. */
+        float ro = 4.0f + 0.25f * pulse, ri = ro - 0.45f;
+        for (k = 0; k < 24; k++) {
+            float a0 = k * (2 * WG_PI / 24), a1 = (k + 1) * (2 * WG_PI / 24);
+            float q[4][2] = { { bx + ri * cosf(a0), by + ri * sinf(a0) }, { bx + ro * cosf(a0), by + ro * sinf(a0) },
+                              { bx + ro * cosf(a1), by + ro * sinf(a1) }, { bx + ri * cosf(a1), by + ri * sinf(a1) } };
+            int m;
+            for (m = 0; m < 4; m++)
+                glVertex3f(q[m][0], world_height(w, q[m][0], q[m][1]) + CHEV_LIFT, -q[m][1]);
+            dgk_gfx_tris += 2;
+        }
+        k = 4;                                       /* (no bay outline) */
+    }
+    for (; k < 4; k++) {
         /* A strip 0.35 m wide inside each side of the bay's rectangle. */
         float a0 = edge[k][0], c0 = edge[k][1], a1 = edge[k][2], c1 = edge[k][3];
         float da = a1 - a0, dc = c1 - c0, l = sqrtf(da * da + dc * dc), ia = -dc / l * 0.35f, ic = da / l * 0.35f;
@@ -257,12 +272,15 @@ void target_arrow_draw(const jobs *j, const rig *r, const world *w, uint32_t tic
 {
     float t = (float)ticks / 60.0f, bob = 0.7f * fabsf(sinf(t * 2.6f)), bx, by, bh;
     if (j->state == JOB_TO_PICKUP) {
-        const parked *p = &j->trailers[j->current.from];
+        const parked *p = j->current.kind == JOB_KIND_SHUNT && j->current.way == SHUNT_TO_LINE
+                              ? &j->docked[j->current.from] : &j->trailers[j->current.from];
         if (p->present)
             arrow3d(w, p->x - 1.0f * cosf(p->heading), p->y - 1.0f * sinf(p->heading), 5.6f + bob, t * 2.0f);
         return;
     }
-    if (target_bay(j, r, w, &bx, &by, &bh) && j->state != JOB_DOCKING)
+    if (target_bay(j, r, w, &bx, &by, &bh) && j->current.kind == JOB_KIND_PARCEL)
+        arrow3d(w, bx, by, 4.5f + bob, t * 2.0f);      /* over the parcel's stop */
+    else if (target_bay(j, r, w, &bx, &by, &bh) && j->state != JOB_DOCKING)
         arrow3d(w, bx + 9.0f * cosf(bh), by + 9.0f * sinf(bh), 5.0f + bob, t * 2.0f);
 }
 

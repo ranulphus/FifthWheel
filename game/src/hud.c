@@ -275,22 +275,38 @@ static void job_board(game *g)
 {
     const jobs *j = &g->jobs;
     char line[64];
-    int i;
-    panel(14, 44, 380, 30 + 22 * JOB_OFFERS + 22);
-    snprintf(line, sizeof line, "DEPOT %d: A %s TO TAKE", j->offers_at + 1,
-             trailer_name[j->trailers[j->offers_at].type]);
+    int i, waiting = j->trailers[j->offers_at].present, shunt = j->shunt.kind == JOB_KIND_SHUNT;
+    int rows = (waiting ? JOB_OFFERS + 1 : 0) + (shunt ? 1 : 0), y = 76;
+    panel(14, 44, 400, 30 + 22 * rows);
+    if (waiting)
+        snprintf(line, sizeof line, "DEPOT %d: A %s TO TAKE", j->offers_at + 1,
+                 trailer_name[j->trailers[j->offers_at].type]);
+    else
+        snprintf(line, sizeof line, "DEPOT %d: THE YARD", j->offers_at + 1);
     dgk_text(&g->font, 22, 50, 1.0f, 0xFFD23FFFu, line);
-    for (i = 0; i < JOB_OFFERS; i++) {
-        const job *o = &j->offers[i];
-        snprintf(line, sizeof line, "%d  DEPOT %d BAY %d  %4.1f KM  $%d", i + 1, o->to + 1, o->bay + 1,
-                 o->distance / 1000.0f, (int)o->pay);
-        dgk_text(&g->font, 22, 76 + 22 * i, 1.0f, j->licences >> o->type & 1u ? 0xFFFFFFFFu : 0x8A8F99FFu, line);
+    if (waiting) {
+        for (i = 0; i < JOB_OFFERS; i++, y += 22) {
+            const job *o = &j->offers[i];
+            snprintf(line, sizeof line, "%d  DEPOT %d BAY %d  %4.1f KM  $%d", i + 1, o->to + 1, o->bay + 1,
+                     o->distance / 1000.0f, (int)o->pay);
+            dgk_text(&g->font, 22, y, 1.0f, j->licences >> o->type & 1u ? 0xFFFFFFFFu : 0x8A8F99FFu, line);
+        }
     }
+    if (shunt) {                                     /* the yard's work: no licence needed */
+        if (j->shunt.way == SHUNT_TO_BAY)
+            snprintf(line, sizeof line, "4  SHUNT IT INTO BAY %d  $%d", j->shunt.bay + 1, (int)j->shunt.pay);
+        else
+            snprintf(line, sizeof line, "4  SHUNT BAY %d BACK TO THE LINE  $%d", j->shunt.bay + 1, (int)j->shunt.pay);
+        dgk_text(&g->font, 22, y, 1.0f, 0xFFFFFFFFu, line);
+        y += 22;
+    }
+    if (!waiting)
+        return;
     if (j->licences >> j->trailers[j->offers_at].type & 1u)
-        dgk_text(&g->font, 22, 76 + 22 * JOB_OFFERS, 1.0f, 0x9FFFB0FFu, "PRESS 1, 2 OR 3");
+        dgk_text(&g->font, 22, y, 1.0f, 0x9FFFB0FFu, shunt ? "PRESS 1, 2, 3 OR 4" : "PRESS 1, 2 OR 3");
     else {                                           /* the garage sells the licence */
         snprintf(line, sizeof line, "NEEDS A %s LICENCE (G: GARAGE)", trailer_name[j->trailers[j->offers_at].type]);
-        dgk_text(&g->font, 22, 76 + 22 * JOB_OFFERS, 1.0f, 0xFFB030FFu, line);
+        dgk_text(&g->font, 22, y, 1.0f, 0xFFB030FFu, line);
     }
 }
 
@@ -326,7 +342,8 @@ static void job_panel(game *g)
     case JOB_NONE:
         if (g->callout && dgk_app.ticks - g->callout_tick < 150) {
             point = 0;                               /* the next board after the cheering */
-        } else if (j->at_depot >= 0 && j->offers_at == j->at_depot && j->trailers[j->at_depot].present) {
+        } else if (j->at_depot >= 0 && j->offers_at == j->at_depot &&
+                   (j->trailers[j->at_depot].present || j->shunt.kind == JOB_KIND_SHUNT)) {
             job_board(g);
             point = 0;
         } else {
@@ -335,31 +352,66 @@ static void job_panel(game *g)
             for (i = 0; i < g->w.ndepots; i++) {
                 float d = (g->w.depots[i].x - g->r.x) * (g->w.depots[i].x - g->r.x) +
                           (g->w.depots[i].y - g->r.y) * (g->w.depots[i].y - g->r.y);
-                if (d < bd && j->trailers[i].present && i != j->at_depot) {
+                /* (a trailer the player may take: one needing a licence they lack is no work for them) */
+                if (d < bd && j->trailers[i].present && i != j->at_depot && (j->licences >> j->trailers[i].type & 1u)) {
                     bd = d;
                     best = i;
                 }
             }
-            panel(14, 44, 380, 26);
-            if (best < 0) {
-                point = 0;
-                break;
+            {
+                /* Parcels are always there for a lone tractor: slower money, no licence. */
+                int parcels = g->w.nstops > 0 && !g->r.has_trailer;
+                panel(14, 44, 380, best >= 0 && parcels ? 48 : 26);
+                if (best >= 0) {
+                    snprintf(line, sizeof line, "WORK AT DEPOT %d  %.1f KM", best + 1, sqrtf(bd) / 1000.0f);
+                    dgk_text(&g->font, 22, 50, 1.0f, 0xFFFFFFFFu, line);
+                    tx = g->w.depots[best].x;
+                    ty = g->w.depots[best].y;
+                } else
+                    point = 0;
+                if (parcels)
+                    dgk_text(&g->font, 22, best >= 0 ? 72 : 50, 1.0f, 0x9FFFB0FFu, "R: A PARCEL ROUND IN TOWN");
             }
-            snprintf(line, sizeof line, "WORK AT DEPOT %d  %.1f KM", best + 1, sqrtf(bd) / 1000.0f);
-            dgk_text(&g->font, 22, 50, 1.0f, 0xFFFFFFFFu, line);
-            tx = g->w.depots[best].x;
-            ty = g->w.depots[best].y;
         }
         break;
-    case JOB_TO_PICKUP:
+    case JOB_TO_PICKUP: {
+        const parked *t = j->current.kind == JOB_KIND_SHUNT && j->current.way == SHUNT_TO_LINE
+                              ? &j->docked[j->current.from] : &j->trailers[j->current.from];
         panel(14, 44, 380, 48);
         snprintf(line, sizeof line, "BACK UNDER THE %s", trailer_name[j->current.type]);
         dgk_text(&g->font, 22, 50, 1.0f, 0xFFFFFFFFu, line);
         dgk_text(&g->font, 22, 72, 1.0f, 0x9FFFB0FFu, "BACKSPACE: CANCEL");
-        tx = j->trailers[j->current.from].x;
-        ty = j->trailers[j->current.from].y;
+        tx = t->x;
+        ty = t->y;
         break;
+    }
     case JOB_HAULING:
+        if (j->current.kind == JOB_KIND_PARCEL) {
+            /* The round: where the parcel goes, how far, the time left for it to count as on time, the streak. */
+            const wg_stop *s = &g->w.stops[j->stop];
+            float left = j->limit - j->elapsed;
+            panel(14, 44, 380, 48);
+            if (j->route_left < 1000.0f)             /* (metres in town: tens of them) */
+                snprintf(line, sizeof line, "PARCEL FOR A %s  %d M", s->kind == WG_STOP_SHOP ? "SHOP" : "HOUSE",
+                         (int)(DGK_MAX(j->route_left, 0.0f) / 10.0f + 0.5f) * 10);
+            else
+                snprintf(line, sizeof line, "PARCEL FOR A %s  %.1f KM", s->kind == WG_STOP_SHOP ? "SHOP" : "HOUSE",
+                         j->route_left / 1000.0f);
+            dgk_text(&g->font, 22, 50, 1.0f, 0xFFFFFFFFu, line);
+            if (left > 0)
+                snprintf(line, sizeof line, "%d:%02d  STREAK %d  R: STOP", (int)left / 60, (int)left % 60, j->streak);
+            else
+                snprintf(line, sizeof line, "LATE  STREAK %d  R: STOP", j->streak);
+            dgk_text(&g->font, 22, 72, 1.0f, left > 10 ? 0x9FFFB0FFu : left > 0 ? 0xFFD23FFFu : 0xFF6040FFu, line);
+            if (j->route_next + 4 < j->nroute) {
+                tx = j->route[j->route_next + 4][0];
+                ty = j->route[j->route_next + 4][1];
+            } else {
+                tx = s->x;
+                ty = s->y;
+            }
+            break;
+        }
         panel(14, 44, 380, 26);
         snprintf(line, sizeof line, "TO DEPOT %d BAY %d  %.1f KM", j->current.to + 1, j->current.bay + 1,
                  DGK_MAX(j->route_left, 0.0f) / 1000.0f);
@@ -375,7 +427,10 @@ static void job_panel(game *g)
     case JOB_DOCKING: {
         float hd;
         panel(14, 44, 380, 26);
-        snprintf(line, sizeof line, "BACK INTO BAY %d", j->current.bay + 1);
+        if (j->current.kind == JOB_KIND_SHUNT && j->current.way == SHUNT_TO_LINE)
+            snprintf(line, sizeof line, "BACK IT ONTO THE LINE");
+        else
+            snprintf(line, sizeof line, "BACK INTO BAY %d", j->current.bay + 1);
         dgk_text(&g->font, 22, 50, 1.0f, 0xFFFFFFFFu, line);
         jobs_bay(j, &g->w, &tx, &ty, &hd);
         dock_gauge(g);
@@ -409,7 +464,11 @@ static void speedo(game *g, const char *gear)
     dgk_text(&g->font, x - dgk_text_width(&g->font, 0.5f, "KM/H") / 2, y + 36, 0.5f, 0x9FC8FFFFu, "KM/H");
     ui_medal(x + 62, y + 10);                         /* the gear's badge, on the dial's rim */
     dgk_text(&g->font, x + 62 - dgk_text_width(&g->font, 1.5f, gear) / 2, y, 1.5f, 0x1C2E5AFFu, gear);
-    dgk_text(&g->font, 156, 430, 1.0f, g->r.damage > 50 ? 0xFF6040FFu : 0xFFFFFFFFu, "DAMAGE");
+    if (g->r.damage > 50) {                           /* heavy: every job pays less until the garage mends it */
+        snprintf(line, sizeof line, "PAY -%d%%", (int)((1.0f - jobs_damage_factor(g->r.damage)) * 100.0f + 0.5f));
+        dgk_text(&g->font, 156, 430, 1.0f, 0xFF6040FFu, line);
+    } else
+        dgk_text(&g->font, 156, 430, 1.0f, 0xFFFFFFFFu, "DAMAGE");
     ui_bar(156, 450, 86, 10, g->r.damage / 100.0f, g->r.damage > 50 ? 0xFF5030FFu : 0xFFB030FFu);
 }
 

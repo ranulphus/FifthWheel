@@ -31,6 +31,10 @@ typedef struct world {
     const int16_t *height;
     const wg_depot *depots;
     int ndepots;
+    const wg_town *towns;                /* street grids and parcel stops (none in an older pack) */
+    int ntowns;
+    const wg_stop *stops;
+    int nstops;
     const wg_variant *variants;          /* CVAR (NULL: every triangle for every detail) */
     int models;                          /* the detail's models: 0 draws the LOW runs, else MEDIUM and HIGH's */
     /* HIGH's textured world (WORLDHI.PAK beside the pack, wgen.h), loaded the first time HIGH wants it. */

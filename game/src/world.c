@@ -126,6 +126,16 @@ int world_load(world *w, const char *path)
         }
         w->ndepots = (int)d[0];
         w->depots = (const wg_depot *)(d + 1);
+        {
+            const uint32_t *tn = (const uint32_t *)dgk_pak_section(&w->pak, WG_TOWNS, NULL);
+            const uint32_t *st = (const uint32_t *)dgk_pak_section(&w->pak, WG_STOPS, NULL);
+            if (tn && st) {
+                w->ntowns = (int)tn[0];
+                w->towns = (const wg_town *)(tn + 1);
+                w->nstops = (int)st[0];
+                w->stops = (const wg_stop *)(st + 1);
+            }
+        }
     } else {
         const uint8_t *m = (const uint8_t *)dgk_pak_section(&w->pak, FW_FOURCC_MESH, NULL);
         uint32_t nv, nt;
@@ -159,8 +169,9 @@ int world_load(world *w, const char *path)
         w->spawn_y = w->lane[5];
         w->spawn_heading = atan2f(w->lane[7] - w->lane[5], w->lane[6] - w->lane[4]);
     }
-    dgk_log("FW-WORLD %s: %s, %d boxes, a path of %d points, %d depots, seed %lu", path,
-            w->chunked ? "generated" : "test yard", w->nboxes, w->npath, w->ndepots, (unsigned long)w->pak.seed);
+    dgk_log("FW-WORLD %s: %s, %d boxes, a path of %d points, %d depots, seed %lu, %d towns, %d parcel stops", path,
+            w->chunked ? "generated" : "test yard", w->nboxes, w->npath, w->ndepots, (unsigned long)w->pak.seed,
+            w->ntowns, w->nstops);
     return 0;
 }
 

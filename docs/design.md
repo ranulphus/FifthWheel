@@ -90,6 +90,14 @@ Box trailers come with the job; flatbeds and tankers need a licence, and
 their jobs show greyed on the board until then. Tests, replays and
 recordings leave the career alone (a test can name one with `-career`).
 
+The rig's damage is the career's too (2026-11-25, the owner: "Repairs at
+the garage"): saved with it (in tenths of a point, where older saves had
+zeros), so it carries from job to job and run to run. Each job still pays
+4 a point of damage taken on it; past 50 points every job's pay is cut as
+well (the HUD's DAMAGE reads PAY -n%), to half at 100. The garage's last
+category, REPAIRS, mends it at $3 a point: all of it, or what the money
+pays for.
+
 ## Flourishes (game/src/fx.c)
 
 Looks only, never fed back into the simulation: a delivery's pay flies to
@@ -296,6 +304,43 @@ on the trailer's axle gives the trailer's wanted curvature; the kingpin
 kinematics turn that into a wanted articulation; the tractor steers for
 the yaw rate that holds it. `make jobsweep` runs it on every depot pair
 and bay.
+
+## Work that is always there (game/src/jobs.c, townroute.c, 2026-11-25)
+
+A new career has $250 and box trailers only, and a trailer that is taken
+comes back as the next type (box, flatbed, tanker) while one the player
+may not take never changes: so after three box jobs a player short of the
+flatbed licence's $500 (spent on paint, say) had no job anywhere and no
+other income, for good. The owner's answer: "bread and butter" work that
+can always be done, "a bit like GTA had taxis", slow money; they chose
+both kinds offered:
+
+- **Parcel rounds** (R, a lone tractor, no job on): parcels in the cab for
+  the doors of the nearest town, one stop after another until R again. A
+  stop (WORLD.PAK's `FWST`: one before each house's and shop's door, in the
+  street's left lane) shows as a gold ring on the street with the arrow over
+  it; the route runs along the town's streets (townroute.c: at most two
+  corners, rounded; round the roundabout clockwise, flared in and out, the
+  whole way round for a U-turn; never starting back the way the lorry faces:
+  on to the next crossing first, or round the block), after the roads to the
+  town when outside it, with the chevrons and the minimap as for a job. The
+  cab stopped in the ring 0.8 s drops it: $10, 5 cents a metre from the last
+  stop, $4 more at a shop, $3 for each drop in a row on time (a leg's time:
+  its metres / 6 + 20 s; at most +15), less $2 a point of damage on the way.
+  The next stop is 70 to 260 m off, its way starting the way the lorry
+  faces. In town about a third of the depot jobs' money a minute.
+- **Shunting** (board key 4, at any depot, no licence): the yard's trailer
+  from its line into a bay, then (the line empty) from the bay back onto the
+  line, and so on; $30 and a grade's bonus ($10, 20, 30 for GOOD, GREAT,
+  PERFECT). A trailer shunted counts as taken: away from the depot, its
+  line gets the next type, so shunting also turns over trailers no one could
+  take.
+
+The board's WORK AT DEPOT n points only to trailers the player may take,
+and under it (no trailer on) offers R. The test (`make career`,
+`-autocareer`) plays a new career through by the autopilot: jobs where it
+may, licences when it can pay, else shunts, else a round; a spender who
+buys cosmetics first still gets there.
 
 ## Traffic (game/src/traffic.c)
 

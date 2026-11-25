@@ -101,3 +101,21 @@ const item *career_item(const career *c, int kind)
     uint32_t i = c->fitted[kind];
     return &items[i < (uint32_t)nitems ? i : (uint32_t)first_of(kind)];
 }
+
+int career_repair_cost(const career *c)
+{
+    return (int)((c->damage10 * REPAIR_PER_POINT + 9) / 10);
+}
+
+int career_repair(career *c)
+{
+    uint32_t tenths = c->damage10, cost;
+    if (c->money * 10 / REPAIR_PER_POINT < tenths)
+        tenths = c->money * 10 / REPAIR_PER_POINT;   /* what the money pays for */
+    cost = tenths == c->damage10 ? (uint32_t)career_repair_cost(c) : (tenths * REPAIR_PER_POINT + 9) / 10;
+    if (tenths == 0 || cost > c->money)
+        return 0;
+    c->damage10 -= tenths;
+    c->money -= cost;
+    return (int)cost;
+}

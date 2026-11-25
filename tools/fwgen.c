@@ -166,7 +166,7 @@ typedef struct place {
     int kind;                                     /* WG_TOWN, WG_DEPOT */
 } place;
 
-#define GRID 64.0f                               /* town block */
+#define GRID WG_GRID                             /* town block */
 /* A town is flat to TOWN_FLAT beyond its outer streets (every block too: a
  * block's middle is 32 m from a street), easing back into the hills over
  * TOWN_EASE (wide enough that no slope at a town's edge passes 25 degrees). */
@@ -178,6 +178,11 @@ typedef struct place {
 
 static place places[WG_MAX_PLACES];
 static int nplaces, ntowns, ndepots;
+/* The parcel stops (FWST), town by town as build_town makes them. */
+#define MAX_STOPS 8192
+static wg_stop stops[MAX_STOPS];
+static int nstops;
+static uint32_t town_first_stop[WG_MAX_PLACES], town_nstops[WG_MAX_PLACES];
 static dgk_rng rng;
 
 static float frand(void)
@@ -1463,6 +1468,22 @@ static void terrace_row(const place *t, const bframe *f, float a, float b, int s
             variant = WG_HIGH_ONLY;
             row_house_high(f, h, base);
             variant = WG_SHARED;
+            {
+                /* Its parcel stop: in the street's left lane before the door (the door on the left), unless
+                 * that is by the roundabout or on a main road. */
+                bframe s = sub_frame(f, h->door_left ? h->a + (h->shop ? 1.4f : 1.3f) : h->b - (h->shop ? 1.4f : 1.3f),
+                                     fv - ROW_SET + WG_LANE);
+                float dx = s.cx - t->x, dy = s.cy - t->y;
+                if (nstops < MAX_STOPS && dx * dx + dy * dy > (WG_RING_R + 10.0f) * (WG_RING_R + 10.0f) &&
+                    road_distance(s.cx, s.cy) >= 7.0f) {
+                    wg_stop *st = &stops[nstops++];
+                    st->x = s.cx;
+                    st->y = s.cy;
+                    st->heading = atan2f(f->s, f->c);
+                    st->town = (uint16_t)(t - places);
+                    st->kind = h->shop ? WG_STOP_SHOP : WG_STOP_HOUSE;
+                }
+            }
         }
     }
 }
@@ -2049,6 +2070,7 @@ static void roundabout(const place *t)
 static void build_town(const place *t)
 {
     int n = town_blocks(t), i, j;
+    town_first_stop[t - places] = (uint32_t)nstops;
     for (i = -n; i <= n; i++) {                   /* streets */
         town_street(t, 0, i * GRID, n * GRID, 0.12f);
         town_street(t, 1, i * GRID, n * GRID, 0.13f);     /* crossings: not coplanar */
@@ -2151,6 +2173,7 @@ static void build_town(const place *t)
                    kinds[(int)(t - places) % 4], mx, my, px, py, t->heading * 57.29578f);
         }
     }
+    town_nstops[t - places] = (uint32_t)nstops - town_first_stop[t - places];
 }
 
 static void depot_frame(const place *d, float u, float v, float *x, float *y)
@@ -3224,6 +3247,33 @@ static int write_pack(const char *path, const wg_depot *depots)
         memcpy(d + 4, depots, sizeof(wg_depot) * (size_t)ndepots);
         pakw_section(w, WG_DEPOTS, d, (uint32_t)(4 + sizeof(wg_depot) * (size_t)ndepots));
         free(d);
+    }
+    {
+        /* The towns' street grids and their parcel stops. */
+        uint8_t *b = (uint8_t *)malloc(4 + sizeof(wg_town) * (size_t)ntowns);
+        uint32_t u = (uint32_t)ntowns;
+        memcpy(b, &u, 4);
+        for (i = 0; i < ntowns; i++) {
+            wg_town tn;
+            tn.x = places[i].x;
+            tn.y = places[i].y;
+            tn.heading = places[i].heading;
+            tn.r = places[i].r;
+            tn.blocks = (uint32_t)town_blocks(&places[i]);
+            tn.node = (uint32_t)i;
+            tn.first_stop = town_first_stop[i];
+            tn.nstops = town_nstops[i];
+            memcpy(b + 4 + sizeof tn * (size_t)i, &tn, sizeof tn);
+        }
+        pakw_section(w, WG_TOWNS, b, (uint32_t)(4 + sizeof(wg_town) * (size_t)ntowns));
+        free(b);
+        b = (uint8_t *)malloc(4 + sizeof(wg_stop) * (size_t)nstops);
+        u = (uint32_t)nstops;
+        memcpy(b, &u, 4);
+        memcpy(b + 4, stops, sizeof(wg_stop) * (size_t)nstops);
+        pakw_section(w, WG_STOPS, b, (uint32_t)(4 + sizeof(wg_stop) * (size_t)nstops));
+        free(b);
+        printf("fwgen: %d towns, %d parcel stops\n", ntowns, nstops);
     }
     {
         uint8_t *t = (uint8_t *)malloc(4 + 8 * (size_t)ntour);

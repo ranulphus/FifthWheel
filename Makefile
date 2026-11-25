@@ -12,6 +12,7 @@
 #   make release        dist/fwheel-ID.zip: the game, CWSDPMI and the text files (tools/release.sh)
 #   make winvm [CARD=g450]   dist/fwheel-CARD-vm.zip: an 86Box machine with the release on it
 #   make jobsweep       the job autopilot on every depot pair and bay, headless (tools/jobsweep.sh)
+#   make career         a new career played through by the autopilot, headless (tools/career.sh)
 #   make check-deps     RetroGPU's and dgk's checkouts are there (every build checks)
 #   make regress [CARD=g450]   the quick regression set for a new RetroGPU (DOS-GL, the HAL) or dgk
 include config.mk
@@ -32,7 +33,8 @@ WARN      := -std=gnu99 -Wall -Wextra -Werror
 # Every target compiles its GL against DOS-GL's own <GL/gl.h>: the subset is enforced.
 COMMON    := $(WARN) -O2 -ffp-contract=off $(DGK_CFLAGS)
 
-.PHONY: all dos linux headless loopa shots suite tests-host glcheck release winvm jobsweep check-deps regress deps clean help
+.PHONY: all dos linux headless loopa shots suite tests-host glcheck release winvm jobsweep career check-deps regress deps \
+        clean help
 all: dos
 
 check-deps:
@@ -43,7 +45,7 @@ check-deps:
 # DOS against Mesa, and the suite's sound, exit, crash, screen-size and
 # agreement checks on one card. The full `make suite` on g200, g400 and
 # g450 before a release.
-regress: tests-host jobsweep shots
+regress: tests-host jobsweep career shots
 	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) tools/suite.sh $(CARD) sb16 exit crash modes auto
 
 build/gen/font_gen.c: data/font5x7.txt $(DGK_FONTBAKE)
@@ -152,12 +154,12 @@ suite: dos
 	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) tools/suite.sh $(CARD) $(CHECKS)
 
 # Unit tests that need no screen: the host's compiler, the kit's and the game's pure parts.
-build/tests/test_host: game/tests/test_host.c game/src/career.c game/src/detail.c $(DGK)/src/cfg.c $(DGK)/src/save.c \
-                       $(DGK)/src/base.c $(DGK)/src/log.c $(HDRS)
+build/tests/test_host: game/tests/test_host.c game/src/career.c game/src/detail.c game/src/townroute.c $(DGK)/src/cfg.c \
+                       $(DGK)/src/save.c $(DGK)/src/base.c $(DGK)/src/log.c $(HDRS)
 	@mkdir -p $(dir $@)
 	$(Q)echo "  CC      $@"
-	$(Q)$(CC) $(TOOL_CFLAGS) -o $@ game/tests/test_host.c game/src/career.c game/src/detail.c $(DGK)/src/cfg.c \
-	  $(DGK)/src/save.c $(DGK)/src/base.c $(DGK)/src/log.c -lm
+	$(Q)$(CC) $(TOOL_CFLAGS) -o $@ game/tests/test_host.c game/src/career.c game/src/detail.c game/src/townroute.c \
+	  $(DGK)/src/cfg.c $(DGK)/src/save.c $(DGK)/src/base.c $(DGK)/src/log.c -lm
 tests-host: build/tests/test_host glcheck
 	$(Q)mkdir -p out && build/tests/test_host
 
@@ -176,6 +178,8 @@ release: dos tests-host
 
 jobsweep: headless
 	$(Q)$(DEV) sh tools/jobsweep.sh $(or $(PAR),8)
+career: headless
+	$(Q)$(DEV) sh tools/career.sh
 
 clean:
 	rm -rf build out dist
