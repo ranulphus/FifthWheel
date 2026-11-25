@@ -411,6 +411,13 @@ the town:
   trees at their corners. Their buildings, the fountain and the trees are
   solid: at LOW boxes, pyramids and four-sided spires (4 triangles a tree).
 
+The flat details on walls stand out from them in layers of 8 cm (`PROUD`):
+frames, then windows, doors, signs and clock faces, then a shop's door on
+its window (2026-11-25). At 2 to 4 cm, rounded to the pack's 1/32 m, a
+frame and its window, or a window and its wall, often fell on one plane
+and flickered through each other on the Matrox (16-bit depth); make shots'
+HIGH frame (H3) found it.
+
 With 64 m chunks (the pack's version 2) a town view at MEDIUM is about
 4,400 to 5,400 triangles, at HIGH about 10,000, at LOW about 1,230 (1,685
 before the towns, with 128 m chunks).

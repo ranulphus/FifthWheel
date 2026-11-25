@@ -107,6 +107,11 @@ static float terrain_tri(float x, float y, int idx[3])
  * above its own height; the terrain under it is kept at least CLEARANCE below
  * that height, and (filled) no more than FILL below it. */
 #define CLEARANCE 0.02f
+/* How far a wall's flat details stand out from it, a layer each: frames on the wall, windows, doors and signs on
+ * it or on a frame, a shop's door on its window. 8 cm is about 2.5 of the pack's 1/32 m units, so however a house
+ * is turned and its corners rounded they stay clear of what is under them, even in a 16-bit depth buffer (at 2 or 3
+ * cm, frames and windows rounded to the same plane and flickered through each other on the Matrox). */
+#define PROUD 0.08f
 #define FILL 0.3f
 
 /* Fit the terrain under a strip from (x0, y0) at height h0 to (x1, y1) at
@@ -1246,9 +1251,9 @@ static void row_house(const bframe *f, const hse *h, const hse *left, const hse 
         wall_at(m, f, 0, -hw, h->a, h->b, e, e + 0.5f, -1, h->wall, base);
         wall_at(m, f, 0, hw, h->a, h->b, e, e + 0.5f, 1, h->wall, base);
         /* The shopfront: its window, a door in it; the awning over, the sign above. */
-        wall_at(m, f, 0, -hw - 0.03f, h->a + 0.5f, h->b - 0.5f, lo, hi, -1, glass, -1e9f);
+        wall_at(m, f, 0, -hw - 2 * PROUD, h->a + 0.5f, h->b - 0.5f, lo, hi, -1, glass, -1e9f);
         du = h->door_left ? h->a + 1.4f : h->b - 1.4f;
-        wall_at(m, f, 0, -hw - 0.05f, du - 0.55f, du + 0.55f, base, base + 2.2f, -1, h->door, -1e9f);
+        wall_at(m, f, 0, -hw - 3 * PROUD, du - 0.55f, du + 0.55f, base, base + 2.2f, -1, h->door, -1e9f);
         {
             float p[4][3], out[3];
             bpoint(f, h->a + 0.3f, -hw, base + 3.15f, p[0]);
@@ -1259,13 +1264,13 @@ static void row_house(const bframe *f, const hse *h, const hse *left, const hse 
             out[1] = 1.2f;
             face(m, p, 4, out, h->trim, -1e9f);
         }
-        wall_at(m, f, 0, -hw - 0.04f, h->a + 0.4f, h->b - 0.4f, base + 3.3f, base + 4.0f, -1, h->door == 0xF4F4F0u ? 0x1C2E5Au : signs[(int)(uc * 7) & 3], -1e9f);
+        wall_at(m, f, 0, -hw - 2 * PROUD, h->a + 0.4f, h->b - 0.4f, base + 3.3f, base + 4.0f, -1, h->door == 0xF4F4F0u ? 0x1C2E5Au : signs[(int)(uc * 7) & 3], -1e9f);
         nwin = w > 8.5f ? 3 : 2;
         for (k = base + 4.6f; k + 1.4f < e - 0.2f; k += 3.0f)       /* the flats above: rows of windows */
             for (i = 0; i < nwin; i++) {
                 float a = h->a + (i + 0.5f) * (w / nwin);
-                wall_at(m, f, 0, -hw - 0.03f, a - 0.6f, a + 0.6f, k, k + 1.4f, -1, glass, -1e9f);
-                wall_at(m, f, 0, hw + 0.03f, a - 0.6f, a + 0.6f, k, k + 1.4f, 1, glass, -1e9f);
+                wall_at(m, f, 0, -hw - 2 * PROUD, a - 0.6f, a + 0.6f, k, k + 1.4f, -1, glass, -1e9f);
+                wall_at(m, f, 0, hw + 2 * PROUD, a - 0.6f, a + 0.6f, k, k + 1.4f, 1, glass, -1e9f);
             }
         return;
     }
@@ -1290,15 +1295,15 @@ static void row_house(const bframe *f, const hse *h, const hse *left, const hse 
     }
     /* The front: a door, a window by it, the windows above; the back's windows above. */
     du = h->door_left ? h->a + 1.3f : h->b - 1.3f;
-    wall_at(m, f, 0, -hw - 0.03f, du - 0.5f, du + 0.5f, base, base + 2.1f, -1, h->door, -1e9f);
+    wall_at(m, f, 0, -hw - 2 * PROUD, du - 0.5f, du + 0.5f, base, base + 2.1f, -1, h->door, -1e9f);
     {
         float wu = h->door_left ? (du + 0.5f + h->b) * 0.5f : (h->a + du - 0.5f) * 0.5f;
-        wall_at(m, f, 0, -hw - 0.03f, wu - 0.75f, wu + 0.75f, base + 0.9f, base + 2.2f, -1, glass, -1e9f);
+        wall_at(m, f, 0, -hw - 2 * PROUD, wu - 0.75f, wu + 0.75f, base + 0.9f, base + 2.2f, -1, glass, -1e9f);
     }
     nwin = w > 7.5f ? 2 : 1;
     for (i = 0; i < nwin; i++) {
         float a = h->a + (i + 0.5f) * (w / nwin);
-        wall_at(m, f, 0, -hw - 0.03f, a - 0.6f, a + 0.6f, e - 2.0f, e - 0.7f, -1, glass, -1e9f);
+        wall_at(m, f, 0, -hw - 2 * PROUD, a - 0.6f, a + 0.6f, e - 2.0f, e - 0.7f, -1, glass, -1e9f);
     }
 }
 
@@ -1316,10 +1321,10 @@ static void row_house_high(const bframe *f, const hse *h, float base)
         /* The awning's white stripes. */
         float p[4][3], out[3], a;
         for (a = h->a + 0.3f + 0.45f; a + 0.45f < h->b - 0.3f; a += 1.8f) {
-            bpoint(f, a, -hw - 0.01f, base + 3.17f, p[0]);
-            bpoint(f, a + 0.9f, -hw - 0.01f, base + 3.17f, p[1]);
-            bpoint(f, a + 0.9f, -hw - 1.61f, base + 2.67f, p[2]);
-            bpoint(f, a, -hw - 1.61f, base + 2.67f, p[3]);
+            bpoint(f, a, -hw - 0.01f, base + 3.15f + PROUD, p[0]);
+            bpoint(f, a + 0.9f, -hw - 0.01f, base + 3.15f + PROUD, p[1]);
+            bpoint(f, a + 0.9f, -hw - 1.61f, base + 2.65f + PROUD, p[2]);
+            bpoint(f, a, -hw - 1.61f, base + 2.65f + PROUD, p[3]);
             fdir(f, 1, -1, out);
             out[1] = 1.2f;
             face(m, p, 4, out, 0xF6F4EEu, -1e9f);
@@ -1328,12 +1333,12 @@ static void row_house_high(const bframe *f, const hse *h, float base)
     }
     for (i = 0; i < nwin; i++) {                     /* frames round the front's windows; the back's windows */
         float a = h->a + (i + 0.5f) * (w / nwin);
-        wall_at(m, f, 0, -hw - 0.02f, a - 0.75f, a + 0.75f, e - 2.15f, e - 0.55f, -1, h->trim, -1e9f);
-        wall_at(m, f, 0, hw + 0.03f, a - 0.6f, a + 0.6f, e - 2.0f, e - 0.7f, 1, 0x8FCBEFu, -1e9f);
+        wall_at(m, f, 0, -hw - PROUD, a - 0.75f, a + 0.75f, e - 2.15f, e - 0.55f, -1, h->trim, -1e9f);
+        wall_at(m, f, 0, hw + 2 * PROUD, a - 0.6f, a + 0.6f, e - 2.0f, e - 0.7f, 1, 0x8FCBEFu, -1e9f);
     }
     du = h->door_left ? h->a + 1.3f : h->b - 1.3f;
     wu = h->door_left ? (du + 0.5f + h->b) * 0.5f : (h->a + du - 0.5f) * 0.5f;
-    wall_at(m, f, 0, -hw - 0.02f, wu - 0.9f, wu + 0.9f, base + 0.75f, base + 2.35f, -1, h->trim, -1e9f);
+    wall_at(m, f, 0, -hw - PROUD, wu - 0.9f, wu + 0.9f, base + 0.75f, base + 2.35f, -1, h->trim, -1e9f);
     fbox(m, f, wu, -hw - 0.3f, 0.85f, 0.25f, base + 0.5f, base + 0.85f, 0x8A5A3Au, flowers[(int)(uc * 3.7f) & 3]);
     {   /* the door's hood */
         float p[4][3], out[3];
@@ -1349,7 +1354,7 @@ static void row_house_high(const bframe *f, const hse *h, float base)
         float dv = -hw * 0.45f, slope_h = e + (r - e) * (1.0f - 0.45f), dh0 = slope_h - 0.2f, dh1 = slope_h + 1.3f;
         bframe d = sub_frame(f, uc, 0);
         wall_at(m, &d, 0, dv - 0.6f, -0.8f, 0.8f, dh0, dh1, -1, h->wall, -1e9f);
-        wall_at(m, &d, 0, dv - 0.62f, -0.5f, 0.5f, dh0 + 0.3f, dh1 - 0.2f, -1, 0x8FCBEFu, -1e9f);
+        wall_at(m, &d, 0, dv - 0.6f - 2 * PROUD, -0.5f, 0.5f, dh0 + 0.3f, dh1 - 0.2f, -1, 0x8FCBEFu, -1e9f);
         {
             /* Its gable over the window, and its little roof's two slopes running back into the main roof. */
             float p[4][3], out[3];
@@ -1745,15 +1750,15 @@ static void clock_face(const bframe *f, float u, float at, float h, float r)
         bpoint(&c, r * cosf(a1), 0, h + r * sinf(a1), tri[2]);
         face(m, tri, 3, out, 0xF6F4EEu, -1e9f);
     }
-    bpoint(&c, -0.08f, -0.02f, h, p[0]);              /* the hour hand (ten to two, as a toy's) */
-    bpoint(&c, 0.08f, -0.02f, h, p[1]);
-    bpoint(&c, 0.5f * r + 0.08f, -0.02f, h + 0.45f * r, p[2]);
-    bpoint(&c, 0.5f * r - 0.08f, -0.02f, h + 0.45f * r, p[3]);
+    bpoint(&c, -0.08f, -PROUD, h, p[0]);              /* the hour hand (ten to two, as a toy's) */
+    bpoint(&c, 0.08f, -PROUD, h, p[1]);
+    bpoint(&c, 0.5f * r + 0.08f, -PROUD, h + 0.45f * r, p[2]);
+    bpoint(&c, 0.5f * r - 0.08f, -PROUD, h + 0.45f * r, p[3]);
     face(m, p, 4, out, 0x1C1C24u, -1e9f);
-    bpoint(&c, -0.06f, -0.03f, h, p[0]);              /* the minute hand */
-    bpoint(&c, 0.06f, -0.03f, h, p[1]);
-    bpoint(&c, -0.55f * r + 0.06f, -0.03f, h + 0.7f * r, p[2]);
-    bpoint(&c, -0.55f * r - 0.06f, -0.03f, h + 0.7f * r, p[3]);
+    bpoint(&c, -0.06f, -2 * PROUD, h, p[0]);          /* the minute hand */
+    bpoint(&c, 0.06f, -2 * PROUD, h, p[1]);
+    bpoint(&c, -0.55f * r + 0.06f, -2 * PROUD, h + 0.7f * r, p[2]);
+    bpoint(&c, -0.55f * r - 0.06f, -2 * PROUD, h + 0.7f * r, p[3]);
     face(m, p, 4, out, 0x1C1C24u, -1e9f);
 }
 
@@ -1813,8 +1818,8 @@ static void landmark(const place *t, float u0, float u1, float v0, float v1, int
         slope_at(chunk_for(nave.cx, nave.cy), &nave, -11.3f, 11.3f, 6.5f, h + 6.6f, 0, h + 12.0f, slate);
         for (k = 0; k < 4; k++) {                    /* tall windows down its sides */
             float a = -7.5f + k * 5.0f;
-            wall_at(chunk_for(nave.cx, nave.cy), &nave, 0, -6.03f, a - 0.8f, a + 0.8f, h + 1.8f, h + 5.8f, -1, glass, -1e9f);
-            wall_at(chunk_for(nave.cx, nave.cy), &nave, 0, 6.03f, a - 0.8f, a + 0.8f, h + 1.8f, h + 5.8f, 1, glass, -1e9f);
+            wall_at(chunk_for(nave.cx, nave.cy), &nave, 0, -6.0f - 2 * PROUD, a - 0.8f, a + 0.8f, h + 1.8f, h + 5.8f, -1, glass, -1e9f);
+            wall_at(chunk_for(nave.cx, nave.cy), &nave, 0, 6.0f + 2 * PROUD, a - 0.8f, a + 0.8f, h + 1.8f, h + 5.8f, 1, glass, -1e9f);
         }
         fbox(chunk_for(tower.cx, tower.cy), &tower, 0, 0, 3.0f, 3.0f, h - 0.5f, h + 18.0f, stone, stone);
         for (k = 0; k < 4; k++) {                    /* the belfry's openings */
@@ -1822,12 +1827,12 @@ static void landmark(const place *t, float u0, float u1, float v0, float v1, int
             float a = t->heading + k * WG_PI / 2;
             side.c = cosf(a);
             side.s = sinf(a);
-            wall_at(chunk_for(tower.cx, tower.cy), &side, 0, -3.03f, -1.0f, 1.0f, h + 13.5f, h + 16.5f, -1, 0x2A2A34u, -1e9f);
+            wall_at(chunk_for(tower.cx, tower.cy), &side, 0, -3.0f - 2 * PROUD, -1.0f, 1.0f, h + 13.5f, h + 16.5f, -1, 0x2A2A34u, -1e9f);
         }
-        wall_at(chunk_for(tower.cx, tower.cy), &tower, 0, -3.03f, -1.0f, 1.0f, h, h + 3.4f, -1, 0x6A4028u, -1e9f);
+        wall_at(chunk_for(tower.cx, tower.cy), &tower, 0, -3.0f - 2 * PROUD, -1.0f, 1.0f, h, h + 3.4f, -1, 0x6A4028u, -1e9f);
         cone(tower.cx, tower.cy, h + 18.0f, h + 30.0f, 3.4f, 8, copper);
         variant = WG_HIGH_ONLY;
-        clock_face(&tower, 0, -3.06f, h + 10.5f, 1.4f);
+        clock_face(&tower, 0, -3.0f - PROUD, h + 10.5f, 1.4f);
         blob(tower.cx, tower.cy, h + 30.3f, 0.35f, 0.35f, 0xF2C230u);
         (void)x0;
         (void)y0;
@@ -1880,8 +1885,8 @@ static void landmark(const place *t, float u0, float u1, float v0, float v1, int
         top_at(m, &hall, -12.4f, 12.4f, -2.0f, 2.0f, h + 12.0f, roof);
         for (k = 0; k < 5; k++) {                    /* windows, two floors */
             float a = -10.0f + k * 5.0f;
-            wall_at(m, &hall, 0, -7.03f, a - 0.8f, a + 0.8f, h + 1.2f, h + 3.4f, -1, 0x8FCBEFu, -1e9f);
-            wall_at(m, &hall, 0, -7.03f, a - 0.8f, a + 0.8f, h + 5.0f, h + 7.4f, -1, 0x8FCBEFu, -1e9f);
+            wall_at(m, &hall, 0, -7.0f - 2 * PROUD, a - 0.8f, a + 0.8f, h + 1.2f, h + 3.4f, -1, 0x8FCBEFu, -1e9f);
+            wall_at(m, &hall, 0, -7.0f - 2 * PROUD, a - 0.8f, a + 0.8f, h + 5.0f, h + 7.4f, -1, 0x8FCBEFu, -1e9f);
         }
         for (k = 0; k < 4; k++) {                    /* the portico: four columns, a pediment */
             bframe col = sub_frame(&hall, -3.6f + k * 2.4f, -8.4f);
@@ -1904,7 +1909,7 @@ static void landmark(const place *t, float u0, float u1, float v0, float v1, int
             float a = t->heading + k * WG_PI / 2;
             side.c = cosf(a);
             side.s = sinf(a);
-            clock_face(&side, 0, -3.04f, h + 16.5f, 1.7f);
+            clock_face(&side, 0, -3.0f - PROUD, h + 16.5f, 1.7f);
         }
         variant = WG_HIGH_ONLY;
         blob(hall.cx, hall.cy, h + 24.3f, 0.4f, 0.4f, 0xF2C230u);
