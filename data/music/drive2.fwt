@@ -1,5 +1,7 @@
 # Country Mile: the second driving tune. A banjo's tune and a harmonica answering it over a boom-chick bass and
-# guitar, a train beat on the snare; G major, A A' B A' (32 bars), shuffled.
+# guitar, a train beat on the snare; shuffled. 88 bars (about 2:56): a banjo roll in, the head in G (A A' B A'),
+# the harmonica's chorus over the banjo's rolls, a fiddle break on the bridge, the banjo's last A, then up a
+# tone to A for the bridge and the last A, and a tag on D7, which leads back round to G.
 title Country Mile
 tempo 120
 meter 4/4
@@ -15,12 +17,49 @@ define mB
 | g4/8 b4/8 d5/8 g5/8 b5/2 | c#5/8 e5/8 a5/8 e5/8 c#5/4 e5/4 | g5/8 f#5/8 e5/8 c#5/8 a4/2 |
 | d5/8 f#5/8 a5/8 f#5/8 d5/4 c5/4 | b4/8 a4/8 f#4/8 a4/8 d5/2 |
 enddef
+# The same up a tone, in A.
+define mA2
+| a4/8 c#5/8 e5/8 c#5/8 a5/4 e5/4 | f#5/8 e5/8 c#5/8 a4/8 b4/2 | d5/8 f#5/8 a5/8 f#5/8 d5/4 f#5/4 |
+| e5/8 c#5/8 a4/8 c#5/8 e5/2 | a4/8 c#5/8 e5/8 c#5/8 a5/4 c#6/4 | b5/8 a5/8 g#5/8 f#5/8 e5/4 d5/4 |
+| c#5/8 e5/8 a5/8 e5/8 c#5/8 b4/8 a4/4 |
+enddef
+define mB2
+| d5/8 f#5/8 a5/8 f#5/8 d6/4 a5/4 | b5/8 a5/8 f#5/8 d5/8 f#5/2 | e5/8 a5/8 c#6/8 a5/8 e5/4 c#5/4 |
+| a4/8 c#5/8 e5/8 a5/8 c#6/2 | d#5/8 f#5/8 b5/8 f#5/8 d#5/4 f#5/4 | a5/8 g#5/8 f#5/8 d#5/8 b4/2 |
+| e5/8 g#5/8 b5/8 g#5/8 e5/4 d5/4 | c#5/8 b4/8 g#4/8 b4/8 e5/2 |
+enddef
+# The banjo's rolls under another's tune.
+define rG
+| g4/8? b4/8? d5/8? b4/8? g4/8? b4/8? d5/8? b4/8? |
+enddef
+define rC
+| g4/8? c5/8? e5/8? c5/8? g4/8? c5/8? e5/8? c5/8? |
+enddef
+define rD
+| a4/8? d5/8? f#5/8? d5/8? a4/8? d5/8? f#5/8? d5/8? |
+enddef
+define rA7
+| a4/8? c#5/8? e5/8? g5/8? a4/8? c#5/8? e5/8? g5/8? |
+enddef
+define rest8
+| r/1 | r/1 | r/1 | r/1 | r/1 | r/1 | r/1 | r/1 |
+enddef
 
 part banjo ch 1 prog 105 vol 107
+| g4/8 b4/8 d5/8 g5/8 b4/8 d5/8 g5/8 d5/8 | g4/8 b4/8 d5/8 g5/8 b4/8 d5/8 g5/8 b5/8 |
+| a4/8 c5/8 d5/8 f#5/8 a4/8 c5/8 d5/8 f#5/8 | a5/8 f#5/8 d5/8 c5/8 a4/4 d4/4 |
 $mA | a4/8 b4/8 c5/8 b4/8 a4/4 d4/4 |
 $mA | g4/2 r/2 |
 $mB
 $mA | g4/2 r/2 |
+$rG $rG $rC $rG $rG $rD $rG $rD
+$rG $rG $rC $rG $rG $rD $rG $rG
+$rC $rC $rG $rG $rA7 $rA7 $rD $rD
+$mA | g4/2 r/2 |
+$mB2
+$mA2 | a4/2 r/2 |
+| a4/8 c#5/8 e5/8 a5/8 c#5/8 e5/8 a5/8 e5/8 | a5/2 e5/4 c#5/4 | d5/8 f#5/8 a5/8 c6/8 a5/8 f#5/8 d5/4 |
+| c6/8 a5/8 f#5/8 d5/8 c5/4 a4/4 |
 
 define hA
 | r/1 | r/2 b4/4. a4/8 | r/1 | r/2 d5/4. c5/8 | r/1 | r/2 c5/4 a4/4 | r/1 |
@@ -28,12 +67,36 @@ enddef
 define hB
 | e5/1 | c5/1 | d5/1 | b4/1 | c#5/1 | a4/1 | f#5/1 | d5/1 |
 enddef
+define hA2
+| r/1 | r/2 c#5/4. b4/8 | r/1 | r/2 e5/4. d5/8 | r/1 | r/2 d5/4 b4/4 | r/1 |
+enddef
+define hB2
+| f#5/1 | d5/1 | e5/1 | c#5/1 | d#5/1 | b4/1 | g#5/1 | e5/1 |
+enddef
 
-part harmonica ch 2 prog 22 vol 101
+part harmonica ch 2 prog 22 vol 90
+| r/1 | r/1 | r/1 | r/1 |
 $hA | r/2 f#4/2 |
 $hA | r/1 |
 $hB
 $hA | r/1 |
+$mA | a4/8 b4/8 c5/8 b4/8 a4/4 d4/4 |
+$mA | g4/2 r/2 |
+$rest8
+$hA | r/1 |
+$hB2
+$hA2 | r/1 |
+| r/1 | r/2 e5/2 | r/1 | r/2 d5/2 |
+
+# The fiddle's break on the bridge (C C G G A7 A7 D D).
+part fiddle ch 4 prog 110 vol 98
+| r/1 | r/1 | r/1 | r/1 |
+$rest8 $rest8 $rest8 $rest8 $rest8 $rest8
+| e5/8 g5/8 c6/8 g5/8 e5/8 g5/8 c6/4 | b5/8 a5/8 g5/8 e5/8 c5/2 | d5/8 g5/8 b5/8 d6/8 b5/8 g5/8 d5/4 |
+| g5/8 f#5/8 e5/8 d5/8 b4/2 | c#5/8 e5/8 a5/8 c#6/8 a5/8 g5/8 e5/4 | g5/8 e5/8 c#5/8 a4/8 e5/2 |
+| f#5/8 a5/8 d6/8 a5/8 f#5/8 a5/8 c6/4 | a5/8 f#5/8 d5/8 c5/8 a4/2 |
+$rest8 $rest8 $rest8
+| r/1 | r/1 | r/1 | r/1 |
 
 define cG
 | g2/4 b3+d4+g4/4? d2/4 b3+d4+g4/4? |
@@ -50,12 +113,32 @@ enddef
 define cA
 $cG $cG $cC $cG $cG $cD $cG
 enddef
+define cA2
+| a2/4 c#4+e4+a4/4? e2/4 c#4+e4+a4/4? |
+enddef
+define cD2
+| d3/4 d4+f#4+a4/4? a2/4 d4+f#4+a4/4? |
+enddef
+define cE
+| e2/4 d4+e4+g#4/4? b2/4 d4+e4+g#4/4? |
+enddef
+define cB7
+| b2/4 d#4+f#4+a4/4? f#2/4 d#4+f#4+a4/4? |
+enddef
 
 part rhythm ch 3 prog 25 vol 81
+$cG $cG $cD $cD
 $cA $cD
 $cA $cG
 $cC $cC $cG $cG $cA7 $cA7 $cD $cD
 $cA $cG
+$cA $cD
+$cA $cG
+$cC $cC $cG $cG $cA7 $cA7 $cD $cD
+$cA $cG
+$cD2 $cD2 $cA2 $cA2 $cB7 $cB7 $cE $cE
+$cA2 $cA2 $cD2 $cA2 $cA2 $cE $cA2 $cA2
+$cA2 $cA2 $cD $cD
 
 define dBar
 | bd+sd/8? sd/8? sd/8? sd/8? bd+sd/8? sd/8? sd/8? sd/8? |
@@ -63,9 +146,14 @@ enddef
 define dEnd
 | bd+sd/8? sd/8? sd/8? sd/8? sd/8 sd/8 sd/8 cr/8 |
 enddef
+define dStrain
+$dBar x7 $dEnd
+enddef
 
 part drums ch 10 prog 0 vol 105
-$dBar x7 $dEnd
-$dBar x7 $dEnd
-$dBar x7 $dEnd
-$dBar x7 $dEnd
+$dBar x3 $dEnd
+$dStrain $dStrain $dStrain $dStrain
+$dStrain $dStrain
+$dStrain $dStrain
+$dStrain $dStrain
+$dBar x3 $dEnd

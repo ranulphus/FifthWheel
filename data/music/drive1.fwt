@@ -1,10 +1,15 @@
 # Open Road Rag: the first driving tune. A clarinet over a tuba's oom and the piano's pah, brushes on the
-# drums; ragtime's two strains, A A' B A' (32 bars, C major then F), straight eighths.
+# drums; straight eighths. A rag's form (96 bars, about 2:55): an intro, the first strain twice (C), the second
+# (F, then home), the first again, the trio in F with the piano taking the tune, a stop-time strain (the band on
+# the beat, the clarinet's breaks between), the trio on the clarinet, and a coda that turns back to C.
 title Open Road Rag
 tempo 132
 meter 4/4
 swing 0
 
+define melIntro
+| r/2 g5/8 a5/8 g5/8 e5/8 | c#5/8 e5/8 a5/8 g5/8 e5/4 c#5/4 | d5/8 f#5/8 a5/8 c6/8 b5/4 a5/4 | g5/4 f5/4 d5/4 b4/4 |
+enddef
 define melA
 | e5/8 g5/8 c6/4 b5/8 c6/8 e5/4 | d5/8 e5/8 g5/4. e5/8 c5/4 | b4/8 d5/8 f5/4 a5/8 g5/8 f5/4 |
 | d5/4 g4/8 a4/8 b4/8 d5/8 f5/4 | e5/8 g5/8 c6/4 e6/8 d6/8 c6/4 | bb5/4 g5/8 e5/8 c5/8 e5/8 g5/4 |
@@ -14,12 +19,49 @@ define melB
 | a5/4. g5/8 f5/4 a5/4 | c6/2 a5/4 f5/4 | g5/4. f5/8 e5/4 g5/4 | c6/2 g5/4 e5/4 |
 | f#5/8 a5/8 d6/4 c6/8 a5/8 f#5/4 | a5/4 f#5/4 d5/4 f#5/4 | g5/8 a5/8 b5/4 d6/4 b5/4 | a5/4 g5/4 f5/4 d5/4 |
 enddef
+define melB2
+| a5/4. g5/8 f5/4 a5/4 | c6/2 a5/4 f5/4 | g5/4. f5/8 e5/4 g5/4 | c#6/2 a5/4 e5/4 |
+| f5/8 a5/8 d6/4 c6/8 a5/8 f5/4 | g5/4 b5/4 d6/4 f5/4 | e5/8 g5/8 c6/4 g5/8 e5/8 c5/4 | c5/2 r/2 |
+enddef
+# The trio (F: F F C7 C7 C7 C7 F F7 Bb Bbm F D7 G7 C7 F F).
+define melC
+| c5/8 d5/8 f5/8 a5/8 c6/4. a5/8 | g5/8 f5/8 d5/8 f5/8 a5/2 | g5/4. e5/8 c5/4 e5/4 | g5/8 bb5/8 g5/8 e5/8 c5/2 |
+| bb4/8 c5/8 e5/8 g5/8 bb5/4. g5/8 | e5/8 d5/8 c5/8 bb4/8 g4/2 | a4/8 c5/8 f5/8 a5/8 c6/4 a5/4 | eb5/2 c5/2 |
+| d5/8 f5/8 bb5/8 d6/8 c6/4 bb5/4 | db5/8 f5/8 bb5/8 db6/8 c6/4 bb5/4 | a5/4. f5/8 c5/4 a4/4 |
+| f#5/8 a5/8 c6/8 a5/8 f#5/4 d5/4 | g5/4. f5/8 d5/4 b4/4 | e5/8 g5/8 bb5/8 g5/8 e5/4 c5/4 | f5/4 a5/4 c6/4 a5/4 |
+| f5/2 r/2 |
+enddef
+# Stop time (C7 C7 F F C7 C7 F F G7 G7 C C G7 G7 C7 C7): the band on the first beat, the clarinet's breaks.
+define melD
+| r/4 g5/8 a5/8 bb5/8 a5/8 g5/4 | e5/8 f5/8 g5/8 e5/8 c5/2 | r/4 a5/8 bb5/8 c6/8 bb5/8 a5/4 | f5/8 g5/8 a5/8 f5/8 c5/2 |
+| r/4 bb5/8 c6/8 d6/8 c6/8 bb5/4 | g5/8 a5/8 bb5/8 g5/8 e5/2 | r/4 f5/8 e5/8 f5/8 a5/8 c6/4 | a5/2 f5/2 |
+| r/4 d5/8 e5/8 f5/8 g5/8 a5/4 | b5/8 a5/8 g5/8 f5/8 d5/2 | r/4 e5/8 f5/8 g5/8 a5/8 b5/4 | c6/2 g5/2 |
+| r/4 b5/8 a5/8 g5/8 f5/8 d5/4 | g5/8 f5/8 d5/8 b4/8 g4/2 | c5/8 e5/8 g5/8 bb5/8 c6/4 bb5/4 | g5/4 e5/4 c5/4 bb4/4 |
+enddef
+define melCoda
+| a5/4 c6/4 f5/2 | ab5/4 c6/4 f5/2 | e5/4 g5/4 c6/2 | b5/4 g5/4 f5/4 d5/4 |
+enddef
+define rest8
+| r/1 | r/1 | r/1 | r/1 | r/1 | r/1 | r/1 | r/1 |
+enddef
 
 part melody ch 1 prog 71 vol 89
+$melIntro
 $melA | e5/4 g5/8 e5/8 d5/2 |
 $melA | c5/4 e5/8 g5/8 c6/2 |
-$melB
+$melB $melB2
 $melA | c5/4 e5/8 g5/8 c6/2 |
+$rest8 $rest8
+$melD
+$melC
+$melCoda
+
+part pianolead ch 4 prog 0 vol 96
+| r/1 | r/1 | r/1 | r/1 |
+$rest8 $rest8 $rest8 $rest8 $rest8
+$melC
+$rest8 $rest8 $rest8 $rest8
+| r/1 | r/1 | r/1 | r/1 |
 
 define pC
 | r/4 e4+g4+c5/4? r/4 e4+g4+c5/4? |
@@ -27,26 +69,70 @@ enddef
 define pG7
 | r/4 d4+f4+b4/4? r/4 d4+f4+b4/4? |
 enddef
+define pF
+| r/4 f4+a4+c5/4? r/4 f4+a4+c5/4? |
+enddef
+define pC7
+| r/4 e4+g4+bb4/4? r/4 e4+g4+bb4/4? |
+enddef
+define pA7
+| r/4 e4+g4+c#5/4? r/4 e4+g4+c#5/4? |
+enddef
+define pD7
+| r/4 f#4+a4+c5/4? r/4 f#4+a4+c5/4? |
+enddef
+define pDm
+| r/4 f4+a4+d5/4? r/4 f4+a4+d5/4? |
+enddef
 define pA
 $pC x2 $pG7 x2 $pC | r/4 e4+g4+bb4/4? r/4 e4+g4+bb4/4? | r/4 f4+a4+c5/4? r/4 f4+ab4+c5/4? |
 enddef
 define pB
-| r/4 f4+a4+c5/4? r/4 f4+a4+c5/4? | r/4 f4+a4+c5/4? r/4 f4+a4+c5/4? | $pC x2
-| r/4 f#4+a4+c5/4? r/4 f#4+a4+c5/4? | r/4 f#4+a4+c5/4? r/4 f#4+a4+c5/4? |
+$pF $pF $pC x2 | r/4 f#4+a4+c5/4? r/4 f#4+a4+c5/4? | r/4 f#4+a4+c5/4? r/4 f#4+a4+c5/4? |
 | r/4 d4+g4+b4/4? r/4 d4+g4+b4/4? | $pG7
+enddef
+define pB2
+$pF $pF $pC $pA7 $pDm $pG7 $pC $pC
+enddef
+define pTrio
+$pF $pF $pC7 $pC7 $pC7 $pC7 $pF | r/4 eb4+f4+a4/4? r/4 eb4+f4+a4/4? |
+| r/4 d4+f4+bb4/4? r/4 d4+f4+bb4/4? | r/4 db4+f4+bb4/4? r/4 db4+f4+bb4/4? | $pF $pD7 $pG7 $pC7 $pF $pF
+enddef
+define pHitC7
+| e4+g4+bb4/4 r/4 r/2 |
+enddef
+define pHitF
+| f4+a4+c5/4 r/4 r/2 |
+enddef
+define pHitG7
+| d4+f4+b4/4 r/4 r/2 |
+enddef
+define pHitC
+| e4+g4+c5/4 r/4 r/2 |
+enddef
+define pD
+$pHitC7 $pC7 $pHitF $pF $pHitC7 $pC7 $pHitF $pF $pHitG7 $pG7 $pHitC $pC $pHitG7 $pG7 $pC7 $pC7
 enddef
 
 part piano ch 2 prog 0 vol 88
+$pC $pA7 $pD7 $pG7
 $pA | r/4 e4+g4+c5/4? r/4 d4+f4+b4/4? |
 $pA $pC
-$pB
+$pB $pB2
 $pA $pC
+$pTrio
+$pD
+$pTrio
+$pF | r/4 f4+ab4+c5/4? r/4 f4+ab4+c5/4? | $pC $pG7
 
 define tC
 | c3/4 r/4 g2/4 r/4 |
 enddef
 define tG
 | g2/4 r/4 d3/4 r/4 |
+enddef
+define tF
+| f2/4 r/4 c3/4 r/4 |
 enddef
 define tA
 $tC x2 $tG x2 $tC x2 | f2/4 r/4 c3/4 r/4 |
@@ -55,12 +141,28 @@ define tB
 | f2/4 r/4 c3/4 r/4 | f2/4 r/4 a2/4 r/4 | $tC x2 | d3/4 r/4 a2/4 r/4 | d3/4 r/4 f#2/4 r/4 | $tG
 | g2/4 a2/4 b2/4 g2/4 |
 enddef
+define tB2
+$tF | f2/4 r/4 a2/4 r/4 | $tC | a2/4 r/4 e2/4 r/4 | d3/4 r/4 a2/4 r/4 | $tG $tC | c3/4 g2/4 c3/4 r/4 |
+enddef
+define tTrio
+$tF $tF $tC $tC $tC $tC $tF | f2/4 r/4 eb2/4 r/4 | bb2/4 r/4 f2/4 r/4 | bb2/4 r/4 db3/4 r/4 | $tF
+| d3/4 r/4 a2/4 r/4 | $tG $tC $tF | f2/4 c3/4 f2/4 r/4 |
+enddef
+define tD
+| c3/4 r/4 r/2 | $tC | f2/4 r/4 r/2 | $tF | c3/4 r/4 r/2 | $tC | f2/4 r/4 r/2 | $tF
+| g2/4 r/4 r/2 | $tG | c3/4 r/4 r/2 | $tC | g2/4 r/4 r/2 | $tG $tC | c3/4 bb2/4 a2/4 g2/4 |
+enddef
 
-part tuba ch 3 prog 58 vol 78
+part tuba ch 3 prog 58 vol 69
+| c3/4 r/4 g2/4 r/4 | a2/4 r/4 e2/4 r/4 | d3/4 r/4 a2/4 r/4 | g2/4 r/4 d3/4 r/4 |
 $tA | c3/4 r/4 g2/4 b2/4 |
 $tA | c3/4 g2/4 c3/4 r/4 |
-$tB
+$tB $tB2
 $tA | c3/4 g2/4 c3/4 r/4 |
+$tTrio
+$tD
+$tTrio
+$tF | f2/4 r/4 ab2/4 r/4 | $tC | g2/4 a2/4 b2/4 g2/4 |
 
 define dBar
 | bd+hh/8 hh/8? sd+hh/8? hh/8? bd+hh/8 hh/8? sd+hh/8? hh/8? |
@@ -68,9 +170,17 @@ enddef
 define dFill
 | bd+hh/8 hh/8? sd+hh/8? hh/8? sd/8? sd/8? sd/8 cr/8 |
 enddef
+define dHit
+| bd+cr/4 r/4 r/2 |
+enddef
+define dStrain
+$dBar x7 $dFill
+enddef
 
 part drums ch 10 prog 0 vol 101
-$dBar x7 $dFill
-$dBar x7 $dFill
-$dBar x7 $dFill
-$dBar x7 $dFill
+$dBar x3 $dFill
+$dStrain $dStrain $dStrain $dStrain $dStrain
+$dStrain $dStrain
+$dHit $dBar $dHit $dBar $dHit $dBar $dHit $dBar $dHit $dBar $dHit $dBar $dHit $dBar $dBar $dFill
+$dStrain $dStrain
+$dBar x3 $dFill

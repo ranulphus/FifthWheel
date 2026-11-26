@@ -2,7 +2,7 @@
  * standard MIDI files by tools/fwtune.c and built into the game), played as
  * General MIDI through dgk's music (dgk/midi.h: the Sound Blaster's FM chip
  * with GLOS's instruments, GLOS's MIDI ports as a GLOS app, an emulated OPL3
- * off DOS). A tune loops; the driving tunes take turns (each played twice).
+ * off DOS). A tune loops; the driving tunes take turns, each played once.
  * Quietly nothing where dgk finds nothing to play on, or with -nosound. Timed
  * by the game's clock (in a -fixed test, its ticks: the same messages every
  * run); music_update sends what falls due soon, so the game calls it at every
@@ -28,5 +28,6 @@ void music_volume(int level);                /* 0 (silent) .. 10 */
 void music_update(void);
 void music_shutdown(void);                   /* silent, the chip reset */
 const char *music_playing(void);             /* the tune's name, or NULL */
+double music_loop_s(void);                   /* its length, seconds (0: none) */
 
 #endif

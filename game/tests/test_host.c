@@ -318,9 +318,7 @@ static void music(void)
         memset(programs, 0, sizeof programs);
         CHECK(music_play(names[i]), "no tune %s", names[i]);
         CHECK(music_playing() && !strcmp(music_playing(), names[i]), "%s does not play", names[i]);
-        /* Past every tune's end: it plays on. (Over 80 s it sent every note the files hold: title 462, garage
-         * 566, drive1 586, drive2 576, drive3 696, give or take the notes at the cut, 2026-11-26.) */
-        ticks(80);
+        ticks(music_loop_s() + 2);                   /* past its end: it plays on */
         for (c = 0; c < 16; c++)
             progs += programs[c] != 0;
         CHECK(music_playing() && !strcmp(music_playing(), names[i]), "%s stopped", names[i]);
@@ -329,10 +327,10 @@ static void music(void)
         CHECK(bad_order == 0 && late == 0, "%s: %d sent out of order, %d late", names[i], bad_order, late);
     }
     CHECK(!music_play("nothing"), "a tune that is not there plays");
-    music_want(MUSIC_DRIVING);                       /* the driving tunes in turn: each twice */
+    music_want(MUSIC_DRIVING);                       /* the driving tunes in turn, each once */
     CHECK(music_playing() && !strcmp(music_playing(), "drive1"), "driving starts with %s", music_playing());
-    ticks(2 * 58.2 + 1);
-    CHECK(music_playing() && !strcmp(music_playing(), "drive2"), "after drive1 twice: %s", music_playing());
+    ticks(music_loop_s() + 1);
+    CHECK(music_playing() && !strcmp(music_playing(), "drive2"), "after drive1: %s", music_playing());
     music_want(MUSIC_GARAGE);
     CHECK(music_playing() && !strcmp(music_playing(), "garage"), "the garage plays %s", music_playing());
     music_want(MUSIC_OFF);

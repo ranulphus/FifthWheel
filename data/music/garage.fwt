@@ -1,5 +1,6 @@
 # Showroom Bossa: the garage. Vibes over a nylon guitar's bossa comp and a soft bass, a rim and hi-hat; Bb
-# major, A A' B A' (32 bars), straight eighths.
+# major, straight eighths. 80 bars (about 3:05): a vamp on ii-V, the head on vibes (A A' B A'), a chorus of
+# flute solo over the same changes, the head's last A again, and the vamp as a tag, which leads round.
 title Showroom Bossa
 tempo 104
 meter 4/4
@@ -13,12 +14,45 @@ define mB
 | g5/4. bb5/8 d6/2 | c6/8 bb5/8 gb5/4 eb5/2 | f5/4. a5/8 d6/2 | b5/8 a5/8 g5/4 f5/4 d5/4 |
 | eb5/4. g5/8 c6/2 | a5/8 g5/8 f5/4 eb5/4 c5/4 | d5/2 f5/4 g5/4 | a5/2 r/2 |
 enddef
+define rest4
+| r/1 | r/1 | r/1 | r/1 |
+enddef
+define rest8
+$rest4 $rest4
+enddef
 
 part vibes ch 1 prog 11 vol 107
+$rest4
 $mA | a5/2 r/2 |
 $mA | bb5/2 r/2 |
 $mB
 $mA | bb5/2 r/2 |
+$rest8 $rest8 $rest8 $rest8
+$mA | bb5/2 r/2 |
+| r/1 | r/1 | g5/4. f5/8 eb5/4 c5/4 | d5/2 r/2 |
+
+# The flute's chorus: A (Bb Bb Cm F7 Dm G7 Cm F7) twice, B (Gm Ebm6 Bb G7 Cm F7 Gm7 F7), A.
+define sA1
+| r/8 f5/8 d5/8 bb4/8 c5/4 d5/4 | f5/2 r/4 a4/8 bb4/8 | c5/8 eb5/8 g5/8 bb5/8 a5/4. g5/8 | f5/4 eb5/8 c5/8 a4/2 |
+| r/8 a4/8 d5/8 f5/8 a5/4 f5/4 | g5/4. f5/8 d5/4 b4/4 | c5/8 d5/8 eb5/8 g5/8 c6/4 bb5/4 | a5/2. r/4 |
+enddef
+define sA2
+| d6/4. c6/8 bb5/8 a5/8 f5/4 | d5/4 f5/4 bb5/2 | r/4 g5/8 eb5/8 c5/4 eb5/8 g5/8 | a5/4 c6/4 eb5/4. f5/8 |
+| d5/2 r/8 f5/8 a5/8 c6/8 | b5/4 g5/4 f5/4 d5/4 | eb5/4. d5/8 c5/4 bb4/4 | a4/2 c5/4 f5/4 |
+enddef
+define sB
+| g5/4. a5/8 bb5/4 d6/4 | c6/4 bb5/8 gb5/8 eb5/2 | f5/8 g5/8 a5/8 bb5/8 d6/2 | b5/4 d6/4 f6/4 d6/4 |
+| eb6/4. d6/8 c6/4 g5/4 | a5/8 g5/8 f5/8 eb5/8 c5/2 | d5/4 f5/4 g5/4 bb5/4 | a5/2 r/2 |
+enddef
+define sA3
+| r/8 d5/8 f5/8 a5/8 bb5/4 a5/4 | f5/4. d5/8 bb4/2 | eb5/4 g5/4 c6/4. bb5/8 | a5/4 f5/4 c5/2 |
+| f5/8 e5/8 d5/8 a4/8 d5/4 f5/4 | b4/4. d5/8 g5/2 | eb5/8 f5/8 g5/8 bb5/8 c6/4 eb5/4 | f5/1 |
+enddef
+
+part flute ch 4 prog 73 vol 112
+$rest4 $rest8 $rest8 $rest8 $rest8
+$sA1 $sA2 $sB $sA3
+$rest8 $rest4
 
 define gBb
 | d4+f4+a4/4? r/8 d4+f4+a4/8? r/4 d4+f4+a4/4? |
@@ -42,9 +76,16 @@ define gB
 | d4+g4+bb4/4? r/8 d4+g4+bb4/8? r/4 d4+g4+bb4/4? | | eb4+gb4+c5/4? r/8 eb4+gb4+c5/8? r/4 eb4+gb4+c5/4? |
 $gBb $gG7 $gCm $gF7 | d4+f4+g4/4? r/8 d4+f4+g4/8? r/4 d4+f4+g4/4? | $gF7
 enddef
+define gVamp
+$gCm $gF7 $gCm $gF7
+enddef
 
 part guitar ch 2 prog 24 vol 100
+$gVamp
 $gA $gA $gB $gA
+$gA $gA $gB $gA
+$gA
+$gVamp
 
 define bBb
 | bb2/4. f2/8 f2/4. bb2/8 |
@@ -67,13 +108,20 @@ enddef
 define bB
 | eb3/4. bb2/8 bb2/4. eb3/8 | | eb3/4. bb2/8 bb2/4. gb2/8 | $bBb $bG $bC $bF $bBb $bF
 enddef
+define bVamp
+$bC $bF $bC $bF
+enddef
 
 part bass ch 3 prog 32 vol 84
+$bVamp
 $bA $bA $bB $bA
+$bA $bA $bB $bA
+$bA
+$bVamp
 
 define dBar
 | bd+hh/8? hh/8? hh/8? sd+hh/8? bd+hh/8? hh/8? sd+hh/8? hh/8? |
 enddef
 
 part drums ch 10 prog 0 vol 127
-$dBar x32
+$dBar x80

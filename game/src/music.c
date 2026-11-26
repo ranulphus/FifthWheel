@@ -10,7 +10,7 @@
 
 #define MAX_EVENTS 16384
 #define DRIVE_FIRST 2                /* music_tunes[2..]: the driving tunes */
-#define DRIVE_LOOPS 2                /* each played this many times before the next */
+#define DRIVE_LOOPS 1                /* each played this many times before the next (once: the owner, 2026-11-26) */
 #define AHEAD_US 150000              /* messages go this far ahead of their time (a slow frame's worth) */
 
 /* ---- the tune ---------------------------------------------------------------- */
@@ -264,6 +264,11 @@ void music_shutdown(void)
     dgk_midi_close();
     device = DGK_MIDI_OFF;
     tune = -1;
+}
+
+double music_loop_s(void)
+{
+    return tune >= 0 ? loop_us / 1e6 : 0;
 }
 
 const char *music_playing(void)
