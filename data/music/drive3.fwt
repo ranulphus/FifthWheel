@@ -24,7 +24,7 @@ define rest4
 | r/1 | r/1 | r/1 | r/1 |
 enddef
 
-part sax ch 1 prog 65 vol 101
+part sax ch 1 prog 65 vol 127
 $rest4
 $mA | a5/4 f5/4 g5/4. c5/8 |
 $mA | f5/2. r/4 |
@@ -128,7 +128,7 @@ define pB
 $pA7 $pA7 $pDm $pDm $pG7 $pG7 $pC7 $pC7
 enddef
 
-part piano ch 2 prog 0 vol 93
+part piano ch 2 prog 0 vol 64
 $pF6 $pD7 $pGm7 $pC7
 $pA $pTurn $pA $pHome $pB $pA $pTurn
 $pA $pTurn $pA $pHome $pB $pA $pTurn
@@ -175,7 +175,7 @@ define dStrain
 $dBar x7 $dFill
 enddef
 
-part drums ch 10 prog 0 vol 78
+part drums ch 10 prog 0 vol 51
 $dBar x3 $dFill
 $dStrain $dStrain $dStrain $dStrain
 $dStrain $dStrain $dStrain $dStrain

@@ -21,7 +21,7 @@ define rest8
 $rest4 $rest4
 enddef
 
-part vibes ch 1 prog 11 vol 107
+part vibes ch 1 prog 11 vol 127
 $rest4
 $mA | a5/2 r/2 |
 $mA | bb5/2 r/2 |
@@ -49,7 +49,7 @@ define sA3
 | f5/8 e5/8 d5/8 a4/8 d5/4 f5/4 | b4/4. d5/8 g5/2 | eb5/8 f5/8 g5/8 bb5/8 c6/4 eb5/4 | f5/1 |
 enddef
 
-part flute ch 4 prog 73 vol 112
+part flute ch 4 prog 73 vol 127
 $rest4 $rest8 $rest8 $rest8 $rest8
 $sA1 $sA2 $sB $sA3
 $rest8 $rest4
@@ -80,7 +80,7 @@ define gVamp
 $gCm $gF7 $gCm $gF7
 enddef
 
-part guitar ch 2 prog 24 vol 100
+part guitar ch 2 prog 24 vol 80
 $gVamp
 $gA $gA $gB $gA
 $gA $gA $gB $gA

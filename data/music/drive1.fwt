@@ -45,7 +45,7 @@ define rest8
 | r/1 | r/1 | r/1 | r/1 | r/1 | r/1 | r/1 | r/1 |
 enddef
 
-part melody ch 1 prog 71 vol 89
+part melody ch 1 prog 71 vol 127
 $melIntro
 $melA | e5/4 g5/8 e5/8 d5/2 |
 $melA | c5/4 e5/8 g5/8 c6/2 |
@@ -56,7 +56,7 @@ $melD
 $melC
 $melCoda
 
-part pianolead ch 4 prog 0 vol 96
+part pianolead ch 4 prog 0 vol 110
 | r/1 | r/1 | r/1 | r/1 |
 $rest8 $rest8 $rest8 $rest8 $rest8
 $melC
@@ -114,7 +114,7 @@ define pD
 $pHitC7 $pC7 $pHitF $pF $pHitC7 $pC7 $pHitF $pF $pHitG7 $pG7 $pHitC $pC $pHitG7 $pG7 $pC7 $pC7
 enddef
 
-part piano ch 2 prog 0 vol 88
+part piano ch 2 prog 0 vol 73
 $pC $pA7 $pD7 $pG7
 $pA | r/4 e4+g4+c5/4? r/4 d4+f4+b4/4? |
 $pA $pC
@@ -177,7 +177,7 @@ define dStrain
 $dBar x7 $dFill
 enddef
 
-part drums ch 10 prog 0 vol 101
+part drums ch 10 prog 0 vol 120
 $dBar x3 $dFill
 $dStrain $dStrain $dStrain $dStrain $dStrain
 $dStrain $dStrain

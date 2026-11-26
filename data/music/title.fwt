@@ -42,7 +42,7 @@ define rest8
 | r/1 | r/1 | r/1 | r/1 | r/1 | r/1 | r/1 | r/1 |
 enddef
 
-part trumpet ch 1 prog 56 vol 107
+part trumpet ch 1 prog 56 vol 127
 $mIntro
 $mA | c5/4. d5/8 c5/4 r/4 |
 $mA | bb4/2 r/2 |
@@ -53,7 +53,7 @@ $mBreak
 $mC8
 $mCoda
 
-part horn ch 4 prog 60 vol 117
+part horn ch 4 prog 60 vol 127
 | r/1 | r/1 | r/1 | r/1 |
 $rest8 $rest8 $rest8 $rest8
 $mC
@@ -125,7 +125,7 @@ $hEb $hEb $hBb7 $hBb7 $hBb7 $hBb7 $hEb $hEb
 $hEb $hEb7 $hAb $hAb $hEb $hBb7 $hEb $hEb
 enddef
 
-part horns ch 2 prog 61 vol 114
+part horns ch 2 prog 61 vol 87
 $hF $hF $hF | r/4 c4+eb4+a4/4 r/2 |
 $hA $hF
 $hA $hBb
