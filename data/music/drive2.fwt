@@ -16,7 +16,7 @@ define mB
 | d5/8 f#5/8 a5/8 f#5/8 d5/4 c5/4 | b4/8 a4/8 f#4/8 a4/8 d5/2 |
 enddef
 
-part banjo ch 1 prog 105 vol 127
+part banjo ch 1 prog 105 vol 107
 $mA | a4/8 b4/8 c5/8 b4/8 a4/4 d4/4 |
 $mA | g4/2 r/2 |
 $mB
@@ -29,7 +29,7 @@ define hB
 | e5/1 | c5/1 | d5/1 | b4/1 | c#5/1 | a4/1 | f#5/1 | d5/1 |
 enddef
 
-part harmonica ch 2 prog 22 vol 96
+part harmonica ch 2 prog 22 vol 101
 $hA | r/2 f#4/2 |
 $hA | r/1 |
 $hB
@@ -51,7 +51,7 @@ define cA
 $cG $cG $cC $cG $cG $cD $cG
 enddef
 
-part rhythm ch 3 prog 25 vol 72
+part rhythm ch 3 prog 25 vol 81
 $cA $cD
 $cA $cG
 $cC $cC $cG $cG $cA7 $cA7 $cD $cD
@@ -64,7 +64,7 @@ define dEnd
 | bd+sd/8? sd/8? sd/8? sd/8? sd/8 sd/8 sd/8 cr/8 |
 enddef
 
-part drums ch 10 prog 0 vol 70
+part drums ch 10 prog 0 vol 105
 $dBar x7 $dEnd
 $dBar x7 $dEnd
 $dBar x7 $dEnd

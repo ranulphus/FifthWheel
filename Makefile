@@ -25,7 +25,7 @@ DEV      := $(MGAHAL)/tools/dev
 BUILD_ID := $(shell git describe --always --dirty 2>/dev/null || echo unknown)
 Q ?= @
 
-KIT_SRCS  := $(DGK_SRCS)
+KIT_SRCS  := $(DGK_SRCS) $(DGK_MIDI)
 GAME_SRCS := $(wildcard game/src/*.c)
 GEN_SRCS  := build/gen/font_gen.c build/gen/music_gen.c
 HDRS      := $(DGK_HDRS) $(wildcard game/src/*.h)
@@ -34,11 +34,13 @@ WARN      := -std=gnu99 -Wall -Wextra -Werror
 COMMON    := $(WARN) -O2 -ffp-contract=off $(DGK_CFLAGS)
 
 .PHONY: all dos linux headless loopa shots suite tests-host glcheck release winvm jobsweep career check-deps regress deps \
-        clean help
+        clean help FORCE
+FORCE:
 all: dos
 
 check-deps:
-	@for d in "RETROGPU $(RETROGPU)/hal/include/mga/hal.h" "RETROGPU $(DOSGL)/include/GL/gl.h" "DGK $(DGK)/dgk.mk"; do \
+	@for d in "RETROGPU $(RETROGPU)/hal/include/mga/hal.h" "RETROGPU $(DOSGL)/include/GL/gl.h" "DGK $(DGK)/dgk.mk" \
+	          "GLOS $(GLOS)/include/glos/fmsynth.h"; do \
 	  [ -f "$${d#* }" ] || { echo "check-deps: no $${d%% *} checkout ($${d#* } is missing)"; exit 1; }; done
 
 # The quick regression set for a new RetroGPU or dgk: unit tests, every job headless,
@@ -104,11 +106,16 @@ data-check:
 
 # ---- DOS -------------------------------------------------------------------
 DJCC := env LD_LIBRARY_PATH=$(DJGPP_PREFIX)/hostlib $(DJGPP_PREFIX)/bin/i586-pc-msdosdjgpp-gcc
+DJAR := env LD_LIBRARY_PATH=$(DJGPP_PREFIX)/hostlib $(DJGPP_PREFIX)/bin/i586-pc-msdosdjgpp-ar
 DOS_CFLAGS := $(COMMON) -march=i586 -fexcess-precision=standard -I$(DOSGL)/include \
-              -I$(DOSGL)/build/sdl/dos/include -I$(MGAHAL)/tests/shim -I$(MGAHAL)/hal/include -DHX_BUILD_ID='"$(BUILD_ID)"'
-DOS_LIBS := $(DOSGL)/build/sdl/dos/lib/libSDL3.a $(DOSGL)/build/lib/libGL.a -lm
+              -I$(DOSGL)/build/sdl/dos/include -I$(MGAHAL)/tests/shim -I$(MGAHAL)/hal/include -DHX_BUILD_ID='"$(BUILD_ID)"' \
+              $(DGK_MIDI_DOS_CFLAGS)
+DOS_LIBS := $(DOSGL)/build/sdl/dos/lib/libSDL3.a $(DOSGL)/build/lib/libGL.a build/dgk/dos/libdgkmidi.a -lm
+# dgk's music's library (dgk/libs.mk): GLOS's FM driver and instruments, sdk/fm and libglos, from GLOS's checkout.
+build/dgk/dos/libdgkmidi.a: FORCE
+	$(Q)$(MAKE) -s -f $(DGK_LIBS_MK) OUT=build/dgk GLOS=$(GLOS) DJCC="$(DJCC)" DJAR="$(DJAR)" dos
 build/dos/FWHEEL.EXE: build/data/WORLD.PAK $(KIT_SRCS) $(DGK_SDL) $(GAME_SRCS) $(GEN_SRCS) $(HDRS) $(MGAHAL)/tests/shim/hx.c \
-                      $(DOSGL)/build/sdl/dos/lib/libSDL3.a $(DOSGL)/build/lib/libGL.a
+                      $(DOSGL)/build/sdl/dos/lib/libSDL3.a $(DOSGL)/build/lib/libGL.a build/dgk/dos/libdgkmidi.a
 	@mkdir -p $(dir $@)
 	$(Q)echo "  DJLD    $@"
 	$(Q)$(DJCC) $(DOS_CFLAGS) -o $@ $(KIT_SRCS) $(DGK_SDL) $(GAME_SRCS) $(GEN_SRCS) \
@@ -133,19 +140,31 @@ endif
 deps: build/deps/stamp
 
 HOST_CFLAGS := $(COMMON) -g -Ibuild/deps/include
-build/linux/fwheel: build/data/WORLD.PAK $(KIT_SRCS) $(DGK_SDL) $(GAME_SRCS) $(GEN_SRCS) $(HDRS) build/deps/stamp
+# dgk's music's library off DOS (dgk/libs.mk): GLOS's FM driver and instruments, staged into build/dgk/glos
+# outside the container (which does not see GLOS's checkout), and ymfm's OPL3. C++: linked with -lstdc++.
+HOST_MIDI := build/dgk/host/libdgkmidi.a
+ifdef IN_DEV
+build/dgk/glos/stamp: ;                  # staged outside the container
+else
+build/dgk/glos/stamp: FORCE
+	$(Q)$(MAKE) -s -f $(DGK_LIBS_MK) OUT=build/dgk GLOS=$(GLOS) stage
+endif
+$(HOST_MIDI): build/dgk/glos/stamp FORCE
+	$(Q)$(MAKE) -s -f $(DGK_LIBS_MK) OUT=build/dgk GLOS=$(CURDIR)/build/dgk/glos host
+build/linux/fwheel: build/data/WORLD.PAK $(KIT_SRCS) $(DGK_SDL) $(GAME_SRCS) $(GEN_SRCS) $(HDRS) build/deps/stamp $(HOST_MIDI)
 	@mkdir -p $(dir $@)
 	$(Q)echo "  CC      $@"
 	$(Q)$(HOST_CC) $(HOST_CFLAGS) -o $@ $(KIT_SRCS) $(DGK_SDL) $(GAME_SRCS) $(GEN_SRCS) \
-	  build/deps/lib/libSDL3.a -lGL -lm -ldl -lpthread
-build/headless/fwheel-hl: build/data/WORLD.PAK $(KIT_SRCS) $(DGK_HEADLESS) $(GAME_SRCS) $(GEN_SRCS) $(HDRS) build/deps/stamp
+	  build/deps/lib/libSDL3.a $(HOST_MIDI) -lstdc++ -lGL -lm -ldl -lpthread
+build/headless/fwheel-hl: build/data/WORLD.PAK $(KIT_SRCS) $(DGK_HEADLESS) $(GAME_SRCS) $(GEN_SRCS) $(HDRS) build/deps/stamp \
+                          $(HOST_MIDI)
 	@mkdir -p $(dir $@)
 	$(Q)echo "  CC      $@"
 	$(Q)$(HOST_CC) $(HOST_CFLAGS) -o $@ $(KIT_SRCS) $(DGK_HEADLESS) $(GAME_SRCS) $(GEN_SRCS) \
-	  -lOSMesa -lm
-linux: check-deps build/deps/stamp $(GEN_SRCS) build/data/WORLD.PAK
+	  $(HOST_MIDI) -lstdc++ -lOSMesa -lm
+linux: check-deps build/deps/stamp build/dgk/glos/stamp $(GEN_SRCS) build/data/WORLD.PAK
 	$(Q)MGA_EXTRA_DIR=$(DGK) $(DEV) $(MAKE) -s IN_DEV=1 DGK=$(DGK) build/linux/fwheel
-headless: check-deps build/deps/stamp $(GEN_SRCS) build/data/WORLD.PAK
+headless: check-deps build/deps/stamp build/dgk/glos/stamp $(GEN_SRCS) build/data/WORLD.PAK
 	$(Q)MGA_EXTRA_DIR=$(DGK) $(DEV) $(MAKE) -s IN_DEV=1 DGK=$(DGK) build/headless/fwheel-hl
 
 # ---- Loop A ----------------------------------------------------------------

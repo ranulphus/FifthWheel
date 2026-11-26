@@ -5,10 +5,10 @@
 #include "career.h"
 #include "detail.h"
 #include "music.h"
-#include "opl.h"
 #include "townroute.h"
 #include "dgk/app.h"
 #include "dgk/cfg.h"
+#include "dgk/midi.h"
 #include "dgk/save.h"
 #include <math.h>
 #include <stdio.h>
@@ -261,33 +261,37 @@ static void town_ways(void)
     CHECK(backs < 40, "%d of 400 start against the rig (only at the town's edge)", backs);
 }
 
-/* The music (music.c and its tunes) on a chip of the test's own, which keeps the registers and counts the
- * key-ons: each one's pitch off the nearest equal-tempered note (A 440), and any on the drums' channels. */
+/* The music (music.c and its tunes) on a dgk of the test's own: its messages kept (note-ons counted by channel,
+ * times checked in order and ahead of the clock). */
 dgk_app_state dgk_app;
 uint64_t dgk_now_us(void) { return 0; }
-static uint8_t chip[256];
-static int keyons, keyons_drum_ch, drum_hits;
-static double worst_cents;
+static int notes, drum_notes, bad_order, late, opened;
+static uint32_t last_at, now_ms_seen;
+static int programs[16];
 
-int opl_open(void) { memset(chip, 0, sizeof chip); return OPL_CHIP3; }
-void opl_reset(void) { memset(chip, 0, sizeof chip); }
-void opl_close(void) {}
-void opl_write(int r, int v)
+int dgk_midi_open(int want) { opened = want != DGK_MIDI_OFF; return opened ? DGK_MIDI_FM : DGK_MIDI_OFF; }
+const char *dgk_midi_name(void) { return "the test's"; }
+void dgk_midi_volume(int percent) { DGK_UNUSED(percent); }
+void dgk_midi_panic(void) { last_at = 0; }
+void dgk_midi_close(void) { opened = 0; }
+void dgk_midi_service(uint32_t now) { now_ms_seen = now; }
+uint32_t dgk_midi_hash(void) { return 0; }
+uint32_t dgk_midi_count(void) { return 0; }
+void dgk_midi_send(uint32_t at, uint8_t s, uint8_t d1, uint8_t d2)
 {
-    int was = chip[r & 255];
-    chip[r & 255] = (uint8_t)v;
-    if (r >= 0xB0 && r <= 0xB8 && (v & 0x20) && !(was & 0x20)) {
-        int c = r - 0xB0, fnum = chip[0xA0 + c] | (v & 3) << 8;
-        double hz = fnum * 49716.0 / (1 << (20 - (v >> 2 & 7))), cents = 1200.0 * log2(hz / 440.0);
-        double off = fabs(cents - 100.0 * floor(cents / 100.0 + 0.5));
-        keyons++;
-        if ((chip[0xBD] & 0x20) && c >= 6)
-            keyons_drum_ch++;
-        if (off > worst_cents)
-            worst_cents = off;
+    if (at < last_at)
+        bad_order++;
+    if (at + 20 < now_ms_seen)                       /* (sent after its time: more than a tick late) */
+        late++;
+    last_at = at;
+    if ((s & 0xF0) == 0xC0)
+        programs[s & 15] = d1 + 1;
+    if ((s & 0xF0) == 0x90 && d2 > 0) {
+        if ((s & 15) == 9)
+            drum_notes++;
+        else
+            notes++;
     }
-    if (r == 0xBD)
-        drum_hits += __builtin_popcount(v & ~was & 0x1F);
 }
 
 static void ticks(double s)
@@ -306,19 +310,23 @@ static void music(void)
     dgk_app.sound = 1;
     dgk_app.fixed = 1;
     music_init();
+    CHECK(opened, "music_init opened nothing");
     CHECK(music_ntunes == 5, "%d tunes", music_ntunes);
     for (i = 0; i < sizeof names / sizeof names[0]; i++) {
-        keyons = keyons_drum_ch = drum_hits = 0;
-        worst_cents = 0;
+        int c, progs = 0;
+        notes = drum_notes = bad_order = late = 0;
+        memset(programs, 0, sizeof programs);
         CHECK(music_play(names[i]), "no tune %s", names[i]);
         CHECK(music_playing() && !strcmp(music_playing(), names[i]), "%s does not play", names[i]);
-        /* Past every tune's end: it plays on. (Over 80 s the player keyed every note the files hold: title 462,
-         * garage 566, drive1 586, drive2 576, drive3 696, give or take the notes at the cut, 2026-11-26.) */
+        /* Past every tune's end: it plays on. (Over 80 s it sent every note the files hold: title 462, garage
+         * 566, drive1 586, drive2 576, drive3 696, give or take the notes at the cut, 2026-11-26.) */
         ticks(80);
+        for (c = 0; c < 16; c++)
+            progs += programs[c] != 0;
         CHECK(music_playing() && !strcmp(music_playing(), names[i]), "%s stopped", names[i]);
-        CHECK(keyons > 400 && drum_hits > 300, "%s: %d notes, %d drum hits", names[i], keyons, drum_hits);
-        CHECK(worst_cents < 3.0, "%s: a note %.1f cents off", names[i], worst_cents);
-        CHECK(keyons_drum_ch == 0, "%s: %d notes on the drums' channels", names[i], keyons_drum_ch);
+        CHECK(notes > 400 && drum_notes > 300, "%s: %d notes, %d drum notes", names[i], notes, drum_notes);
+        CHECK(progs >= 3, "%s: programs set on %d channels", names[i], progs);
+        CHECK(bad_order == 0 && late == 0, "%s: %d sent out of order, %d late", names[i], bad_order, late);
     }
     CHECK(!music_play("nothing"), "a tune that is not there plays");
     music_want(MUSIC_DRIVING);                       /* the driving tunes in turn: each twice */
@@ -330,6 +338,7 @@ static void music(void)
     music_want(MUSIC_OFF);
     CHECK(!music_playing(), "off, yet %s plays", music_playing());
     music_shutdown();
+    CHECK(!opened, "music_shutdown left dgk's music open");
 }
 
 int main(void)

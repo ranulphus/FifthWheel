@@ -15,7 +15,7 @@ define melB
 | f#5/8 a5/8 d6/4 c6/8 a5/8 f#5/4 | a5/4 f#5/4 d5/4 f#5/4 | g5/8 a5/8 b5/4 d6/4 b5/4 | a5/4 g5/4 f5/4 d5/4 |
 enddef
 
-part melody ch 1 prog 71 vol 127
+part melody ch 1 prog 71 vol 89
 $melA | e5/4 g5/8 e5/8 d5/2 |
 $melA | c5/4 e5/8 g5/8 c6/2 |
 $melB
@@ -36,7 +36,7 @@ define pB
 | r/4 d4+g4+b4/4? r/4 d4+g4+b4/4? | $pG7
 enddef
 
-part piano ch 2 prog 0 vol 74
+part piano ch 2 prog 0 vol 88
 $pA | r/4 e4+g4+c5/4? r/4 d4+f4+b4/4? |
 $pA $pC
 $pB
@@ -56,7 +56,7 @@ define tB
 | g2/4 a2/4 b2/4 g2/4 |
 enddef
 
-part tuba ch 3 prog 58 vol 66
+part tuba ch 3 prog 58 vol 78
 $tA | c3/4 r/4 g2/4 b2/4 |
 $tA | c3/4 g2/4 c3/4 r/4 |
 $tB
@@ -69,7 +69,7 @@ define dFill
 | bd+hh/8 hh/8? sd+hh/8? hh/8? sd/8? sd/8? sd/8 cr/8 |
 enddef
 
-part drums ch 10 prog 0 vol 80
+part drums ch 10 prog 0 vol 101
 $dBar x7 $dFill
 $dBar x7 $dFill
 $dBar x7 $dFill

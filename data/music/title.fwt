@@ -14,7 +14,7 @@ define mB
 | eb5/4 eb5/8. d5/16 c5/4 g4/4 | b4/8. c5/16 d5/4 g5/2 | e5/4 g5/4 bb5/4 g5/4 | a5/4 f5/4 c5/4 eb5/4 |
 enddef
 
-part trumpet ch 1 prog 56 vol 120
+part trumpet ch 1 prog 56 vol 107
 $mA | c5/4. d5/8 c5/4 r/4 |
 $mA | bb4/2 r/2 |
 $mB
@@ -33,7 +33,7 @@ define tA
 $tBb $tBb $tF $tBb $tEb $tBb | c2/4 r/4 f2/4 r/4 |
 enddef
 
-part tuba ch 3 prog 58 vol 92
+part tuba ch 3 prog 58 vol 97
 $tA $tF
 $tA $tBb
 $tEb $tEb $tBb $tBb | c2/4 r/4 g2/4 r/4 | g2/4 r/4 d2/4 r/4 | c2/4 r/4 g2/4 r/4 | f2/4 r/4 c2/4 r/4 |
@@ -52,7 +52,7 @@ define hA
 $hBb $hBb $hF $hBb $hEb $hBb | r/4 c4+e4+bb4/4? r/4 c4+eb4+a4/4? |
 enddef
 
-part horns ch 2 prog 61 vol 72
+part horns ch 2 prog 61 vol 114
 $hA $hF
 $hA $hBb
 $hEb $hEb $hBb $hBb | r/4 c4+eb4+g4/4? r/4 c4+eb4+g4/4? | r/4 b3+d4+f4/4? r/4 b3+d4+f4/4? |
@@ -69,7 +69,7 @@ define dFill
 | bd+sd/8 sd/16 sd/16 sd/8 sd/16 sd/16 sd/16 sd/16 sd/16 sd/16 sd/8! sd/8! |
 enddef
 
-part drums ch 10 prog 0 vol 64
+part drums ch 10 prog 0 vol 101
 $dTop $dBar x6 $dFill
 $dTop $dBar x6 $dFill
 $dTop $dBar x6 $dFill

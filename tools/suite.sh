@@ -15,9 +15,9 @@
 #                 86Box does not keep pace with the recorder)
 #   music         -musictest through the SB16's FM chip, drawing nothing (with the world
 #                 drawn 86Box runs some 7 times slower than the recorder, which then
-#                 holds 20 ms slices): FW-MUSIC finds an OPL3, and the recording's
-#                 strongest notes are the notes the game keyed on (tools/musiccheck.py,
-#                 its own register log, FW_OPL_LOG)
+#                 holds 20 ms slices): FW-MUSIC finds an OPL3 (dgk's music, GLOS's
+#                 FM synthesiser), and the recording's strongest notes are the notes
+#                 the game played (tools/musiccheck.py, dgk's DGK_MIDI_LOG)
 #   joy           86Box's virtual joystick (RetroGPU's 86Box patch 0105): -calibrate
 #                 sees it steered left and right, accelerated (forward) and
 #                 braked (back), and saves FWHEEL.CFG; then a run that loads
@@ -102,8 +102,8 @@ sound() {  # NAME SNDCARD BLASTER
 music() {
     local st m
     st=$(run music --args="-test -detail low -nodraw -musictest -frames 2400" --sound sb16 --pre "$blaster" \
-         --pre "SET FW_OPL_LOG=C:\\OUT\\OPL.LOG" --wav)
-    m=$("$DEV" env MGAHAL="$MGAHAL" python3 "$PWD/tools/musiccheck.py" "$out/music/audio.wav" "$out/music/files/OPL.LOG" 2>&1)
+         --pre "SET DGK_MIDI_LOG=C:\\OUT\\MIDI.LOG" --wav)
+    m=$("$DEV" env MGAHAL="$MGAHAL" python3 "$PWD/tools/musiccheck.py" "$out/music/audio.wav" "$out/music/files/MIDI.LOG" 2>&1)
     local mst=$?
     echo "$m" > "$out/music/musiccheck.txt"
     if [ "$st" = PASS ] && [ $mst = 0 ] && log music | grep -aq "FW-MUSIC an OPL3"; then

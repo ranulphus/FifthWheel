@@ -1,12 +1,12 @@
-/* music.h - Fifth Wheel's music on the Sound Blaster's FM chip (opl.h): tunes
- * of its own (data/music, made into standard MIDI files by tools/fwtune.c and
- * built into the game), played by a small set of FM instruments of its own
- * (one for each General MIDI family the tunes use: piano, vibes, clarinet,
- * brass, bass ...) on six of the chip's channels, the drums in its rhythm
- * mode. A tune loops; the driving tunes take turns (each played twice).
- * Quietly nothing without a chip (opl.h) or with -nosound. Timed by the
- * game's clock (in a -fixed test, its ticks: the same notes every run);
- * music_update plays what is due, so the game calls it at every yield. */
+/* music.h - Fifth Wheel's music: tunes of its own (data/music, made into
+ * standard MIDI files by tools/fwtune.c and built into the game), played as
+ * General MIDI through dgk's music (dgk/midi.h: the Sound Blaster's FM chip
+ * with GLOS's instruments, GLOS's MIDI ports as a GLOS app, an emulated OPL3
+ * off DOS). A tune loops; the driving tunes take turns (each played twice).
+ * Quietly nothing where dgk finds nothing to play on, or with -nosound. Timed
+ * by the game's clock (in a -fixed test, its ticks: the same messages every
+ * run); music_update sends what falls due soon, so the game calls it at every
+ * yield. */
 #ifndef FW_MUSIC_H
 #define FW_MUSIC_H
 

@@ -14,7 +14,7 @@ define mB
 | eb5/4. g5/8 c6/2 | a5/8 g5/8 f5/4 eb5/4 c5/4 | d5/2 f5/4 g5/4 | a5/2 r/2 |
 enddef
 
-part vibes ch 1 prog 11 vol 127
+part vibes ch 1 prog 11 vol 107
 $mA | a5/2 r/2 |
 $mA | bb5/2 r/2 |
 $mB
@@ -43,7 +43,7 @@ define gB
 $gBb $gG7 $gCm $gF7 | d4+f4+g4/4? r/8 d4+f4+g4/8? r/4 d4+f4+g4/4? | $gF7
 enddef
 
-part guitar ch 2 prog 24 vol 84
+part guitar ch 2 prog 24 vol 100
 $gA $gA $gB $gA
 
 define bBb
@@ -75,5 +75,5 @@ define dBar
 | bd+hh/8? hh/8? hh/8? sd+hh/8? bd+hh/8? hh/8? sd+hh/8? hh/8? |
 enddef
 
-part drums ch 10 prog 0 vol 70
+part drums ch 10 prog 0 vol 127
 $dBar x32

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""musiccheck.py - Fifth Wheel's music in a Loop A recording, checked against
-the game's own register log (FW_OPL_LOG): the notes the game keyed on are the
-notes in the recording.
+"""musiccheck.py - Fifth Wheel's music in a recording, checked against the
+messages the game sent (dgk's DGK_MIDI_LOG): the notes it played are the notes
+in the recording.
 
-  musiccheck.py AUDIO.WAV OPL.LOG [--points N] [--min-match F]
+  musiccheck.py AUDIO.WAV MIDI.LOG [--points N] [--min-match F]
 
-The log gives every melodic channel's pitch and key (A0h-B8h; with the rhythm
-mode on, channels 6-8 are the drums and left out). The music's first loud
-window in the recording is lined up with the log's first key-on. Then, at N
+The log has every message as "ms status d1 d2" (hex bytes): a note sounds from
+its note-on to its note-off (channel 10, the drums, left out). The music's first
+loud window in the recording is lined up with the log's first note. Then, at N
 points through the music, the recording's strongest note (a semitone from E2 to
 D7) must be one the log has sounding then (by its pitch class: an instrument's
 octave harmonic counts), give or take 60 ms. Exit status 0 when at least
@@ -26,28 +26,25 @@ from wavcheck import read_mono, goertzel    # noqa: E402  (RetroGPU's Loop A too
 
 
 def notes_from_log(path):
-    """(us, set of MIDI notes keyed on) after each change, and the first key-on's time."""
-    regs = [0] * 256
+    """(us, set of MIDI notes sounding) after each change, and the first note's time."""
+    held = set()
     changes, first = [], None
     cur = frozenset()
     for line in open(path):
         w = line.split()
-        if len(w) != 3:
+        if len(w) != 4:
             continue
-        us, r, v = int(w[0]), int(w[1], 16), int(w[2], 16)
-        regs[r] = v
-        if not (0xA0 <= r <= 0xB8 or r == 0xBD):
+        us, st, d1, d2 = int(w[0]) * 1000, int(w[1], 16), int(w[2], 16), int(w[3], 16)
+        ch, kind = st & 15, st & 0xF0
+        if ch == 9 or kind not in (0x80, 0x90, 0xB0):
             continue
-        rhythm = regs[0xBD] & 0x20
-        on = set()
-        for c in range(6 if rhythm else 9):
-            b = regs[0xB0 + c]
-            if b & 0x20:
-                fnum = regs[0xA0 + c] | (b & 3) << 8
-                if fnum:
-                    hz = fnum * 49716.0 / (1 << (20 - (b >> 2 & 7)))
-                    on.add(int(round(69 + 12 * math.log2(hz / 440.0))))
-        on = frozenset(on)
+        if kind == 0x90 and d2 > 0:
+            held.add((ch, d1))
+        elif kind in (0x80, 0x90):
+            held.discard((ch, d1))
+        elif d1 in (120, 123):                      # all sound off, all notes off
+            held = {h for h in held if h[0] != ch}
+        on = frozenset(n for c, n in held)
         if on != cur:
             if on and first is None:
                 first = us
@@ -74,13 +71,13 @@ def main():
     a = ap.parse_args()
     changes, first = notes_from_log(a.log)
     if first is None:
-        print("musiccheck: no note keyed on in %s" % a.log)
+        print("musiccheck: no note played in %s" % a.log)
         sys.exit(1)
     x, rate = read_mono(a.wav)
     win = rate // 100
     rms = [math.sqrt(sum(v * v for v in x[i:i + win]) / win) for i in range(0, len(x) - win, win)]
-    # The music: what ends the longest quiet (the boot; the BIOS's beep comes before it).
-    start, quiet, longest = None, 0, 0
+    # The music: what ends the longest quiet (the boot; the BIOS's beep comes before it), or the start.
+    start, quiet, longest = 0, 0, 0
     for i, r in enumerate(rms):
         if r < 0.0005:
             quiet += 1
@@ -88,7 +85,7 @@ def main():
             if quiet > longest:
                 start, longest = i, quiet
             quiet = 0
-    if start is None:
+    if not any(r >= 0.0005 for r in rms[start:]):
         print("musiccheck: no music in %s" % a.wav)
         sys.exit(1)
     last_us = changes[-1][0]
@@ -109,7 +106,7 @@ def main():
             want |= {m % 12 for m in sounding(changes, us + d)}
         ok = best % 12 in want
         match += ok
-        print("musiccheck: %5.1f s  heard %-4s  keyed %-24s %s" % (
+        print("musiccheck: %5.1f s  heard %-4s  played %-23s %s" % (
             t, names[best % 12] + str(best // 12 - 1),
             " ".join(sorted({names[m % 12] for m in sounding(changes, us)})), "ok" if ok else "MISS"))
     frac = match / float(a.points)
