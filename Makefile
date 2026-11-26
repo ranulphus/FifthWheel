@@ -8,7 +8,7 @@
 #   make loopa [CARD=g450] [ARGS="-frames 60"]   run FWHEEL.EXE in 86Box: out/loopa-CARD/
 #   make shots [CARD=g450]   the same frames from DOS (Loop A) and OSMesa, compared (tools/shots.sh)
 #   make suite [CARD=g450] [CHECKS="sb16 sbpro"]   Loop A suites (tools/suite.sh)
-#   make tests-host     unit tests on the host (governor, presets, settings, saves, the shop) and glcheck
+#   make tests-host     unit tests on the host (governor, presets, settings, saves, the shop, the music) and glcheck
 #   make release        dist/fwheel-ID.zip: the game, CWSDPMI and the text files (tools/release.sh)
 #   make winvm [CARD=g450]   dist/fwheel-CARD-vm.zip: an 86Box machine with the release on it
 #   make jobsweep       the job autopilot on every depot pair and bay, headless (tools/jobsweep.sh)
@@ -42,11 +42,11 @@ check-deps:
 	  [ -f "$${d#* }" ] || { echo "check-deps: no $${d%% *} checkout ($${d#* } is missing)"; exit 1; }; done
 
 # The quick regression set for a new RetroGPU or dgk: unit tests, every job headless,
-# DOS against Mesa, and the suite's sound, exit, crash, screen-size and
+# DOS against Mesa, and the suite's sound, music, exit, crash, screen-size and
 # agreement checks on one card. The full `make suite` on g200, g400 and
 # g450 before a release.
 regress: tests-host jobsweep career shots
-	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) tools/suite.sh $(CARD) sb16 exit crash modes auto
+	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) tools/suite.sh $(CARD) sb16 music exit crash modes auto
 
 build/gen/font_gen.c: data/font5x7.txt $(DGK_FONTBAKE)
 	@mkdir -p $(dir $@)
@@ -164,12 +164,12 @@ suite: dos
 	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) tools/suite.sh $(CARD) $(CHECKS)
 
 # Unit tests that need no screen: the host's compiler, the kit's and the game's pure parts.
-build/tests/test_host: game/tests/test_host.c game/src/career.c game/src/detail.c game/src/townroute.c $(DGK)/src/cfg.c \
-                       $(DGK)/src/save.c $(DGK)/src/base.c $(DGK)/src/log.c $(HDRS)
+build/tests/test_host: game/tests/test_host.c game/src/career.c game/src/detail.c game/src/townroute.c game/src/music.c \
+                       build/gen/music_gen.c $(DGK)/src/cfg.c $(DGK)/src/save.c $(DGK)/src/base.c $(DGK)/src/log.c $(HDRS)
 	@mkdir -p $(dir $@)
 	$(Q)echo "  CC      $@"
 	$(Q)$(CC) $(TOOL_CFLAGS) -o $@ game/tests/test_host.c game/src/career.c game/src/detail.c game/src/townroute.c \
-	  $(DGK)/src/cfg.c $(DGK)/src/save.c $(DGK)/src/base.c $(DGK)/src/log.c -lm
+	  game/src/music.c build/gen/music_gen.c $(DGK)/src/cfg.c $(DGK)/src/save.c $(DGK)/src/base.c $(DGK)/src/log.c -lm
 tests-host: build/tests/test_host glcheck
 	$(Q)mkdir -p out && build/tests/test_host
 

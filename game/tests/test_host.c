@@ -1,10 +1,13 @@
 /* test_host.c - unit tests that need no screen (make tests-host): the
  * governor and the detail presets, settings and saves (corrupt and
  * half-written ones too), the career's shop and repairs, the ways along a
- * town's streets. */
+ * town's streets, the music's tunes. */
 #include "career.h"
 #include "detail.h"
+#include "music.h"
+#include "opl.h"
 #include "townroute.h"
+#include "dgk/app.h"
 #include "dgk/cfg.h"
 #include "dgk/save.h"
 #include <math.h>
@@ -258,6 +261,77 @@ static void town_ways(void)
     CHECK(backs < 40, "%d of 400 start against the rig (only at the town's edge)", backs);
 }
 
+/* The music (music.c and its tunes) on a chip of the test's own, which keeps the registers and counts the
+ * key-ons: each one's pitch off the nearest equal-tempered note (A 440), and any on the drums' channels. */
+dgk_app_state dgk_app;
+uint64_t dgk_now_us(void) { return 0; }
+static uint8_t chip[256];
+static int keyons, keyons_drum_ch, drum_hits;
+static double worst_cents;
+
+int opl_open(void) { memset(chip, 0, sizeof chip); return OPL_CHIP3; }
+void opl_reset(void) { memset(chip, 0, sizeof chip); }
+void opl_close(void) {}
+void opl_write(int r, int v)
+{
+    int was = chip[r & 255];
+    chip[r & 255] = (uint8_t)v;
+    if (r >= 0xB0 && r <= 0xB8 && (v & 0x20) && !(was & 0x20)) {
+        int c = r - 0xB0, fnum = chip[0xA0 + c] | (v & 3) << 8;
+        double hz = fnum * 49716.0 / (1 << (20 - (v >> 2 & 7))), cents = 1200.0 * log2(hz / 440.0);
+        double off = fabs(cents - 100.0 * floor(cents / 100.0 + 0.5));
+        keyons++;
+        if ((chip[0xBD] & 0x20) && c >= 6)
+            keyons_drum_ch++;
+        if (off > worst_cents)
+            worst_cents = off;
+    }
+    if (r == 0xBD)
+        drum_hits += __builtin_popcount(v & ~was & 0x1F);
+}
+
+static void ticks(double s)
+{
+    int n = (int)(s * DGK_TICK_HZ);
+    while (n-- > 0) {
+        dgk_app.ticks++;
+        music_update();
+    }
+}
+
+static void music(void)
+{
+    static const char *names[] = { "title", "garage", "drive1", "drive2", "drive3" };
+    size_t i;
+    dgk_app.sound = 1;
+    dgk_app.fixed = 1;
+    music_init();
+    CHECK(music_ntunes == 5, "%d tunes", music_ntunes);
+    for (i = 0; i < sizeof names / sizeof names[0]; i++) {
+        keyons = keyons_drum_ch = drum_hits = 0;
+        worst_cents = 0;
+        CHECK(music_play(names[i]), "no tune %s", names[i]);
+        CHECK(music_playing() && !strcmp(music_playing(), names[i]), "%s does not play", names[i]);
+        /* Past every tune's end: it plays on. (Over 80 s the player keyed every note the files hold: title 462,
+         * garage 566, drive1 586, drive2 576, drive3 696, give or take the notes at the cut, 2026-11-26.) */
+        ticks(80);
+        CHECK(music_playing() && !strcmp(music_playing(), names[i]), "%s stopped", names[i]);
+        CHECK(keyons > 400 && drum_hits > 300, "%s: %d notes, %d drum hits", names[i], keyons, drum_hits);
+        CHECK(worst_cents < 3.0, "%s: a note %.1f cents off", names[i], worst_cents);
+        CHECK(keyons_drum_ch == 0, "%s: %d notes on the drums' channels", names[i], keyons_drum_ch);
+    }
+    CHECK(!music_play("nothing"), "a tune that is not there plays");
+    music_want(MUSIC_DRIVING);                       /* the driving tunes in turn: each twice */
+    CHECK(music_playing() && !strcmp(music_playing(), "drive1"), "driving starts with %s", music_playing());
+    ticks(2 * 58.2 + 1);
+    CHECK(music_playing() && !strcmp(music_playing(), "drive2"), "after drive1 twice: %s", music_playing());
+    music_want(MUSIC_GARAGE);
+    CHECK(music_playing() && !strcmp(music_playing(), "garage"), "the garage plays %s", music_playing());
+    music_want(MUSIC_OFF);
+    CHECK(!music_playing(), "off, yet %s plays", music_playing());
+    music_shutdown();
+}
+
 int main(void)
 {
     governor_steps();
@@ -267,6 +341,7 @@ int main(void)
     shop();
     repairs();
     town_ways();
+    music();
     printf("tests-host: %d checks, %d failures\n", checks, failures);
     return failures != 0;
 }

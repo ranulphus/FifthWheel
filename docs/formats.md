@@ -93,4 +93,29 @@ item fitted of each kind (paint, horn, decal, licence, cab), three spare.
 `FWHEEL.CFG`: `key = value` lines (`#` comments), saved the same way; the
 joystick's map is `joy.steer.axis`, `.rest`, `.left`, `.right`,
 `joy.accel.*`, `joy.brake.*`, `joy.deadzone` (thousandths), `joy.handbrake`
-and `joy.horn` (buttons).
+and `joy.horn` (buttons). `sound.volume` and `sound.music` (0-10, default
+7) are VOLUME and MUSIC.
+
+## Tunes (`data/music/*.fwt`, tools/fwtune.c)
+
+A tune is text, made into a standard MIDI file (format 1, 96 ticks a beat,
+one track a part after a tempo track) and into `build/gen/music_gen.c`, in
+the order the Makefile's `TUNES` gives (title, garage, then the driving
+tunes; the game finds them by their file names). `fwtune OUT.c OUTDIR
+TUNE.fwt...` also writes `OUTDIR/NAME.MID`, to listen to elsewhere.
+
+    title Open Road Rag          the tune's name
+    tempo 132                    beats a minute
+    meter 4/4                    bars are checked against it
+    swing 0.5                    off-beat eighths late: 0 straight, 1 a triplet's third
+    define NAME ... enddef       a phrase; $NAME, or $NAME x3, puts it in a part (phrases may use phrases)
+    part NAME ch N prog P vol V  a part: MIDI channel N (10: the drums), GM program P, CC7 volume V
+
+Notes are `c4` (middle C) to `b8`, with `#` or `b` (`f#5`, `bb3`); `r` is a
+rest. A length follows: `/1 /2 /4 /8 /16`, dotted `/4.`, a triplet's `/8t`;
+without one, the last length. A chord is `c4+e4+g4/2`. A trailing `_` ties a
+note to the next of its pitch, `!` makes it loud (118) and `?` soft (62; else
+90). `|` is a bar line: each bar must fill the meter, and an empty bar
+between two bar lines is ignored. Drums: `bd sd hh oh ph lt mt ht cr rd cl`
+(kick, snare, hi-hat closed, open and pedalled, toms low to high, crash,
+ride, a clap). A comment is `#` at a line's start or after a space.

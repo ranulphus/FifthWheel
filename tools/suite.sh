@@ -4,7 +4,7 @@
 # sets them) and build/dos/FWHEEL.EXE.
 #
 #   tools/suite.sh [CARD] [CHECK...]
-#       checks: sb16 sbpro joy shop fx menus exit dglexit crash ctrlc mem modes auto (default: all)
+#       checks: sb16 sbpro music joy shop fx menus exit dglexit crash ctrlc mem modes auto (default: all)
 #
 # Every run fails on a DGL-STUB (a GL call DOS-GL lacks) or DGL-GLERR line.
 #
@@ -13,6 +13,11 @@
 #                 recording, and the driver played no chunk as silence (SDL
 #                 patch 0005; a recording's gaps cannot show that, since
 #                 86Box does not keep pace with the recorder)
+#   music         -musictest through the SB16's FM chip, drawing nothing (with the world
+#                 drawn 86Box runs some 7 times slower than the recorder, which then
+#                 holds 20 ms slices): FW-MUSIC finds an OPL3, and the recording's
+#                 strongest notes are the notes the game keyed on (tools/musiccheck.py,
+#                 its own register log, FW_OPL_LOG)
 #   joy           86Box's virtual joystick (RetroGPU's 86Box patch 0105): -calibrate
 #                 sees it steered left and right, accelerated (forward) and
 #                 braked (back), and saves FWHEEL.CFG; then a run that loads
@@ -51,7 +56,7 @@
 set -uo pipefail
 : "${MGAHAL:?}" "${DEV:?}"
 card=${1:-g450}; shift || true
-checks=${*:-sb16 sbpro joy shop fx menus exit dglexit crash ctrlc ctrlbreak mem modes auto release}
+checks=${*:-sb16 sbpro music joy shop fx menus exit dglexit crash ctrlc ctrlbreak mem modes auto release}
 out=$PWD/out/suite-$card
 mkdir -p "$out"
 fail=0
@@ -92,6 +97,18 @@ sound() {  # NAME SNDCARD BLASTER
     u=$(log "$1" | grep -o 'HX-TEST audio [A-Z]* .*' | cut -d' ' -f3-)
     if [ "$st" = PASS ] && [ $wst = 0 ]; then say "$1" "PASS (tones found; audio $u)"
     else bad "$1" "($st; audio ${u:-not reported}; $(echo "$w" | grep -c missing) tones missing)"; fi
+}
+
+music() {
+    local st m
+    st=$(run music --args="-test -detail low -nodraw -musictest -frames 2400" --sound sb16 --pre "$blaster" \
+         --pre "SET FW_OPL_LOG=C:\\OUT\\OPL.LOG" --wav)
+    m=$("$DEV" env MGAHAL="$MGAHAL" python3 "$PWD/tools/musiccheck.py" "$out/music/audio.wav" "$out/music/files/OPL.LOG" 2>&1)
+    local mst=$?
+    echo "$m" > "$out/music/musiccheck.txt"
+    if [ "$st" = PASS ] && [ $mst = 0 ] && log music | grep -aq "FW-MUSIC an OPL3"; then
+        say music "PASS ($(log music | grep -ao 'FW-MUSIC [a-z0-9]*: ' | head -1 | cut -d' ' -f2 | tr -d :); $(echo "$m" | tail -1 | sed 's/musiccheck: //'))"
+    else bad music "($st; $(log music | grep -a 'FW-MUSIC' | head -1 | tr -d '\r'); $(echo "$m" | tail -1))"; fi
 }
 
 joy() {
@@ -251,6 +268,7 @@ for c in $checks; do
         r=$(log fx | grep -ao 'HX-TEST fx-caps [A-Z]* .*' | cut -d' ' -f3-)
         if [ "$st" = PASS ] && [[ $r == PASS* ]]; then say fx "PASS (${r#PASS })"; else bad fx "($st; $r)"; fi ;;
     sb16) sound sb16 sb16 "A220 I5 D1 H5 T6" ;;
+    music) music ;;
     sbpro) sound sbpro sbprov2 "A220 I7 D1 T4" ;;   # 86Box's SB Pro 2 is on IRQ 7
     *) bad "$c" "(no such check)" ;;
     esac

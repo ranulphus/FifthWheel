@@ -35,8 +35,10 @@ STARTING
     SET BLASTER=A220 I5 D1 H5 T6        (your Sound Blaster's settings)
     FWHEEL
 
-Without BLASTER the game runs silent. FWHEEL -nosound (in small letters)
-does the same on purpose.
+Without BLASTER the game's sounds are silent. The music plays on the
+card's FM chip (the Sound Blasters above all have one, as does an AdLib),
+which the game finds by itself. FWHEEL -nosound (in small letters) turns
+both off.
 
 
 CONTROLS
@@ -69,7 +71,8 @@ OPTIONS
 DETAIL       LOW, MEDIUM or HIGH: how far you see and how many flourishes.
 SCREEN       the screen size, from the next start.
 VSYNC        wait for the screen's refresh (smoother; turn off if slow).
-VOLUME       0 to 10.
+VOLUME       the sounds, 0 to 10.
+MUSIC        the music, 0 to 10 (0: none).
 GOVERNOR     lowers the detail by itself while frames run slow.
 
 The options, and the joystick's set-up, are kept in FWHEEL.CFG. Your

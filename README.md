@@ -79,7 +79,7 @@ Command line: `-mode WxH`, `-novsync`, `-nosound`, and for tests `-frames N`,
 `-fixed` (one tick per frame), `-shot F:NAME`, `-nodraw`, `-test` (see
 `dgk/app.h` in dgk); the game adds `-world FILE` (default
 `WORLD.PAK`; the F1 test yard is `YARD.PAK`), `-autopilot` (`-laps N`),
-`-autojob` (`-job D:T:B`), `-dockpose`, `-pose X:Y:H:V` (the rig held at a place, the camera as at speed V), `-park X:Y:H` (the game starts with the rig standing there), `-cars N` (traffic: 12, 0 none, up to 40), `-highlights` (with `-autojob`: three pieces of the job timed, FW3), `-soundtest`, `-calibrate`, `-joylog`, `-career FILE`, `-money N`, `-fxtest`,
+`-autojob` (`-job D:T:B`), `-dockpose`, `-pose X:Y:H:V` (the rig held at a place, the camera as at speed V), `-park X:Y:H` (the game starts with the rig standing there), `-cars N` (traffic: 12, 0 none, up to 40), `-highlights` (with `-autojob`: three pieces of the job timed, FW3), `-soundtest`, `-musictest` (the driving tunes, the engine silent), `-musictune NAME` (one tune, looped), `-calibrate`, `-joylog`, `-career FILE`, `-money N`, `-fxtest`,
 `-detail low|medium|high`, `-zoom N`, `-title`,
 `-record FILE`, `-replay FILE`, `-hash`, `-trace N`, `-timedemo FILE -dbtest NAME`,
 `-probe [quick]` and `-tourshots N`.

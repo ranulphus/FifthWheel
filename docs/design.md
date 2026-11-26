@@ -47,6 +47,59 @@ cleans up: neither yields, and the Sound Blaster's ring holds about 90 ms.
 On DOS the kit routes SDL's log through its own, and the driver's count
 of chunks played as silence becomes a test check (`HX-TEST audio`).
 
+## Music (game/src/music.c, opl.c, tools/fwtune.c, 2026-11-26)
+
+Five tunes of our own, light-hearted in the way of the management games of
+the time, played on the Sound Blaster's FM chip (the owner chose the chip,
+and original tunes, no borrowed melodies): "Fifth Wheel March" on the title
+screen and its options, "Showroom Bossa" in the garage, and three driving
+tunes, "Open Road Rag", "Country Mile" and "Delivery Swing", each played
+twice before the next. They are written as text (`data/music/*.fwt`, see
+formats.md), which `tools/fwtune.c` makes into standard MIDI files built
+into the game (`build/gen/music_gen.c`, about 6 KB a tune).
+
+The player (`music.c`) reads a MIDI file (format 0 or 1, its tempo map in
+microseconds) and plays it on six of the chip's nine channels; channels
+6-8 play the drums in the chip's rhythm mode (bass drum, snare, tom,
+cymbal, hi-hat: GM drum notes map onto them). It has 17 FM instruments of
+its own, one for each General MIDI family the tunes use (piano, electric
+piano, vibes, marimba, glockenspiel, organ, reed, clarinet, flute, trumpet,
+trombone, sax, strings, guitar, banjo, bass, tuba), as raw register values.
+A note takes a free voice (the one longest released), else the oldest.
+Velocity, CC7 volume, CC11 expression and MUSIC (0-10, 2 dB a step) set the
+carrier's level in dB; pitch bend, the sustain pedal and all-notes-off are
+followed. The tunes keep to six voices, so nothing is stolen.
+
+Timing is the game's clock (`dgk_now_us`; with `-fixed`, its ticks, so a test
+plays the same notes every run): `music_update` plays what is due at every
+tick and every frame. It is not driven by a timer interrupt, because the
+kit's clock is DJGPP's `uclock`, which owns PIT channel 0. A frame of 30 ms
+puts a note up to 30 ms late; the tunes' tempos hide it.
+
+The chip (`opl.c`): on DOS the AdLib ports (388h, which every Sound Blaster
+and most compatibles decode), found by the timer test, an OPL3 told by its
+status and played as an OPL2. Without one (no card, GLOS's virtual Sound
+Blaster, a PCI card without FM, a GLOS app) there is quietly no music.
+Writes are timed by the clock, not by status reads: 25 us after a value on
+an OPL2, 5 us on an OPL3, because in an emulator status reads may take no
+time. On the way out (exit, Ctrl-C, a fault), every key is let go and every
+level set silent. Off DOS (Linux, headless) an emulation of our own renders
+into dgk's mix (`dgk_mix_stream`): two-operator FM with the chip's
+envelopes, waveforms, feedback, tremolo and vibrato, and the drums roughly.
+It is close enough to hear the tunes and test the player by, but it is not
+a reference.
+
+The reference is Nuked OPL3, which is 86Box's FM. `FW_OPL_LOG=FILE` logs
+every register written, with its time in microseconds. Replayed through
+Nuked OPL3, that log plays the chip's sound; balancing the parts and making
+the previews were done that way, in scratch (Nuked is LGPL, and is never
+built into the game). In Loop A the recording (`run.py --wav`) has gaps
+while 86Box runs slower than the wall clock. FW drawing its world runs about
+7 times too slow there, so only slices of 20 ms survive, each looking like a
+fresh note. With `-nodraw` it records gap-free, and it matches the Nuked
+replay of the same log. `-musictest` plays the driving tunes in a test (the
+engine silent); `-musictune NAME` plays one tune, looped.
+
 ## Screens (game/src/menu.c)
 
 Playing starts at the title screen: the tractor turning in the showroom
