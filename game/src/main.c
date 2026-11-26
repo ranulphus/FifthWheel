@@ -244,7 +244,11 @@ static void detail_start(game *g)
     int d = detail_parse(dgk_cfg_get(&g->cfg, "detail"));
     const char *renderer = (const char *)glGetString(GL_RENDERER), *why = "chosen";
     detail_load(g->presets, g->budget_path);
-    g->engine = detail_engine((const char *)glGetString(GL_EXTENSIONS));
+    /* (FW_ENGINE=1: the engine's paths taken anyway, to see them on another GL; 0: never) */
+    g->engine = getenv("FW_ENGINE") ? atoi(getenv("FW_ENGINE")) != 0
+                                    : detail_engine((const char *)glGetString(GL_EXTENSIONS));
+    mb_engine(g->engine);
+    g->w.engine = g->engine;
     if (g->detail_chosen < 0 && d >= 0) {
         g->detail_chosen = d;
         why = g->cfg_path;
@@ -1040,11 +1044,13 @@ static void draw(void *u, float alpha)
             lorry_shadow_trailer(standing[i]->x, standing[i]->y, standing[i]->heading, &g->w);
         traffic_shadows(&g->traffic, &g->w, alpha, r.x, r.y, reach);
         lorry_shadows_end();
+        mb_light_begin();                            /* (GL lights them on the transform engine: mesh.h) */
         lorry_draw(&g->lorry, &r, &g->w, &g->fxs.sway);
         traffic_draw(&g->traffic, &g->w, alpha, r.x, r.y, reach);
         for (i = 0; i < n; i++)
             lorry_draw_trailer(&g->lorry, standing[i]->type, standing[i]->x, standing[i]->y, standing[i]->heading,
                                &g->w);
+        mb_light_end();
     }
     if (g->has_jobs)
         target_arrow_draw(&g->jobs, &r, &g->w, dgk_app.ticks);

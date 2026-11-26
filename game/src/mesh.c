@@ -250,8 +250,8 @@ void mb_cylinder(builder *b, int axis, const float *c, float radius, float half,
 
 /* A toy's plastic sheen: where a surface faces halfway between the sun and
  * straight up (the camera looks down from high), a glint of white. */
-#define GLOSS 0.5f
-#define GLOSS_POWER 4                 /* squarings: the glint's tightness (2^4 = 16) */
+#define GLOSS MB_GLOSS
+#define GLOSS_POWER MB_GLOSS_POWER
 
 void mb_relight(const builder *b, float yaw)
 {

@@ -50,8 +50,10 @@ int sky_fog(float view_pitch, float eye_height, float far)
     c[3] = 1.0f;
     glFogi(GL_FOG_MODE, GL_LINEAR);
     glFogfv(GL_FOG_COLOR, c);
-    glFogf(GL_FOG_START, far * 0.5f);
-    glFogf(GL_FOG_END, far * 0.95f);
+    /* Linear, from 0.4 of the far plane to it: a fade 100 m long or more (at HIGH's far plane), which DOS-GL keeps
+     * on the Radeons' transform engine (its advice, 2026-11-26), and nothing left unfogged at the far plane. */
+    glFogf(GL_FOG_START, far * 0.4f);
+    glFogf(GL_FOG_END, far);
     glEnable(GL_FOG);
     return 1;
 }

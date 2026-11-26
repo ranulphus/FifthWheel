@@ -45,6 +45,10 @@ typedef struct world {
     const uint16_t *hi_tris;
     unsigned int atlas;                  /* its texture (tex.c) */
     int textured;                        /* draw HIGH from it (main.c sets it: HIGH, and loaded) */
+    /* On a card whose transform engine keeps buffers in its memory (detail_engine): the chunks' vertices in
+     * GL_STATIC_DRAW buffer objects, made the first time each is drawn (0: none yet). */
+    int engine;
+    unsigned int vbo, hi_vbo;
     char file[160];                      /* the pack's name, for WORLDHI.PAK's */
     const obb *boxes;
     int nboxes;

@@ -3,8 +3,11 @@
 #include "world.h"
 #include "dgk/app.h"
 #include "dgk/log.h"
+#define GL_GLEXT_PROTOTYPES                  /* (DOS-GL's buffer objects: GL_ARB_vertex_buffer_object) */
 #include <GL/gl.h>
+#include <GL/glext.h>
 #include <math.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -177,6 +180,10 @@ int world_load(world *w, const char *path)
 
 void world_free(world *w)
 {
+    if (w->vbo)
+        glDeleteBuffersARB(1, &w->vbo);
+    if (w->hi_vbo)
+        glDeleteBuffersARB(1, &w->hi_vbo);
     free(w->bucket_first);
     free(w->bucket_items);
     free(w->lane);
@@ -286,8 +293,25 @@ static int box_hidden(const float plane[6][4], float x0, float h0, float z0, flo
     return 0;
 }
 
+/* A pack's vertices in a GL_STATIC_DRAW buffer, bound (made the first time). Each chunk is then drawn with its
+ * arrays offset to its own first vertex, so the engine keeps each chunk's vertices on their own (DOS-GL's
+ * advice: one buffer drawn by index offsets would make every chunk's span the whole world). */
+static void bind_vbo(unsigned int *vbo, const dgk_pak *pak, uint32_t fourcc)
+{
+    if (!*vbo) {
+        uint32_t size = 0;
+        const void *data = dgk_pak_section(pak, fourcc, &size);
+        glGenBuffersARB(1, vbo);
+        glBindBufferARB(GL_ARRAY_BUFFER_ARB, *vbo);
+        glBufferDataARB(GL_ARRAY_BUFFER_ARB, (GLsizeiptrARB)size, data, GL_STATIC_DRAW_ARB);
+        dgk_log("FW-WORLD %u KB of vertices in a buffer object", (unsigned)(size / 1024));
+    }
+    glBindBufferARB(GL_ARRAY_BUFFER_ARB, *vbo);
+}
+
 void world_draw(world *w, float x, float y, float r)
 {
+    const char *hbase = (const char *)w->hi_verts, *base = (const char *)w->verts;
     const float margin = 8.0f;                       /* triangles go to chunks by centroid: some reach over */
     float plane[6][4];
     int cx0, cx1, cy0, cy1, cx, cy;
@@ -304,6 +328,15 @@ void world_draw(world *w, float x, float y, float r)
     w->culled_chunks = 0;
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_COLOR_ARRAY);
+    if (w->engine) {                                 /* the buffer's offsets in place of the pack's addresses */
+        if (w->textured) {
+            bind_vbo(&w->hi_vbo, &w->hipak, WG_HI_VERTS);
+            hbase = NULL;
+        } else {
+            bind_vbo(&w->vbo, &w->pak, WG_CVERTS);
+            base = NULL;
+        }
+    }
     if (w->textured) {                               /* HIGH: WORLDHI.PAK's, the atlas tinted by the colours */
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, w->atlas);
@@ -317,7 +350,7 @@ void world_draw(world *w, float x, float y, float r)
     for (cy = cy0; cy <= cy1; cy++)
         for (cx = cx0; cx <= cx1; cx++) {
             const wg_chunk *c = &w->chunks[cy * WG_CHUNKS + cx];
-            const wg_vertex *v = w->verts + c->first_vertex;
+            const char *v = base + (size_t)c->first_vertex * sizeof(wg_vertex);
             uint32_t first = 0, n = c->ntris;
             if (w->textured) {                       /* HIGH's, all of them */
                 first = 0;
@@ -343,14 +376,14 @@ void world_draw(world *w, float x, float y, float r)
             glScalef(1.0f / WG_UNIT, 1.0f / WG_UNIT, 1.0f / WG_UNIT);
             if (w->textured) {
                 const wg_chunk *hc = &w->hi_index[cy * WG_CHUNKS + cx];
-                const wg_hvertex *hv = w->hi_verts + hc->first_vertex;
-                glVertexPointer(3, GL_SHORT, sizeof *hv, &hv->x);
-                glColorPointer(4, GL_UNSIGNED_BYTE, sizeof *hv, hv->rgba);
-                glTexCoordPointer(2, GL_SHORT, sizeof *hv, &hv->s);
+                const char *hv = hbase + (size_t)hc->first_vertex * sizeof(wg_hvertex);
+                glVertexPointer(3, GL_SHORT, sizeof(wg_hvertex), hv + offsetof(wg_hvertex, x));
+                glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(wg_hvertex), hv + offsetof(wg_hvertex, rgba));
+                glTexCoordPointer(2, GL_SHORT, sizeof(wg_hvertex), hv + offsetof(wg_hvertex, s));
                 glDrawElements(GL_TRIANGLES, (GLsizei)n * 3, GL_UNSIGNED_SHORT, w->hi_tris + hc->first_index);
             } else {
-                glVertexPointer(3, GL_SHORT, sizeof *v, &v->x);
-                glColorPointer(4, GL_UNSIGNED_BYTE, sizeof *v, v->rgba);
+                glVertexPointer(3, GL_SHORT, sizeof(wg_vertex), v + offsetof(wg_vertex, x));
+                glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(wg_vertex), v + offsetof(wg_vertex, rgba));
                 glDrawElements(GL_TRIANGLES, (GLsizei)n * 3, GL_UNSIGNED_SHORT, w->tris + c->first_index + first * 3);
             }
             glPopMatrix();
@@ -366,6 +399,8 @@ void world_draw(world *w, float x, float y, float r)
         glDisableClientState(GL_TEXTURE_COORD_ARRAY);
         glDisable(GL_TEXTURE_2D);
     }
+    if (w->engine)
+        glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);
 }

@@ -749,13 +749,11 @@ void traffic_draw(const traffic *t, const world *w, float alpha, float cx, float
         g = world_height(w, x, y);
         gf = world_height(w, x + 1.3f * cosf(h), y + 1.3f * sinf(h));
         gb = world_height(w, x - 1.3f * cosf(h), y - 1.3f * sinf(h));
-        if (built_quality > 0)
-            mb_relight(&bld[c->colour], h);
         glPushMatrix();
         glTranslatef(x, g, -y);
         glRotatef(h * 57.29578f, 0, 1, 0);
         glRotatef(atan2f(gf - gb, 2.6f) * 57.29578f, 0, 0, 1);
-        dgk_gfx_draw_mesh(&meshes[c->colour]);
+        mb_draw(&meshes[c->colour], &bld[c->colour], h);
         glPopMatrix();
     }
 }

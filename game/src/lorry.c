@@ -334,33 +334,30 @@ void lorry_draw(lorry_meshes *m, const rig *r, const world *w, const cab_sway *s
     float pitch = atan2f(h_front - h_rear, RIG_WHEELBASE) * 57.29578f;
     float roll = atan2f(h_left - h_right, 2.4f) * 57.29578f;
     float h_hitch;
-    mb_relight(&m->chassis_b, r->heading);
-    mb_relight(&m->cab_b, r->heading);
     glPushMatrix();
     glTranslatef(r->x, h_rear, -r->y);
     glRotatef(r->heading * 57.29578f, 0, 1, 0);
     glRotatef(pitch, 0, 0, 1);
     glRotatef(-roll, 1, 0, 0);
-    dgk_gfx_draw_mesh(&m->chassis);
+    mb_draw(&m->chassis, &m->chassis_b, r->heading);
     if (sway) {                                      /* the cab rocks about its base, on the chassis */
         glTranslatef(3.2f, 0.8f + sway->lift, 0);
         glRotatef(sway->pitch, 0, 0, 1);
         glRotatef(-sway->roll, 1, 0, 0);
         glTranslatef(-3.2f, -0.8f, 0);
     }
-    dgk_gfx_draw_mesh(&m->cab);
+    mb_draw(&m->cab, &m->cab_b, r->heading);
     glPopMatrix();
     if (!r->has_trailer)
         return;
     rig_hitch(r, &hx, &hy);
     rig_trailer_axle(r, &ax, &ay);
     h_hitch = h_rear + (h_front - h_rear) * RIG_HITCH / RIG_WHEELBASE;
-    mb_relight(&m->trailer_b[r->trailer_type], r->trailer_heading);
     glPushMatrix();
     glTranslatef(hx, h_hitch, -hy);
     glRotatef(r->trailer_heading * 57.29578f, 0, 1, 0);
     glRotatef(atan2f(h_hitch - ground(w, ax, ay), RIG_TRAILER_LEN) * 57.29578f, 0, 0, 1);
-    dgk_gfx_draw_mesh(&m->trailer[r->trailer_type]);
+    mb_draw(&m->trailer[r->trailer_type], &m->trailer_b[r->trailer_type], r->trailer_heading);
     glPopMatrix();
 }
 
@@ -368,12 +365,11 @@ void lorry_draw_trailer(lorry_meshes *m, int type, float kx, float ky, float hea
 {
     float h = ground(w, kx, ky);
     float ah = ground(w, kx - RIG_TRAILER_LEN * cosf(heading), ky - RIG_TRAILER_LEN * sinf(heading));
-    mb_relight(&m->trailer_b[type], heading);
     glPushMatrix();
     glTranslatef(kx, h, -ky);
     glRotatef(heading * 57.29578f, 0, 1, 0);
     glRotatef(atan2f(h - ah, RIG_TRAILER_LEN) * 57.29578f, 0, 0, 1);
-    dgk_gfx_draw_mesh(&m->trailer[type]);
+    mb_draw(&m->trailer[type], &m->trailer_b[type], heading);
     glPopMatrix();
 }
 

@@ -14,6 +14,7 @@ typedef struct builder {
     float *nrm;                /* optional (mb_normals): each vertex's unit normal... */
     uint32_t *base;            /* ...and its unlit colour, to light it again (mb_relight) */
     int nverts, ntris, max_verts, max_tris, overflow;
+    int unlit;                 /* rgba holds the unlit colours (GL lights it: mb_draw on the engine) */
 } builder;
 
 void mb_init(builder *b, float *pos, uint8_t *rgba, uint16_t *idx, int max_verts, int max_tris);
@@ -43,7 +44,20 @@ void mb_cylinder(builder *b, int axis, const float *c, float radius, float half,
  * vertical (as glRotatef(yaw, 0, 1, 0) turns it): the sun stays put in the
  * world while the mesh turns under it. */
 void mb_relight(const builder *b, float yaw);
+#define MB_GLOSS 0.5f                 /* a toy's plastic sheen (mb_relight): its brightness */
+#define MB_GLOSS_POWER 4              /* squarings: the glint's tightness (2^4 = 16) */
+
 /* The sun's light on a surface with unit normal (nx, ny, nz), GL coordinates. */
 float mb_light(float nx, float ny, float nz);
+
+/* On a card whose transform engine lights (detail_engine), GL lighting does mb_relight's work: the sun as
+ * GL_LIGHT0 (its ambient and diffuse as mb_light's, on the vertex's own colour through glColorMaterial) and the
+ * gloss as its specular. mb_engine(1) to use it; mb_light_begin with the camera's matrix in force, then mb_draw
+ * each mesh (turned `yaw` as drawn: the CPU's relighting needs it), then mb_light_end. Elsewhere mb_draw lights
+ * on the CPU as before. In the game only (meshlit.c: GL), not the host tools. */
+void mb_engine(int on);
+void mb_light_begin(void);
+void mb_light_end(void);
+void mb_draw(const dgk_mesh *m, builder *b, float yaw);
 
 #endif
