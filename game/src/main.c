@@ -48,6 +48,7 @@
 #include "ui.h"
 #include "tex.h"
 #include "dgk/bench.h"
+#include "dgk/path.h"
 #include "guides.h"
 #include "dgk/save.h"
 #include "probe.h"
@@ -1142,33 +1143,20 @@ int main(int argc, char **argv)
     g.start_money = -1;
     g.detail_chosen = -1;
     g.zoom_wanted = -1;
-#ifdef DGK_DOS
-    g.budget_path = "BUDGET.CFG";
-#else
-    g.budget_path = "build/data/budget.cfg";
-#endif
+    /* The files by their DOS names (dgk/path.h): off DOS the data are the build's, the career and settings
+     * the current directory's, in lower case. */
+    dgk_path_dir(DGK_DATA, "build/data");
+    g.budget_path = dgk_path(DGK_DATA, "budget.cfg");
     g.career_path = getenv("FW_CAREER");
     g.career_given = g.career_path != NULL;
     if (!g.career_path)
-#ifdef DGK_DOS
-        g.career_path = "CAREER.DAT";
-#else
-        g.career_path = "career.dat";
-#endif
+        g.career_path = dgk_path(DGK_USER, "CAREER.DAT");
     if (getenv("FW_CRASH"))
         g.crash_at = (uint32_t)DGK_MAX(atoi(getenv("FW_CRASH")), 1);
     g.cfg_path = getenv("FW_CFG");
     if (!g.cfg_path)
-#ifdef DGK_DOS
-        g.cfg_path = "FWHEEL.CFG";
-#else
-        g.cfg_path = "fwheel.cfg";
-#endif
-#ifdef DGK_DOS
-    g.world_path = "WORLD.PAK";
-#else
-    g.world_path = "build/data/WORLD.PAK";
-#endif
+        g.cfg_path = dgk_path(DGK_USER, "FWHEEL.CFG");
+    g.world_path = dgk_path(DGK_DATA, "WORLD.PAK");
     for (i = 1; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!strcmp(a, "-autopilot"))
