@@ -27,7 +27,7 @@ Q ?= @
 
 KIT_SRCS  := $(DGK_SRCS)
 GAME_SRCS := $(wildcard game/src/*.c)
-GEN_SRCS  := build/gen/font_gen.c
+GEN_SRCS  := build/gen/font_gen.c build/gen/music_gen.c
 HDRS      := $(DGK_HDRS) $(wildcard game/src/*.h)
 WARN      := -std=gnu99 -Wall -Wextra -Werror
 # Every target compiles its GL against DOS-GL's own <GL/gl.h>: the subset is enforced.
@@ -51,6 +51,16 @@ regress: tests-host jobsweep career shots
 build/gen/font_gen.c: data/font5x7.txt $(DGK_FONTBAKE)
 	@mkdir -p $(dir $@)
 	$(Q)python3 $(DGK_FONTBAKE) $< $@ fw_font
+
+# The music: data/music's tunes, in this order (the title's, the garage's, then the driving tunes), made into
+# standard MIDI files (build/data/music, to listen to) and C for the game (tools/fwtune.c).
+TUNES := data/music/title.fwt data/music/garage.fwt data/music/drive1.fwt data/music/drive2.fwt data/music/drive3.fwt
+build/tools/fwtune: tools/fwtune.c
+	@mkdir -p $(dir $@)
+	$(Q)$(HOST_CC) $(WARN) -O2 -o $@ tools/fwtune.c
+build/gen/music_gen.c: build/tools/fwtune $(TUNES)
+	@mkdir -p $(dir $@) build/data/music
+	$(Q)build/tools/fwtune $@ build/data/music $(TUNES)
 
 # ---- Data: packs made by host tools (the same files on every target) ------
 TOOL_CFLAGS := $(WARN) -O2 -ffp-contract=off $(DGK_CFLAGS) -I$(DGK)/tools -Igame/src

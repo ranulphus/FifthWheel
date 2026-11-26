@@ -4,6 +4,7 @@
 #include "dgk/gfx.h"
 #include "dgk/log.h"
 #include "dgk/mix.h"
+#include "music.h"
 #include "sound.h"
 #include <GL/gl.h>
 #include <math.h>
@@ -12,8 +13,8 @@
 
 static const char *const title_items[] = { "DRIVE", "GARAGE", "OPTIONS", "JOYSTICK SET-UP", "QUIT" };
 static const char *const pause_items[] = { "RESUME", "OPTIONS", "JOYSTICK SET-UP", "QUIT" };
-enum { OPT_DETAIL, OPT_MODE, OPT_VSYNC, OPT_VOLUME, OPT_GOVERNOR, OPT_BACK, OPTS };
-static const char *const option_names[OPTS] = { "DETAIL", "SCREEN", "VSYNC", "VOLUME", "GOVERNOR", "BACK" };
+enum { OPT_DETAIL, OPT_MODE, OPT_VSYNC, OPT_VOLUME, OPT_MUSIC, OPT_GOVERNOR, OPT_BACK, OPTS };
+static const char *const option_names[OPTS] = { "DETAIL", "SCREEN", "VSYNC", "VOLUME", "MUSIC", "GOVERNOR", "BACK" };
 
 static int items_on(int screen)
 {
@@ -102,6 +103,11 @@ static void change(game *g, int dir)
         dgk_mix_master(vol * 32);
         sound_clunk();                               /* hear the new level */
         break;
+    case OPT_MUSIC:
+        vol = DGK_CLAMP(dgk_cfg_int(&g->cfg, "sound.music", 7) + dir, 0, 10);
+        dgk_cfg_set_int(&g->cfg, "sound.music", vol);
+        music_volume(vol);
+        break;
     case OPT_GOVERNOR:
         dgk_cfg_set_int(&g->cfg, "governor", !dgk_cfg_int(&g->cfg, "governor", 1));
         g->gov.on = !dgk_app.fixed && !dgk_test_active() && dgk_cfg_int(&g->cfg, "governor", 1);
@@ -115,6 +121,7 @@ static void change(game *g, int dir)
             g->men.cursor == OPT_DETAIL ? detail_name[g->detail_chosen]
             : g->men.cursor == OPT_MODE ? dgk_cfg_get(&g->cfg, "video.mode")
             : g->men.cursor == OPT_VOLUME ? dgk_cfg_get(&g->cfg, "sound.volume")
+            : g->men.cursor == OPT_MUSIC ? dgk_cfg_get(&g->cfg, "sound.music")
             : g->men.cursor == OPT_VSYNC ? dgk_cfg_get(&g->cfg, "video.vsync")
                                          : dgk_cfg_get(&g->cfg, "governor"));
 }
@@ -262,6 +269,10 @@ static void options(game *g)
             break;
         case OPT_VOLUME:
             snprintf(line, sizeof line, "< %d >", DGK_CLAMP(dgk_cfg_int(&g->cfg, "sound.volume", 8), 0, 10));
+            v = line;
+            break;
+        case OPT_MUSIC:
+            snprintf(line, sizeof line, "< %d >", DGK_CLAMP(dgk_cfg_int(&g->cfg, "sound.music", 7), 0, 10));
             v = line;
             break;
         case OPT_GOVERNOR:

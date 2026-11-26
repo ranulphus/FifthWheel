@@ -1,0 +1,88 @@
+# Delivery Swing: the third driving tune. An alto sax over a walking bass, the piano's Charleston comp and a ride
+# cymbal; F major, A A B A (32 bars), swung hard.
+title Delivery Swing
+tempo 138
+meter 4/4
+swing 1
+
+define mA
+| r/8 c5/8 d5/8 f5/8 a5/4 g5/8 f5/8 | a5/4. f5/8 d5/2 | r/8 bb4/8 d5/8 f5/8 a5/8 g5/8 f5/8 d5/8 |
+| e5/4 g5/4 bb5/4 g5/4 | a5/8 g5/8 f5/8 c5/8 d5/8 f5/8 a5/8 c6/8 | eb6/4! c6/8 a5/8 eb5/4. r/8 |
+| d5/8 f5/8 bb5/8 f5/8 db5/8 f5/8 bb5/8 f5/8 |
+enddef
+define mB
+| c#5/8 e5/8 g5/8 a5/8 c#6/4 a5/4 | bb5/8 a5/8 g5/8 e5/8 c#5/2 | d5/8 f5/8 a5/8 d6/8 c6/4 a5/4 |
+| f5/4. e5/8 d5/2 | b4/8 d5/8 f5/8 g5/8 b5/4 g5/4 | a5/8 g5/8 f5/8 d5/8 b4/2 |
+| c5/8 e5/8 g5/8 bb5/8 c6/4 bb5/8 g5/8 | e5/4 g5/4 bb5/4 c5/4 |
+enddef
+
+part sax ch 1 prog 65 vol 122
+$mA | a5/4 f5/4 g5/4. c5/8 |
+$mA | f5/2. r/4 |
+$mB
+$mA | f5/2. r/4 |
+
+define pF6
+| a3+d4+f4/4.? a3+d4+f4/8? r/2 |
+enddef
+define pDm7
+| a3+c4+f4/4.? a3+c4+f4/8? r/2 |
+enddef
+define pGm7
+| bb3+d4+f4/4.? bb3+d4+f4/8? r/2 |
+enddef
+define pC7
+| bb3+e4+g4/4.? bb3+e4+g4/8? r/2 |
+enddef
+define pF7
+| a3+eb4+f4/4.? a3+eb4+f4/8? r/2 |
+enddef
+define pA7
+| c#4+e4+g4/4.? c#4+e4+g4/8? r/2 |
+enddef
+define pDm
+| d4+f4+a4/4.? d4+f4+a4/8? r/2 |
+enddef
+define pG7
+| b3+d4+f4/4.? b3+d4+f4/8? r/2 |
+enddef
+define pA
+$pF6 $pDm7 $pGm7 $pC7 $pF6 $pF7 | bb3+d4+f4/4? r/4 bb3+db4+f4/4? r/4 |
+enddef
+
+part piano ch 2 prog 0 vol 70
+$pA | a3+c4+f4/4? r/4 bb3+e4+g4/4? r/4 |
+$pA | a3+d4+f4/4.? r/8 r/2 |
+$pA7 $pA7 $pDm $pDm $pG7 $pG7 $pC7 $pC7
+$pA | a3+d4+f4/4.? r/8 r/2 |
+
+define bA
+| f2/4 a2/4 c3/4 a2/4 | d2/4 f2/4 a2/4 c3/4 | g2/4 bb2/4 d3/4 f3/4 | c3/4 bb2/4 g2/4 e2/4 |
+| f2/4 a2/4 c3/4 d3/4 | eb3/4 c3/4 a2/4 f2/4 | bb2/4 d3/4 db3/4 bb2/4 |
+enddef
+define bB
+| a2/4 c#3/4 e3/4 g3/4 | a2/4 g2/4 e2/4 c#2/4 | d2/4 f2/4 a2/4 c3/4 | d3/4 c3/4 a2/4 f2/4 |
+| g2/4 b2/4 d3/4 f3/4 | g2/4 f2/4 d2/4 b1/4 | c3/4 e3/4 g3/4 bb2/4 | c3/4 bb2/4 g2/4 e2/4 |
+enddef
+
+part bass ch 3 prog 32 vol 92
+$bA | f2/4 a2/4 g2/4 c3/4 |
+$bA | f2/4 c3/4 f2/4 r/4 |
+$bB
+$bA | f2/4 c3/4 f2/2 |
+
+define dBar
+| bd+rd/4? rd+ph/8 rd/8? bd+rd/4? rd+ph/8 rd/8? |
+enddef
+define dFill
+| bd+rd/4? rd+ph/8 rd/8? sd/8? sd/8? sd/8 sd/8! |
+enddef
+define dEnd
+| bd+rd/4? rd+ph/8 rd/8? sd/8? sd/8 sd/8 sd/8! |
+enddef
+
+part drums ch 10 prog 0 vol 66
+$dBar x7 $dFill
+$dBar x7 $dFill
+$dBar x7 $dFill
+$dBar x7 $dEnd

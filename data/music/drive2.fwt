@@ -1,0 +1,71 @@
+# Country Mile: the second driving tune. A banjo's tune and a harmonica answering it over a boom-chick bass and
+# guitar, a train beat on the snare; G major, A A' B A' (32 bars), shuffled.
+title Country Mile
+tempo 120
+meter 4/4
+swing 0.7
+
+define mA
+| g4/8 b4/8 d5/8 b4/8 g5/4 d5/4 | e5/8 d5/8 b4/8 g4/8 a4/2 | c5/8 e5/8 g5/8 e5/8 c5/4 e5/4 |
+| d5/8 b4/8 g4/8 b4/8 d5/2 | g4/8 b4/8 d5/8 b4/8 g5/4 b5/4 | a5/8 g5/8 f#5/8 e5/8 d5/4 c5/4 |
+| b4/8 d5/8 g5/8 d5/8 b4/8 a4/8 g4/4 |
+enddef
+define mB
+| c5/8 e5/8 g5/8 e5/8 c6/4 g5/4 | a5/8 g5/8 e5/8 c5/8 e5/2 | d5/8 g5/8 b5/8 g5/8 d5/4 b4/4 |
+| g4/8 b4/8 d5/8 g5/8 b5/2 | c#5/8 e5/8 a5/8 e5/8 c#5/4 e5/4 | g5/8 f#5/8 e5/8 c#5/8 a4/2 |
+| d5/8 f#5/8 a5/8 f#5/8 d5/4 c5/4 | b4/8 a4/8 f#4/8 a4/8 d5/2 |
+enddef
+
+part banjo ch 1 prog 105 vol 127
+$mA | a4/8 b4/8 c5/8 b4/8 a4/4 d4/4 |
+$mA | g4/2 r/2 |
+$mB
+$mA | g4/2 r/2 |
+
+define hA
+| r/1 | r/2 b4/4. a4/8 | r/1 | r/2 d5/4. c5/8 | r/1 | r/2 c5/4 a4/4 | r/1 |
+enddef
+define hB
+| e5/1 | c5/1 | d5/1 | b4/1 | c#5/1 | a4/1 | f#5/1 | d5/1 |
+enddef
+
+part harmonica ch 2 prog 22 vol 96
+$hA | r/2 f#4/2 |
+$hA | r/1 |
+$hB
+$hA | r/1 |
+
+define cG
+| g2/4 b3+d4+g4/4? d2/4 b3+d4+g4/4? |
+enddef
+define cC
+| c3/4 c4+e4+g4/4? g2/4 c4+e4+g4/4? |
+enddef
+define cD
+| d3/4 c4+d4+f#4/4? a2/4 c4+d4+f#4/4? |
+enddef
+define cA7
+| a2/4 c#4+e4+g4/4? e2/4 c#4+e4+g4/4? |
+enddef
+define cA
+$cG $cG $cC $cG $cG $cD $cG
+enddef
+
+part rhythm ch 3 prog 25 vol 72
+$cA $cD
+$cA $cG
+$cC $cC $cG $cG $cA7 $cA7 $cD $cD
+$cA $cG
+
+define dBar
+| bd+sd/8? sd/8? sd/8? sd/8? bd+sd/8? sd/8? sd/8? sd/8? |
+enddef
+define dEnd
+| bd+sd/8? sd/8? sd/8? sd/8? sd/8 sd/8 sd/8 cr/8 |
+enddef
+
+part drums ch 10 prog 0 vol 70
+$dBar x7 $dEnd
+$dBar x7 $dEnd
+$dBar x7 $dEnd
+$dBar x7 $dEnd

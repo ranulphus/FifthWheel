@@ -56,6 +56,9 @@ typedef struct game {
     int careerful;                  /* the career is loaded and saved (play, or -career given) */
     int career_given, start_money;  /* -career; -money N (tests) */
     int soundtest;                  /* -soundtest */
+    int music_on;                   /* the FM music: when playing, or -musictest (the driving tunes) in a test */
+    int musictest;
+    const char *music_tune;         /* -musictune: that one alone */
     int rearcam;                    /* coupling or docking in reverse: the reversing camera's look */
     world w;
     rig r, r_prev;

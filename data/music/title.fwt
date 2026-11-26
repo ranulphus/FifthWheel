@@ -1,0 +1,76 @@
+# Fifth Wheel March: the title. A trumpet's tune over the tuba's oom and the horns' pah, a snare marching; Bb
+# major, A A' B A' (32 bars), the B section in the subdominant's colours.
+title Fifth Wheel March
+tempo 112
+meter 4/4
+swing 0
+
+define mA
+| f4/8. bb4/16 d5/4 f5/4 d5/4 | bb4/8. d5/16 f5/4 bb5/2 | a5/8. g5/16 f5/4 eb5/4 c5/4 | d5/8. c5/16 bb4/4 f4/2 |
+| g4/8. bb4/16 eb5/4 g5/4 eb5/4 | f5/8. eb5/16 d5/4 bb4/4 d5/4 | c5/4 e5/4 eb5/4 a4/4 |
+enddef
+define mB
+| g5/4 g5/8. f5/16 eb5/4 bb4/4 | c5/8. d5/16 eb5/4 g5/2 | f5/4 f5/8. eb5/16 d5/4 bb4/4 | c5/8. d5/16 eb5/4 f5/2 |
+| eb5/4 eb5/8. d5/16 c5/4 g4/4 | b4/8. c5/16 d5/4 g5/2 | e5/4 g5/4 bb5/4 g5/4 | a5/4 f5/4 c5/4 eb5/4 |
+enddef
+
+part trumpet ch 1 prog 56 vol 120
+$mA | c5/4. d5/8 c5/4 r/4 |
+$mA | bb4/2 r/2 |
+$mB
+$mA | bb4/2 r/2 |
+
+define tBb
+| bb1/4 r/4 f2/4 r/4 |
+enddef
+define tF
+| f2/4 r/4 c2/4 r/4 |
+enddef
+define tEb
+| eb2/4 r/4 bb1/4 r/4 |
+enddef
+define tA
+$tBb $tBb $tF $tBb $tEb $tBb | c2/4 r/4 f2/4 r/4 |
+enddef
+
+part tuba ch 3 prog 58 vol 92
+$tA $tF
+$tA $tBb
+$tEb $tEb $tBb $tBb | c2/4 r/4 g2/4 r/4 | g2/4 r/4 d2/4 r/4 | c2/4 r/4 g2/4 r/4 | f2/4 r/4 c2/4 r/4 |
+$tA $tBb
+
+define hBb
+| r/4 d4+f4+bb4/4? r/4 d4+f4+bb4/4? |
+enddef
+define hF
+| r/4 c4+eb4+a4/4? r/4 c4+eb4+a4/4? |
+enddef
+define hEb
+| r/4 eb4+g4+bb4/4? r/4 eb4+g4+bb4/4? |
+enddef
+define hA
+$hBb $hBb $hF $hBb $hEb $hBb | r/4 c4+e4+bb4/4? r/4 c4+eb4+a4/4? |
+enddef
+
+part horns ch 2 prog 61 vol 72
+$hA $hF
+$hA $hBb
+$hEb $hEb $hBb $hBb | r/4 c4+eb4+g4/4? r/4 c4+eb4+g4/4? | r/4 b3+d4+f4/4? r/4 b3+d4+f4/4? |
+| r/4 c4+e4+bb4/4? r/4 c4+e4+bb4/4? | r/4 c4+eb4+a4/4? r/4 c4+eb4+a4/4? |
+$hA $hBb
+
+define dBar
+| bd+sd/8 sd/16? sd/16? sd/8? sd/8? bd+sd/8 sd/16? sd/16? sd/8? sd/8? |
+enddef
+define dTop
+| bd+cr/8! sd/16? sd/16? sd/8? sd/8? bd+sd/8 sd/16? sd/16? sd/8? sd/8? |
+enddef
+define dFill
+| bd+sd/8 sd/16 sd/16 sd/8 sd/16 sd/16 sd/16 sd/16 sd/16 sd/16 sd/8! sd/8! |
+enddef
+
+part drums ch 10 prog 0 vol 64
+$dTop $dBar x6 $dFill
+$dTop $dBar x6 $dFill
+$dTop $dBar x6 $dFill
+$dTop $dBar x6 $dFill

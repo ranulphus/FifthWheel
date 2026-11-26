@@ -6,6 +6,8 @@
  *   FWHEEL -pose X:Y:H:V                 the rig held at (X, Y) heading H degrees, the camera
  *                                        as at V m/s (pictures of a place at speed)
  *   FWHEEL -soundtest                    each sound in turn, then quit (the SOUND suite)
+ *   FWHEEL -musictest                    the driving tunes on the FM chip in a test (FW-MUSIC lines)
+ *   FWHEEL -musictune NAME               that tune alone, looped (title, garage, drive1 ...)
  *   FWHEEL -fxtest                       every flourish far past its cap for 2 s (HX-TEST fx-caps)
  *          [-detail low|medium|high]     the detail preset (else FWHEEL.CFG's, else medium)
  *          [-zoom 0|1|2]                 the camera's zoom to start with (as the detail allows)
@@ -42,6 +44,7 @@
  * (stopped), Z the zoom, J the joystick's set-up, Esc to quit. A joystick or wheel: steering, accelerator and brake as
  * calibrated, button 1 the handbrake, button 2 the horn. */
 #include "game.h"
+#include "music.h"
 #include "ui.h"
 #include "tex.h"
 #include "dgk/bench.h"
@@ -332,6 +335,14 @@ static int init(void *u)
     } else if (g->record_path)
         g->replay = dgk_replay_record((int)sizeof(input_frame), 0);
     sound_init();
+    /* The music: when playing (not in a test unless -musictest: the sound suite listens for its own tones). */
+    g->music_on = (!dgk_test_active() && !g->replay_path && !g->record_path && !g->soundtest) || g->musictest;
+    if (g->music_on) {
+        music_init();
+        music_volume(DGK_CLAMP(dgk_cfg_int(&g->cfg, "sound.music", 7), 0, 10));
+        if (g->music_tune && !music_play(g->music_tune))
+            dgk_log("FW-MUSIC no tune %s", g->music_tune);
+    }
     career_style(g);
     fx_init(&g->fxs, g->jobs.money);
     detail_start(g);
@@ -696,10 +707,24 @@ static void highlights(game *g)
     }
 }
 
+/* The tune for what is on the screen (the title's, the garage's, else the driving tunes), and what is due of
+ * it: at every tick and every frame. */
+static void music_now(game *g)
+{
+    if (!g->music_on)
+        return;
+    if (!g->music_tune)
+        music_want(g->musictest ? MUSIC_DRIVING : g->gar.open ? MUSIC_GARAGE
+                   : g->men.screen == SCREEN_TITLE || (g->men.screen == SCREEN_OPTIONS && g->men.back == SCREEN_TITLE)
+                       ? MUSIC_TITLE : MUSIC_DRIVING);
+    music_update();
+}
+
 static void tick(void *u)
 {
     game *g = (game *)u;
     int k;
+    music_now(g);
     if (g->tourshots) {                              /* pose k is drawn and saved in frame k + 1 */
         if ((int)dgk_app.ticks >= g->tourshots) {
             dgk_app.quit = 1;
@@ -860,7 +885,8 @@ static void drive_tick(game *g)
         camera_tick(&g->cam, &g->r, 1.0f / DGK_TICK_HZ, focus ? &f : NULL);
         g->rearcam = focus && g->r.gear < 0;          /* the reversing camera's look and guides */
     }
-    sound_tick(&g->r, f.buttons & 16);
+    if (!g->musictest)                               /* (-musictest: the music alone) */
+        sound_tick(&g->r, f.buttons & 16);
     fx_tick(&g->fxs, &g->r, &g->w, g->jobs.money);
     if (g->fxs.coins_landed)
         sound_coin();
@@ -959,6 +985,7 @@ static void draw(void *u, float alpha)
 {
     game *g = (game *)u;
     float view_pitch = 1.0f, view_eye = 30.0f;     /* the camera, for the haze after the world */
+    music_now(g);
     if (dgk_app.frame_us && governor_frame(&g->gov, dgk_app.frame_us / 1000.0f))
         detail_apply(g);                             /* looks only: never the simulation */
     if (g->gar.open) {
@@ -1043,6 +1070,8 @@ static void quit(void *u)
 {
     game *g = (game *)u;
     career_save_now(g, "the end");
+    if (g->music_on)
+        music_shutdown();
     sound_stop();
     if (g->record_path && !g->replay_path) {
         if (dgk_replay_save(g->replay, g->record_path) == 0)
@@ -1169,6 +1198,12 @@ int main(int argc, char **argv)
             g.parked = sscanf(argv[++i], "%f:%f:%f", &g.pose[0], &g.pose[1], &g.pose[2]) == 3;
         else if (!strcmp(a, "-soundtest"))
             g.soundtest = 1;
+        else if (!strcmp(a, "-musictest"))
+            g.musictest = 1;
+        else if (!strcmp(a, "-musictune") && v) {
+            g.musictest = 1;
+            g.music_tune = argv[++i];
+        }
         else if (!strcmp(a, "-fxtest"))
             g.fxtest = 1;
         else if (!strcmp(a, "-detail") && v)

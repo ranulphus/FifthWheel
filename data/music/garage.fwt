@@ -1,0 +1,79 @@
+# Showroom Bossa: the garage. Vibes over a nylon guitar's bossa comp and a soft bass, a rim and hi-hat; Bb
+# major, A A' B A' (32 bars), straight eighths.
+title Showroom Bossa
+tempo 104
+meter 4/4
+swing 0
+
+define mA
+| d5/4. f5/8 a5/2 | g5/8 f5/8 d5/4 c5/2 | eb5/4. g5/8 bb5/4 g5/4 | a5/2 f5/4 eb5/4 |
+| f5/4. a5/8 c6/2 | b5/8 a5/8 g5/4 f5/2 | eb5/4 g5/4 bb5/4 a5/4 |
+enddef
+define mB
+| g5/4. bb5/8 d6/2 | c6/8 bb5/8 gb5/4 eb5/2 | f5/4. a5/8 d6/2 | b5/8 a5/8 g5/4 f5/4 d5/4 |
+| eb5/4. g5/8 c6/2 | a5/8 g5/8 f5/4 eb5/4 c5/4 | d5/2 f5/4 g5/4 | a5/2 r/2 |
+enddef
+
+part vibes ch 1 prog 11 vol 127
+$mA | a5/2 r/2 |
+$mA | bb5/2 r/2 |
+$mB
+$mA | bb5/2 r/2 |
+
+define gBb
+| d4+f4+a4/4? r/8 d4+f4+a4/8? r/4 d4+f4+a4/4? |
+enddef
+define gCm
+| eb4+g4+bb4/4? r/8 eb4+g4+bb4/8? r/4 eb4+g4+bb4/4? |
+enddef
+define gF7
+| a3+c4+eb4/4? r/8 a3+c4+eb4/8? r/4 a3+c4+eb4/4? |
+enddef
+define gDm
+| f4+a4+c5/4? r/8 f4+a4+c5/8? r/4 f4+a4+c5/4? |
+enddef
+define gG7
+| b3+d4+f4/4? r/8 b3+d4+f4/8? r/4 b3+d4+f4/4? |
+enddef
+define gA
+$gBb $gBb $gCm $gF7 $gDm $gG7 $gCm $gF7
+enddef
+define gB
+| d4+g4+bb4/4? r/8 d4+g4+bb4/8? r/4 d4+g4+bb4/4? | | eb4+gb4+c5/4? r/8 eb4+gb4+c5/8? r/4 eb4+gb4+c5/4? |
+$gBb $gG7 $gCm $gF7 | d4+f4+g4/4? r/8 d4+f4+g4/8? r/4 d4+f4+g4/4? | $gF7
+enddef
+
+part guitar ch 2 prog 24 vol 84
+$gA $gA $gB $gA
+
+define bBb
+| bb2/4. f2/8 f2/4. bb2/8 |
+enddef
+define bC
+| c3/4. g2/8 g2/4. c3/8 |
+enddef
+define bF
+| f2/4. c3/8 c3/4. f2/8 |
+enddef
+define bD
+| d3/4. a2/8 a2/4. d3/8 |
+enddef
+define bG
+| g2/4. d3/8 d3/4. g2/8 |
+enddef
+define bA
+$bBb $bBb $bC $bF $bD $bG $bC $bF
+enddef
+define bB
+| eb3/4. bb2/8 bb2/4. eb3/8 | | eb3/4. bb2/8 bb2/4. gb2/8 | $bBb $bG $bC $bF $bBb $bF
+enddef
+
+part bass ch 3 prog 32 vol 84
+$bA $bA $bB $bA
+
+define dBar
+| bd+hh/8? hh/8? hh/8? sd+hh/8? bd+hh/8? hh/8? sd+hh/8? hh/8? |
+enddef
+
+part drums ch 10 prog 0 vol 70
+$dBar x32
