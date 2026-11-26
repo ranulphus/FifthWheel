@@ -20,7 +20,9 @@ typedef struct detail {
     float trailers;             /* metres within which standing trailers are drawn */
     int models;                 /* how round the models are: 0 boxes, 1 rounded, 2 rounder */
     float pitch_min;            /* degrees down: how low the camera comes at speed (under 30: sky and fog) */
-    int fog;                    /* GL fog when the camera sees that far (0: sky.c's haze on the screen instead) */
+    /* GL fog when the camera sees that far: 1 always, 2 only where the card's transform engine fogs (DOS-GL's
+     * GL_DGL_hw_tnl: the Radeon 7500 and 7200); else (0, or 2 elsewhere) sky.c's haze on the screen instead. */
+    int fog;
 } detail;
 
 extern const char *const detail_name[DETAILS];
@@ -30,10 +32,15 @@ void detail_load(detail presets[DETAILS], const char *budget_path);
 int  detail_parse(const char *name);          /* "low", "medium", "high"; -1 if neither */
 /* The preset a card is meant for (the owner's targets, 2026-11-19): LOW
  * for the G200 (and the G100, the software renderer, anything unknown on
- * DOS-GL), MEDIUM for the G400, G450 and the TNT2, HIGH for the Radeon 7200
- * and 7500 (when DOS-GL drives them) and a desktop's own OpenGL. From
+ * DOS-GL), MEDIUM for the G400, G450, the TNT2 and the Radeon 7000/VE
+ * (RV100: no transform engine; the owner, 2026-11-26), HIGH for the Radeon
+ * 7200 and 7500 (when DOS-GL drives them) and a desktop's own OpenGL. From
  * glGetString(GL_RENDERER): "DOS-GL on MGA-G450" and the like. */
 int  detail_for_renderer(const char *renderer);
+/* Whether the card's transform engine does the work (DOS-GL's GL_DGL_hw_tnl in glGetString(GL_EXTENSIONS)):
+ * lighting, fog and buffer objects in its memory. */
+int  detail_engine(const char *extensions);
+int  detail_fog(const detail *d, int engine);  /* whether GL fog is drawn (else the haze) */
 
 /* The governor: fed each frame's milliseconds, it steps down a notch after
  * 2 s averaging slower than 36 ms (under 28 fps) and back up after 6 s

@@ -221,6 +221,7 @@ static void dock_pose(game *g)
 static void detail_apply(game *g)
 {
     g->det = detail_effective(g->presets, g->detail_chosen, g->gov.notch);
+    g->fog_on = detail_fog(&g->det, g->engine);
     g->cam.pitch_min = g->det.pitch_min * 3.14159265f / 180.0f;
     g->w.models = g->det.models;                     /* the world's runs for this detail (CVAR) */
     if (g->det.models == 2 && world_load_hi(&g->w) && !g->w.atlas)
@@ -243,6 +244,7 @@ static void detail_start(game *g)
     int d = detail_parse(dgk_cfg_get(&g->cfg, "detail"));
     const char *renderer = (const char *)glGetString(GL_RENDERER), *why = "chosen";
     detail_load(g->presets, g->budget_path);
+    g->engine = detail_engine((const char *)glGetString(GL_EXTENSIONS));
     if (g->detail_chosen < 0 && d >= 0) {
         g->detail_chosen = d;
         why = g->cfg_path;
@@ -256,7 +258,8 @@ static void detail_start(game *g)
     g->gov.on = !dgk_app.fixed && !dgk_test_active() && dgk_cfg_int(&g->cfg, "governor", 1);
     g->cam.zoom = g->zoom_wanted >= 0 ? g->zoom_wanted : 1;
     detail_apply(g);
-    dgk_log("FW-CFG detail %s (%s), governor %s", detail_name[g->detail_chosen], why, g->gov.on ? "on" : "off");
+    dgk_log("FW-CFG detail %s (%s), governor %s, transform engine %s, fog %s", detail_name[g->detail_chosen], why,
+            g->gov.on ? "on" : "off", g->engine ? "yes" : "no", g->fog_on ? "GL" : "haze");
 }
 
 /* -highlights' pieces and the gaps between them (below). */
@@ -1017,7 +1020,7 @@ static void draw(void *u, float alpha)
         view_pitch = pitch;
         view_eye = eye_h;
         sky_draw(pitch);
-        if (g->det.fog)
+        if (g->fog_on)
             sky_fog(pitch, eye_h, g->det.far);
         /* As far round the target as the camera sees ahead of the eye (the eye is behind it), and no less than
          * 0.65 of the far plane (the sides of a steep view); the view's planes cull the rest. */
@@ -1047,7 +1050,7 @@ static void draw(void *u, float alpha)
         target_arrow_draw(&g->jobs, &r, &g->w, dgk_app.ticks);
     fx_draw_world(&g->fxs, &g->cam);
     glDisable(GL_FOG);
-    if (!g->det.fog)
+    if (!g->fog_on)
         sky_haze(view_pitch, view_eye, g->det.far);
     if (g->rearcam)
         guides_draw(&r, &g->w);

@@ -75,6 +75,21 @@ static void presets(void)
     CHECK(detail_for_renderer("DOS-GL on Riva TNT2 M64") == DETAIL_MEDIUM, "TNT2 M64: medium");
     CHECK(detail_for_renderer("DOS-GL on Vanta") == DETAIL_LOW, "a Vanta (a cut-down TNT2): low");
     CHECK(detail_for_renderer("DOS-GL on ATI Radeon 7500") == DETAIL_HIGH, "Radeon 7500: high");
+    CHECK(detail_for_renderer("DOS-GL on Radeon 7500 (RV200)") == DETAIL_HIGH, "Radeon 7500 (RV200): high");
+    CHECK(detail_for_renderer("DOS-GL on Radeon (R100)") == DETAIL_HIGH, "Radeon 7200 (R100): high");
+    CHECK(detail_for_renderer("DOS-GL on Radeon 7000 / VE (RV100)") == DETAIL_MEDIUM, "Radeon 7000 (RV100): medium");
+    CHECK(detail_engine("GL_ARB_multitexture GL_DGL_hw_tnl GL_EXT_fog_coord") && !detail_engine("GL_ARB_multitexture")
+              && !detail_engine(NULL), "the transform engine from GL_EXTENSIONS");
+    {
+        detail d;
+        memset(&d, 0, sizeof d);
+        d.fog = 2;
+        CHECK(detail_fog(&d, 1) && !detail_fog(&d, 0), "fog 2: GL fog only on the engine");
+        d.fog = 1;
+        CHECK(detail_fog(&d, 0), "fog 1: always");
+        d.fog = 0;
+        CHECK(!detail_fog(&d, 1), "fog 0: never");
+    }
     CHECK(detail_for_renderer("Mesa Intel(R) UHD Graphics") == DETAIL_HIGH, "a desktop's GL: high");
     CHECK(detail_for_renderer(NULL) == DETAIL_LOW, "no renderer: low");
 }

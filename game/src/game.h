@@ -46,6 +46,8 @@ typedef struct game {
     int detail_chosen;              /* -detail, FWHEEL.CFG's detail, or MEDIUM */
     governor gov;                   /* steps below it while frames run slow (not in tests) */
     detail det;                     /* in force now */
+    int engine;                     /* the card's transform engine does lighting, fog, buffers (detail_engine) */
+    int fog_on;                     /* GL fog drawn (detail_fog), else the haze */
     const char *budget_path;
     menu men;                       /* the title, pause and options screens */
     int title_wanted;               /* -title (tests: the title even with -test) */

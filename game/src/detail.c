@@ -12,7 +12,7 @@ const char *const detail_name[DETAILS] = { "low", "medium", "high" };
 static const detail defaults[DETAILS] = {
     { 110.0f, 1, 8, 24, 12, 4, 110.0f, 0, 52.0f, 0 },
     { 140.0f, 2, 12, 48, 24, 3, 160.0f, 1, 24.0f, 0 },
-    { 180.0f, 2, 16, 64, 32, 2, 220.0f, 2, 20.0f, 0 },
+    { 180.0f, 2, 16, 64, 32, 2, 220.0f, 2, 20.0f, 2 },
 };
 
 static float num(const dgk_cfg *c, const char *preset, const char *key, float fallback)
@@ -43,7 +43,7 @@ void detail_load(detail presets[DETAILS], const char *budget_path)
         d->trailers = DGK_CLAMP(num(&c, n, "trailers", d->trailers), 40.0f, 400.0f);
         d->models = (int)DGK_CLAMP(num(&c, n, "models", (float)d->models), 0.0f, 2.0f);
         d->pitch_min = DGK_CLAMP(num(&c, n, "pitch_min", d->pitch_min), 15.0f, 64.0f);
-        d->fog = num(&c, n, "fog", (float)d->fog) != 0;
+        d->fog = (int)DGK_CLAMP(num(&c, n, "fog", (float)d->fog), 0.0f, 2.0f);
     }
     if (read)
         dgk_log("FW-CFG budget %s: low far %.0f, medium far %.0f, high far %.0f", budget_path, presets[0].far,
@@ -67,6 +67,8 @@ int detail_for_renderer(const char *renderer)
 {
     if (!renderer)
         return DETAIL_LOW;
+    if (has(renderer, "RV100"))                     /* the Radeon 7000/VE: no transform engine */
+        return DETAIL_MEDIUM;
     if (has(renderer, "radeon"))
         return DETAIL_HIGH;
     if (has(renderer, "G400") || has(renderer, "G450") || has(renderer, "G550") || has(renderer, "TNT"))
@@ -74,6 +76,16 @@ int detail_for_renderer(const char *renderer)
     if (strncmp(renderer, "DOS-GL", 6) != 0)
         return DETAIL_HIGH;                          /* a desktop's own OpenGL (the Linux build) */
     return DETAIL_LOW;                               /* the G200, the G100, software, anything else */
+}
+
+int detail_engine(const char *extensions)
+{
+    return extensions && strstr(extensions, "GL_DGL_hw_tnl") != NULL;
+}
+
+int detail_fog(const detail *d, int engine)
+{
+    return d->fog == 1 || (d->fog == 2 && engine);
 }
 
 int detail_parse(const char *name)
