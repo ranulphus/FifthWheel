@@ -6,6 +6,8 @@ FWHEEL.EXE contains code from the libraries below; their notices follow.
 * RetroGPU (MIT licence): DOS-GL, OpenGL 1.1 for Matrox cards under DOS,
   and the HAL, its driver for the Matrox chips.
   https://github.com/ranulphus/RetroGPU
+* GLOS (MIT licence): its FM synthesiser (the driver that plays the
+  music on the FM chip) and its library for programs, through dgk.
 * SDL 3 (zlib licence), with DOS-GL's patches for DOS (OpenGL through
   DOS-GL, and fixes to the DOS port; in RetroGPU's gl/tools/sdl/patches).
   https://libsdl.org

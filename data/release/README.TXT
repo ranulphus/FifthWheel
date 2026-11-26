@@ -35,10 +35,9 @@ STARTING
     SET BLASTER=A220 I5 D1 H5 T6        (your Sound Blaster's settings)
     FWHEEL
 
-Without BLASTER the game's sounds are silent. The music plays on the
-card's FM chip (the Sound Blasters above all have one, as does an AdLib),
-which the game finds by itself. FWHEEL -nosound (in small letters) turns
-both off.
+Without BLASTER the game is silent: its sounds play through the Sound
+Blaster, and its music on the card's FM chip (every Sound Blaster above
+has one). FWHEEL -nosound (in small letters) turns both off.
 
 
 CONTROLS
