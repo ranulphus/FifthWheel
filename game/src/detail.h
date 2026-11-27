@@ -15,7 +15,7 @@ enum { DETAIL_LOW, DETAIL_MEDIUM, DETAIL_HIGH, DETAILS };
 typedef struct detail {
     float far;                  /* metres: the far plane, and the world's reach round the target */
     /* metres: the far plane instead where the card's transform engine does the work (0: far): the engine's gain
-     * spent on distance (the Radeon 7500 and 7200; the owner, 2026-11-27) */
+     * spent on distance (the Radeon 7500 and 7200, the Quadro2 MXR; the owner, 2026-11-27) */
     float far_engine;
     int zoom_max;               /* the furthest zoom allowed: 0 near, 1 normal, 2 far */
     int coins, confetti, dust;  /* flourishes at once (at most fx's pools) */
@@ -24,7 +24,7 @@ typedef struct detail {
     int models;                 /* how round the models are: 0 boxes, 1 rounded, 2 rounder */
     float pitch_min;            /* degrees down: how low the camera comes at speed (under 30: sky and fog) */
     /* GL fog when the camera sees that far: 1 always, 2 only where the card's transform engine fogs (DOS-GL's
-     * GL_DGL_hw_tnl: the Radeon 7500 and 7200); else (0, or 2 elsewhere) sky.c's haze on the screen instead. */
+     * GL_DGL_hw_tnl: the Radeon 7500 and 7200, the Quadro2 MXR); else (0, or 2 elsewhere) sky.c's haze instead. */
     int fog;
 } detail;
 
@@ -37,7 +37,8 @@ int  detail_parse(const char *name);          /* "low", "medium", "high"; -1 if 
  * for the G200 (and the G100, the software renderer, anything unknown on
  * DOS-GL), MEDIUM for the G400, G450, the TNT2 and the Radeon 7000/VE
  * (RV100: no transform engine; the owner, 2026-11-26), HIGH for the Radeon
- * 7200 and 7500 (when DOS-GL drives them) and a desktop's own OpenGL. From
+ * 7200 and 7500 (when DOS-GL drives them), the Quadro2 MXR (its transform
+ * engine; the owner, 2026-11-27) and a desktop's own OpenGL. From
  * glGetString(GL_RENDERER): "DOS-GL on MGA-G450" and the like. */
 int  detail_for_renderer(const char *renderer);
 /* Whether the card's transform engine does the work (DOS-GL's GL_DGL_hw_tnl in glGetString(GL_EXTENSIONS)):

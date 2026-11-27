@@ -78,6 +78,7 @@ static void presets(void)
     CHECK(detail_for_renderer("DOS-GL on Radeon 7500 (RV200)") == DETAIL_HIGH, "Radeon 7500 (RV200): high");
     CHECK(detail_for_renderer("DOS-GL on Radeon (R100)") == DETAIL_HIGH, "Radeon 7200 (R100): high");
     CHECK(detail_for_renderer("DOS-GL on Radeon 7000 / VE (RV100)") == DETAIL_MEDIUM, "Radeon 7000 (RV100): medium");
+    CHECK(detail_for_renderer("DOS-GL on Quadro2 MXR") == DETAIL_HIGH, "Quadro2 MXR: high");
     CHECK(detail_engine("GL_ARB_multitexture GL_DGL_hw_tnl GL_EXT_fog_coord") && !detail_engine("GL_ARB_multitexture")
               && !detail_engine(NULL), "the transform engine from GL_EXTENSIONS");
     {

@@ -115,7 +115,9 @@ Each preset is meant for a card (the owner, 2026-11-19): LOW for the
 Matrox G200 (the minimum machine, a Pentium II 266, at 30 frames a
 second), MEDIUM for the G400, G450 and the RIVA TNT2, HIGH for the ATI
 Radeon 7200 and 7500 once DOS-GL drives them (a Radeon transforms vertices
-itself, so HIGH need not keep to what a CPU can transform). The game
+itself, so HIGH need not keep to what a CPU can transform) and the Quadro2
+MXR (its transform engine under DOS-GL; the owner, 2026-11-27, to be timed
+there). The game
 starts at the preset meant for the card it finds (`detail_for_renderer`,
 from DOS-GL's renderer name; a desktop's own OpenGL gets HIGH) unless
 `-detail` or the options' choice in `FWHEEL.CFG` says otherwise; tests start
@@ -249,8 +251,9 @@ frames a second on a Pentium II 266 with a G200.
   turns (`mb_relight`: the sun stays put in the world), with a plastic
   toy's glint where its surfaces face halfway between the sun and straight
   up: a few hundred dot products a frame on the CPU.
-- **On a transform engine** (the Radeon 7500 and 7200: DOS-GL's
-  `GL_DGL_hw_tnl`; the owner, 2026-11-26) HIGH hands the card the work: the
+- **On a transform engine** (the Radeon 7500 and 7200, and since RetroGPU
+  37f1e44 the Quadro2 MXR: DOS-GL's `GL_DGL_hw_tnl`; the owner, 2026-11-26)
+  HIGH hands the card the work: the
   world's vertices go into two buffer objects (one per pack) and each chunk
   is drawn from its offset; the lorry and the cars are lit by GL's own
   light (`meshlit.c`: the same sun, ambient and glint as `mb_relight`); and

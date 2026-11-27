@@ -73,6 +73,10 @@ int detail_for_renderer(const char *renderer)
         return DETAIL_MEDIUM;
     if (has(renderer, "radeon"))
         return DETAIL_HIGH;
+    /* The Quadro2 MXR (NV11): DOS-GL's transform engine on its Celsius (RetroGPU 37f1e44; the owner, 2026-11-27).
+     * The NV11's GeForce2 names stay unknown (LOW) until one is seen working there. */
+    if (has(renderer, "Quadro2"))
+        return DETAIL_HIGH;
     if (has(renderer, "G400") || has(renderer, "G450") || has(renderer, "G550") || has(renderer, "TNT"))
         return DETAIL_MEDIUM;
     if (strncmp(renderer, "DOS-GL", 6) != 0)
