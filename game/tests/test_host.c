@@ -89,7 +89,14 @@ static void presets(void)
         CHECK(detail_fog(&d, 0), "fog 1: always");
         d.fog = 0;
         CHECK(!detail_fog(&d, 1), "fog 0: never");
+        d.far = 180.0f;
+        CHECK(detail_far(&d, 1) == 180.0f, "no far_engine: far on the engine too");
+        d.far_engine = 400.0f;
+        CHECK(detail_far(&d, 1) == 400.0f && detail_far(&d, 0) == 180.0f, "far_engine only on the engine");
     }
+    detail_load(p, NULL);
+    CHECK(p[DETAIL_HIGH].far_engine == 400.0f && p[DETAIL_MEDIUM].far_engine == 0.0f
+              && p[DETAIL_LOW].far_engine == 0.0f, "HIGH alone sees further on the engine");
     CHECK(detail_for_renderer("Mesa Intel(R) UHD Graphics") == DETAIL_HIGH, "a desktop's GL: high");
     CHECK(detail_for_renderer(NULL) == DETAIL_LOW, "no renderer: low");
 }

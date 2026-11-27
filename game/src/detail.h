@@ -14,6 +14,9 @@ enum { DETAIL_LOW, DETAIL_MEDIUM, DETAIL_HIGH, DETAILS };
 
 typedef struct detail {
     float far;                  /* metres: the far plane, and the world's reach round the target */
+    /* metres: the far plane instead where the card's transform engine does the work (0: far): the engine's gain
+     * spent on distance (the Radeon 7500 and 7200; the owner, 2026-11-27) */
+    float far_engine;
     int zoom_max;               /* the furthest zoom allowed: 0 near, 1 normal, 2 far */
     int coins, confetti, dust;  /* flourishes at once (at most fx's pools) */
     int minimap_step;           /* road points one minimap segment spans */
@@ -41,6 +44,7 @@ int  detail_for_renderer(const char *renderer);
  * lighting, fog and buffer objects in its memory. */
 int  detail_engine(const char *extensions);
 int  detail_fog(const detail *d, int engine);  /* whether GL fog is drawn (else the haze) */
+float detail_far(const detail *d, int engine); /* the far plane: far_engine on the engine (if set), else far */
 
 /* The governor: fed each frame's milliseconds, it steps down a notch after
  * 2 s averaging slower than 36 ms (under 28 fps) and back up after 6 s

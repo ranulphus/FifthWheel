@@ -10,9 +10,9 @@
 const char *const detail_name[DETAILS] = { "low", "medium", "high" };
 
 static const detail defaults[DETAILS] = {
-    { 110.0f, 1, 8, 24, 12, 4, 110.0f, 0, 52.0f, 0 },
-    { 140.0f, 2, 12, 48, 24, 3, 160.0f, 1, 24.0f, 0 },
-    { 180.0f, 2, 16, 64, 32, 2, 220.0f, 2, 20.0f, 2 },
+    { 110.0f, 0.0f, 1, 8, 24, 12, 4, 110.0f, 0, 52.0f, 0 },
+    { 140.0f, 0.0f, 2, 12, 48, 24, 3, 160.0f, 1, 24.0f, 0 },
+    { 180.0f, 400.0f, 2, 16, 64, 32, 2, 220.0f, 2, 20.0f, 2 },
 };
 
 static float num(const dgk_cfg *c, const char *preset, const char *key, float fallback)
@@ -35,6 +35,8 @@ void detail_load(detail presets[DETAILS], const char *budget_path)
         if (!read)
             continue;
         d->far = DGK_CLAMP(num(&c, n, "far", d->far), 60.0f, 400.0f);
+        d->far_engine = num(&c, n, "far_engine", d->far_engine);
+        d->far_engine = d->far_engine > 0.0f ? DGK_CLAMP(d->far_engine, 60.0f, 400.0f) : 0.0f;
         d->zoom_max = (int)DGK_CLAMP(num(&c, n, "zoom_max", (float)d->zoom_max), 0.0f, 2.0f);
         d->coins = (int)DGK_CLAMP(num(&c, n, "coins", (float)d->coins), 0.0f, (float)FX_COINS);
         d->confetti = (int)DGK_CLAMP(num(&c, n, "confetti", (float)d->confetti), 0.0f, (float)FX_CONFETTI);
@@ -46,8 +48,8 @@ void detail_load(detail presets[DETAILS], const char *budget_path)
         d->fog = (int)DGK_CLAMP(num(&c, n, "fog", (float)d->fog), 0.0f, 2.0f);
     }
     if (read)
-        dgk_log("FW-CFG budget %s: low far %.0f, medium far %.0f, high far %.0f", budget_path, presets[0].far,
-                presets[1].far, presets[2].far);
+        dgk_log("FW-CFG budget %s: low far %.0f, medium far %.0f, high far %.0f (%.0f on the engine)", budget_path,
+                presets[0].far, presets[1].far, presets[2].far, detail_far(&presets[2], 1));
 }
 
 static int has(const char *s, const char *word)
@@ -86,6 +88,11 @@ int detail_engine(const char *extensions)
 int detail_fog(const detail *d, int engine)
 {
     return d->fog == 1 || (d->fog == 2 && engine);
+}
+
+float detail_far(const detail *d, int engine)
+{
+    return engine && d->far_engine > 0.0f ? d->far_engine : d->far;
 }
 
 int detail_parse(const char *name)

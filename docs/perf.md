@@ -272,3 +272,37 @@ old look on the P3, 3% on the 300PL. The haze build (1a6e46f) itself is
 yet to be timed on either; it adds three overlay quads to the runs
 "without fog" above.
 
+## The Radeon's transform engine (2026-11-27)
+
+The P3 with a Radeon 7500 (RV200) under GLOS, 640x480, `DGL_VSYNC=0`,
+`DGL_RADEON_VRAM=16-33`, 2,969 timed frames, one EXE: `FW_ENGINE=0` is the
+path every other card takes (client arrays, `mb_relight`, the haze),
+`FW_ENGINE=1` the engine's (buffer objects, GL lighting, GL fog). FW1 is
+`-autopilot -frames 3000` at the card's own preset (HIGH), FW1H the same at
+`-detail high -zoom 2`. "Busiest" is the slowest one-second DGL-STAT.
+
+| Build, run | fps | busiest s | median s |
+|---|---|---|---|
+| RetroGPU ee40d4a, FW1H, no engine, 180 m | 68.6 | 43.4 | 79.8 |
+| ee40d4a, FW1H, engine, GL fog (no hint) | 67.6 | | |
+| ee40d4a, FW1H, engine, the haze | 75.6 | | |
+| DOS-GL foghint 70affbd, FW1H, engine, GL fog, 180 m | 77.1 | 53.0 | 84.8 |
+| foghint, FW1H, engine, 240 m | 73.9 | 53.2 | 79.9 |
+| foghint, FW1H, engine, 300 m | 71.5 | 53.2 | 76.0 |
+| foghint, FW1H, engine, 360 m | 70.1 | 53.1 | 74.2 |
+| foghint, FW1H, engine, 400 m | 69.8 | 53.1 | 73.4 |
+| ee40d4a, FW1, no engine, 180 m | 74.1 | 44.4 | 83.7 |
+| foghint, FW1, engine, 180 m | 83.5 | 58.6 | 89.2 |
+| foghint, FW1, engine, 400 m | 75.7 | 58.5 | 77.7 |
+
+Without the hint DOS-GL sends a fogged draw to the CPU when any of its
+triangles spans more than a tenth of the fade (10.8 m at 180 m), 64% of
+HIGH's draws (DGL-TNLSTAT `fog_to_cpu`), and the engine path is 2% slower
+than none; with `GL_FASTEST` none goes, and the engine is 12% faster. The
+busiest second (a town) is the same at every distance: the far plane costs
+only on open road. HIGH sees 400 m on the engine (the owner, 2026-11-27):
+its busiest second 53 fps against 43 without the engine, its average level
+with HIGH at 180 m without it. Triangles a frame at FW1H: 5,088 at 180 m,
+6,803 at 300, 7,257 at 400. DOS-GL's buffer cache holds: `vbo_made` settles
+at 59 (180 m) to 89 (360 m) and stays there through a run.
+

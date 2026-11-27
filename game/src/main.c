@@ -221,6 +221,7 @@ static void dock_pose(game *g)
 static void detail_apply(game *g)
 {
     g->det = detail_effective(g->presets, g->detail_chosen, g->gov.notch);
+    g->det.far = detail_far(&g->det, g->engine);
     g->fog_on = detail_fog(&g->det, g->engine);
     g->cam.pitch_min = g->det.pitch_min * 3.14159265f / 180.0f;
     g->w.models = g->det.models;                     /* the world's runs for this detail (CVAR) */
@@ -262,8 +263,8 @@ static void detail_start(game *g)
     g->gov.on = !dgk_app.fixed && !dgk_test_active() && dgk_cfg_int(&g->cfg, "governor", 1);
     g->cam.zoom = g->zoom_wanted >= 0 ? g->zoom_wanted : 1;
     detail_apply(g);
-    dgk_log("FW-CFG detail %s (%s), governor %s, transform engine %s, fog %s", detail_name[g->detail_chosen], why,
-            g->gov.on ? "on" : "off", g->engine ? "yes" : "no", g->fog_on ? "GL" : "haze");
+    dgk_log("FW-CFG detail %s (%s), governor %s, transform engine %s, fog %s, far %.0f m", detail_name[g->detail_chosen],
+            why, g->gov.on ? "on" : "off", g->engine ? "yes" : "no", g->fog_on ? "GL" : "haze", g->det.far);
 }
 
 /* -highlights' pieces and the gaps between them (below). */

@@ -248,8 +248,17 @@ frames a second on a Pentium II 266 with a G200.
   ambient). The lorry keeps each vertex's normal and is lit again as it
   turns (`mb_relight`: the sun stays put in the world), with a plastic
   toy's glint where its surfaces face halfway between the sun and straight
-  up. DOS-GL has no OpenGL lighting; this is a few hundred dot products a
-  frame.
+  up: a few hundred dot products a frame on the CPU.
+- **On a transform engine** (the Radeon 7500 and 7200: DOS-GL's
+  `GL_DGL_hw_tnl`; the owner, 2026-11-26) HIGH hands the card the work: the
+  world's vertices go into two buffer objects (one per pack) and each chunk
+  is drawn from its offset; the lorry and the cars are lit by GL's own
+  light (`meshlit.c`: the same sun, ambient and glint as `mb_relight`); and
+  the world ends in GL fog from 0.4 of the far plane to it, with
+  `GL_FOG_HINT` `GL_FASTEST` (per-vertex fog, as a DirectX 7 card fogs, which
+  DOS-GL then keeps on the engine). The gain is spent on distance: HIGH sees
+  400 m there instead of 180 (`far_engine` in BUDGET.CFG). `FW_ENGINE=0` or
+  `1` overrides what the card says, to see either path anywhere.
 
 ## The HUD and the menus (game/src/ui.c, hud.c, menu.c, garage.c)
 
