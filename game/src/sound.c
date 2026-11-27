@@ -278,7 +278,7 @@ int sound_test_tick(uint32_t tick)
 {
     static const struct { uint32_t at; const char *what; } steps[] = {
         { 0, "reference 440 Hz" }, { 42, "horn" }, { 90, "beeper" }, { 138, "chime" }, { 192, "clunk" },
-        { 216, "thud" }, { 240, "screech" }, { 288, "engine" }, { 420, "end" }
+        { 216, "thud" }, { 240, "screech" }, { 288, "engine" }, { 408, "silence" }, { 528, "end" }
     };
     int i;
     for (i = 0; i < (int)DGK_ARRAY_LEN(steps); i++)
@@ -320,5 +320,8 @@ int sound_test_tick(uint32_t tick)
         engine(600.0f + (tick - 288) * (1600.0f / 120.0f), 1.0f);
     else if (tick == 408)
         sound_stop();
-    return tick < 420;
+    /* Then 2 s of silence before the test ends: the Sound Blaster still has chunks queued, and 86Box records the
+     * WAV in real time until the run ends, so when it ran slow the last sounds fell off the end of the recording
+     * (sb16's 784 and 1900 Hz missing, every chunk played). Ticks are the guest's, so the margin stretches with it. */
+    return tick < 528;
 }

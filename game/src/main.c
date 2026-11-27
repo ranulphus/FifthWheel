@@ -5,7 +5,7 @@
  *   FWHEEL -dockpose                     a trailer reversing into a bay, held still (pictures)
  *   FWHEEL -pose X:Y:H:V                 the rig held at (X, Y) heading H degrees, the camera
  *                                        as at V m/s (pictures of a place at speed)
- *   FWHEEL -soundtest                    each sound in turn, then quit (the SOUND suite)
+ *   FWHEEL -soundtest                    each sound in turn, 2 s of silence, then quit (the SOUND suite)
  *   FWHEEL -musictest                    the driving tunes on the FM chip in a test (FW-MUSIC lines)
  *   FWHEEL -musictune NAME               that tune alone, looped (title, garage, drive1 ...)
  *   FWHEEL -fxtest                       every flourish far past its cap for 2 s (HX-TEST fx-caps)
