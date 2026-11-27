@@ -110,12 +110,16 @@ DJAR := env LD_LIBRARY_PATH=$(DJGPP_PREFIX)/hostlib $(DJGPP_PREFIX)/bin/i586-pc-
 DOS_CFLAGS := $(COMMON) -march=i586 -fexcess-precision=standard -I$(DOSGL)/include \
               -I$(DOSGL)/build/sdl/dos/include -I$(MGAHAL)/tests/shim -I$(MGAHAL)/hal/include -DHX_BUILD_ID='"$(BUILD_ID)"' \
               $(DGK_MIDI_DOS_CFLAGS)
-DOS_LIBS := $(DOSGL)/build/sdl/dos/lib/libSDL3.a $(DOSGL)/build/lib/libGL.a build/dgk/dos/libdgkmidi.a -lm
-# dgk's music's library (dgk/libs.mk): GLOS's FM driver and instruments, sdk/fm and libglos, from GLOS's checkout.
+DOS_LIBS := $(DOSGL)/build/sdl/dos/lib/libSDL3.a $(DOSGL)/build/lib/libGL.a build/dgk/dos/libdgkmidi.a \
+            build/dgk/dos/libdgkglos.a -lm
+# dgk's music's libraries (dgk/libs.mk), from GLOS's checkout: libdgkmidi.a (GLOS's FM driver and instruments,
+# sdk/fm) and libdgkglos.a (GLOS's own library, sdk/libglos), linked in that order; no network, so no libdgknet.a.
 build/dgk/dos/libdgkmidi.a: FORCE
 	$(Q)$(MAKE) -s -f $(DGK_LIBS_MK) OUT=build/dgk GLOS=$(GLOS) DJCC="$(DJCC)" DJAR="$(DJAR)" dos
+build/dgk/dos/libdgkglos.a: build/dgk/dos/libdgkmidi.a
 build/dos/FWHEEL.EXE: build/data/WORLD.PAK $(KIT_SRCS) $(DGK_SDL) $(GAME_SRCS) $(GEN_SRCS) $(HDRS) $(MGAHAL)/tests/shim/hx.c \
-                      $(DOSGL)/build/sdl/dos/lib/libSDL3.a $(DOSGL)/build/lib/libGL.a build/dgk/dos/libdgkmidi.a
+                      $(DOSGL)/build/sdl/dos/lib/libSDL3.a $(DOSGL)/build/lib/libGL.a build/dgk/dos/libdgkmidi.a \
+                      build/dgk/dos/libdgkglos.a
 	@mkdir -p $(dir $@)
 	$(Q)echo "  DJLD    $@"
 	$(Q)$(DJCC) $(DOS_CFLAGS) -o $@ $(KIT_SRCS) $(DGK_SDL) $(GAME_SRCS) $(GEN_SRCS) \
