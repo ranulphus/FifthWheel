@@ -69,13 +69,14 @@ music (`dgk/midi.h`), which plays General MIDI wherever the game runs; the
 game has no hardware code of its own (the owner's rule: dgk is the one place
 for it). On plain DOS, and full screen under GLOS, that is the FM chip at
 388h (only when BLASTER says there is a Sound Blaster) played by GLOS's own
-FM driver (sdk/fm) with dgk's instruments; as a GLOS app, GLOS's MIDI ports;
+FM driver (sdk/fm) with its instruments; as a GLOS app, GLOS's MIDI ports;
 off DOS, the same driver and instruments on an emulated OPL3 (ymfm) in dgk's
-mix. dgk's instruments are Fifth Wheel's own seventeen (piano, electric
+mix. The instruments are Fifth Wheel's own seventeen (piano, electric
 piano, vibes, marimba, glockenspiel, organ, reed, clarinet, flute, trumpet,
 trombone, sax, strings, guitar, banjo, bass, tuba), extended to all of
 General MIDI and its drums: the owner, hearing both on bench A, chose them
-over Freedoom's bank (GLOS's), which made the bossa "like having tinnitus".
+over Freedoom's bank, which made the bossa "like having tinnitus", and they
+became GLOS's own (kernel/drv/fmbank.c; changed in GLOS's tools/mkfmbank.py).
 The driver plays 18 voices on an OPL3 (9 on an OPL2); the tunes hold at most
 six notes at once besides the drums. MUSIC (0-10) scales every channel's
 volume (CC7) by tenths. Without a chip, or with -nosound, there is quietly no
