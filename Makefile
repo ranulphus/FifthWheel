@@ -183,7 +183,7 @@ loopa: dos
 shots: dos headless
 	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) sh tools/shots.sh $(CARD)
 
-suite: dos
+suite: dos headless
 	$(Q)MGAHAL=$(MGAHAL) DEV=$(DEV) tools/suite.sh $(CARD) $(CHECKS)
 
 # Unit tests that need no screen: the host's compiler, the kit's and the game's pure parts.
