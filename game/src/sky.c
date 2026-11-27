@@ -50,10 +50,13 @@ int sky_fog(float view_pitch, float eye_height, float far)
     c[3] = 1.0f;
     glFogi(GL_FOG_MODE, GL_LINEAR);
     glFogfv(GL_FOG_COLOR, c);
-    /* Linear, from 0.4 of the far plane to it: a fade 100 m long or more (at HIGH's far plane), which DOS-GL keeps
-     * on the Radeons' transform engine (its advice, 2026-11-26), and nothing left unfogged at the far plane. */
+    /* Linear, from 0.4 of the far plane to it: nothing left unfogged at the far plane. */
     glFogf(GL_FOG_START, far * 0.4f);
     glFogf(GL_FOG_END, far);
+    /* Per-vertex fog is enough, as a DirectX 7 card fogs: DOS-GL then keeps every fogged draw on the Radeons'
+     * transform engine. Without the hint a draw with any triangle deeper than a tenth of the fade (10.8 m at HIGH)
+     * goes to the CPU, which splits it: 64% of HIGH's draws on the P3, 2% slower than no engine (2026-11-27). */
+    glHint(GL_FOG_HINT, GL_FASTEST);
     glEnable(GL_FOG);
     return 1;
 }
