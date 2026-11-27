@@ -35,10 +35,11 @@ void detail_load(detail presets[DETAILS], const char *budget_path);
 int  detail_parse(const char *name);          /* "low", "medium", "high"; -1 if neither */
 /* The preset a card is meant for (the owner's targets, 2026-11-19): LOW
  * for the G200 (and the G100, the software renderer, anything unknown on
- * DOS-GL), MEDIUM for the G400, G450, the TNT2 and the Radeon 7000/VE
- * (RV100: no transform engine; the owner, 2026-11-26), HIGH for the Radeon
- * 7200 and 7500 (when DOS-GL drives them), the Quadro2 MXR (its transform
- * engine; the owner, 2026-11-27) and a desktop's own OpenGL. From
+ * DOS-GL), MEDIUM for the G400, G450, the TNT2, the Radeon 7000/VE (RV100:
+ * no transform engine; the owner, 2026-11-26), the Rage 128 Pro and the
+ * GeForce2 MX 100/200, HIGH for the Radeon 7200 and 7500 (when DOS-GL drives
+ * them), the Quadro2 MXR, the GeForce2 MX and Go (their transform engine;
+ * the owner, 2026-11-27) and a desktop's own OpenGL. From
  * glGetString(GL_RENDERER): "DOS-GL on MGA-G450" and the like. */
 int  detail_for_renderer(const char *renderer);
 /* Whether the card's transform engine does the work (DOS-GL's GL_DGL_hw_tnl in glGetString(GL_EXTENSIONS)):

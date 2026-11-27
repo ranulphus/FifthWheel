@@ -79,6 +79,10 @@ static void presets(void)
     CHECK(detail_for_renderer("DOS-GL on Radeon (R100)") == DETAIL_HIGH, "Radeon 7200 (R100): high");
     CHECK(detail_for_renderer("DOS-GL on Radeon 7000 / VE (RV100)") == DETAIL_MEDIUM, "Radeon 7000 (RV100): medium");
     CHECK(detail_for_renderer("DOS-GL on Quadro2 MXR") == DETAIL_HIGH, "Quadro2 MXR: high");
+    CHECK(detail_for_renderer("DOS-GL on GeForce2 MX") == DETAIL_HIGH, "GeForce2 MX: high");
+    CHECK(detail_for_renderer("DOS-GL on GeForce2 Go") == DETAIL_HIGH, "GeForce2 Go: high");
+    CHECK(detail_for_renderer("DOS-GL on GeForce2 MX 100/200") == DETAIL_MEDIUM, "GeForce2 MX 100/200: medium");
+    CHECK(detail_for_renderer("DOS-GL on ATI Rage 128 Pro") == DETAIL_MEDIUM, "Rage 128 Pro: medium");
     CHECK(detail_engine("GL_ARB_multitexture GL_DGL_hw_tnl GL_EXT_fog_coord") && !detail_engine("GL_ARB_multitexture")
               && !detail_engine(NULL), "the transform engine from GL_EXTENSIONS");
     {

@@ -73,10 +73,17 @@ int detail_for_renderer(const char *renderer)
         return DETAIL_MEDIUM;
     if (has(renderer, "radeon"))
         return DETAIL_HIGH;
-    /* The Quadro2 MXR (NV11): DOS-GL's transform engine on its Celsius (RetroGPU 37f1e44; the owner, 2026-11-27).
-     * The NV11's GeForce2 names stay unknown (LOW) until one is seen working there. */
-    if (has(renderer, "Quadro2"))
+    /* The NV11 (DOS-GL's transform engine on its Celsius, RetroGPU 37f1e44; the owner, 2026-11-27): the Quadro2
+     * MXR, timed on bench E, and the GeForce2 MX (MX 400) and Go with its 128-bit memory at HIGH; the MX 100/200
+     * (a 32- or 64-bit bus) a level lower until one is measured. */
+    if (has(renderer, "GeForce2 MX 100"))
+        return DETAIL_MEDIUM;
+    if (has(renderer, "Quadro2") || has(renderer, "GeForce2"))
         return DETAIL_HIGH;
+    /* The Rage 128 Pro (no transform engine): FW1 at MEDIUM 85 fps on bench A, its busiest second 63 (the
+     * owner, 2026-11-27) */
+    if (has(renderer, "Rage 128"))
+        return DETAIL_MEDIUM;
     if (has(renderer, "G400") || has(renderer, "G450") || has(renderer, "G550") || has(renderer, "TNT"))
         return DETAIL_MEDIUM;
     if (strncmp(renderer, "DOS-GL", 6) != 0)

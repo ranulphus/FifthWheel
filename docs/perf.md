@@ -272,6 +272,34 @@ old look on the P3, 3% on the 300PL. The haze build (1a6e46f) itself is
 yet to be timed on either; it adds three overlay quads to the runs
 "without fog" above.
 
+## The Quadro2 MXR and the Rage 128 Pro (2026-11-27)
+
+Bench E (a Tualatin 1133 with a Quadro2 MXR, NV11: DOS-GL's transform
+engine on its Celsius) and bench A (a Pentium II with a Rage 128 Pro), FW
+main b3ce5d9 with the NV11 at HIGH, RetroGPU 446b928, 640x480,
+`DGL_VSYNC=0`, 2,969 frames; "busiest" the slowest one-second DGL-STAT:
+
+| Card, run | fps | busiest s |
+|---|---|---|
+| Quadro2, FW1, HIGH, engine, 400 m | 66.8 | 46.4 |
+| Quadro2, FW1H, HIGH, engine, 400 m | 67.4 | 48.1 |
+| Quadro2, FW1, HIGH, engine, 180 m | 71.2 | 45.9 |
+| Quadro2, FW1, HIGH, `FW_ENGINE=0` (180 m, the haze) | 61.1 | 38.7 |
+| Quadro2, FW1, HIGH, `DGL_TNL=0` | 50.0 | 32.6 |
+| Quadro2, FW1, MEDIUM, engine | 77.5 | 52.7 |
+| Rage 128 Pro, FW1, LOW | 132.4 | 110.8 |
+| Rage 128 Pro, FW1, MEDIUM | 85.3 | 63.3 |
+| Rage 128 Pro, FW1, HIGH | 41.6 | 27.8 |
+
+On the Quadro2 the engine path is 16% faster than FW's other one, the far
+plane's 400 m costs 6% on average and nothing at the busiest second, and
+no fogged draw goes to the CPU. The owner chose HIGH for it (and the
+GeForce2 MX and Go), MEDIUM for the Rage 128 Pro and the GeForce2 MX
+100/200. With `DGL_VSYNC=0` a frame faster than the refresh was drawn into
+the buffer still shown on the Rage 128 (its flip waited for the retrace):
+the owner saw frames painted; DOS-GL's r128flip (45ee486) flips at the
+next scan line instead, and the owner saw it clean.
+
 ## The Radeon's transform engine (2026-11-27)
 
 The P3 with a Radeon 7500 (RV200) under GLOS, 640x480, `DGL_VSYNC=0`,
