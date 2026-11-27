@@ -300,6 +300,22 @@ the buffer still shown on the Rage 128 (its flip waited for the retrace):
 the owner saw frames painted; DOS-GL's r128flip (45ee486) flips at the
 next scan line instead, and the owner saw it clean.
 
+## LOW's lower camera and the hulled shadows (2026-11-27)
+
+LOW at speed comes down to 40 degrees (was 52) and aims 1.2 s of travel
+ahead (was 0.6); every building's baked shadow is the hull of its footprint
+and the footprint's shifted copy (four triangles where there were two).
+Headless, FW1 (`-autopilot -frames 3000`), triangles a frame, mean / most:
+
+| Preset | before | after |
+|---|---|---|
+| LOW | 968 / 1,287 | 1,020 / 1,361 |
+| MEDIUM | 3,370 / 5,344 | 3,383 / 5,402 |
+
+LOW stays well inside its working budget (about 2,700). In the frames
+checked at speed (headless, 49 km/h on the tour) no hard edge of the world
+shows: the haze lies over the far ground.
+
 ## The Radeon's transform engine (2026-11-27)
 
 The P3 with a Radeon 7500 (RV200) under GLOS, 640x480, `DGL_VSYNC=0`,

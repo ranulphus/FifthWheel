@@ -215,7 +215,10 @@ frames a second on a Pentium II 266 with a G200.
   buildings in the middles of towns flat-roofed with a parapet and rows of
   windows; each about 30 to 60 triangles, flat-shaded, the walls darker at
   their feet. A depot's warehouse has an arched roof. Their contact shadows
-  take the ground's own colour, darker. A town's streets are laid in 16 m
+  take the ground's own colour, darker, and reach from the walls' feet to
+  where the sun throws the roof (the footprint and its copy 0.35 of the
+  height to the south-east, hulled: a copy alone left sunlit ground at two
+  corners and the building seemed to float, the owner, 2026-11-27). A town's streets are laid in 16 m
   pieces: one quad from end to end went to the chunk holding its middle and
   was drawn only while that chunk was in view, at every detail.
 - **Depots** have each bay's number painted in it (between its lines, near
@@ -233,8 +236,10 @@ frames a second on a Pentium II 266 with a G200.
   town's middle, where the roads meet and run over one another.
 - **The camera** follows speed (the owner's idea): 64 degrees down for
   manoeuvring, easing down from 18 km/h to the preset's `pitch_min` by 61
-  km/h (LOW 52, MEDIUM 24, HIGH 20 degrees), closer and looking a little
-  higher as it comes down, back up quickly when the rig slows (coupling
+  km/h (LOW 40, MEDIUM 24, HIGH 20 degrees), closer and looking a little
+  higher as it comes down, and aiming ahead of the rig by the preset's
+  `lookahead` of travel (LOW 1.2 s, MEDIUM and HIGH 0.6: at LOW's 52 degrees
+  and 0.6 s the owner found little road ahead, 2026-11-27), back up quickly when the rig slows (coupling
   and docking keep their 75-degree view). At MEDIUM and HIGH the horizon
   comes into the picture: the sky is a gradient above it (sky.c), and a
   haze in the horizon's colour, drawn on the screen over the rows where the

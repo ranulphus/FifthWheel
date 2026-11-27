@@ -10,9 +10,9 @@
 const char *const detail_name[DETAILS] = { "low", "medium", "high" };
 
 static const detail defaults[DETAILS] = {
-    { 110.0f, 0.0f, 1, 8, 24, 12, 4, 110.0f, 0, 52.0f, 0 },
-    { 140.0f, 0.0f, 2, 12, 48, 24, 3, 160.0f, 1, 24.0f, 0 },
-    { 180.0f, 400.0f, 2, 16, 64, 32, 2, 220.0f, 2, 20.0f, 2 },
+    { 110.0f, 0.0f, 1, 8, 24, 12, 4, 110.0f, 0, 40.0f, 0, 1.2f },
+    { 140.0f, 0.0f, 2, 12, 48, 24, 3, 160.0f, 1, 24.0f, 0, 0.6f },
+    { 180.0f, 400.0f, 2, 16, 64, 32, 2, 220.0f, 2, 20.0f, 2, 0.6f },
 };
 
 static float num(const dgk_cfg *c, const char *preset, const char *key, float fallback)
@@ -46,6 +46,7 @@ void detail_load(detail presets[DETAILS], const char *budget_path)
         d->models = (int)DGK_CLAMP(num(&c, n, "models", (float)d->models), 0.0f, 2.0f);
         d->pitch_min = DGK_CLAMP(num(&c, n, "pitch_min", d->pitch_min), 15.0f, 64.0f);
         d->fog = (int)DGK_CLAMP(num(&c, n, "fog", (float)d->fog), 0.0f, 2.0f);
+        d->lookahead = DGK_CLAMP(num(&c, n, "lookahead", d->lookahead), 0.0f, 2.0f);
     }
     if (read)
         dgk_log("FW-CFG budget %s: low far %.0f, medium far %.0f, high far %.0f (%.0f on the engine)", budget_path,

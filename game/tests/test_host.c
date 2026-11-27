@@ -54,6 +54,8 @@ static void presets(void)
     FILE *f;
     detail_load(p, NULL);
     CHECK(p[DETAIL_LOW].far < p[DETAIL_MEDIUM].far && p[DETAIL_MEDIUM].far < p[DETAIL_HIGH].far, "far planes in order");
+    CHECK(p[DETAIL_LOW].lookahead > p[DETAIL_MEDIUM].lookahead && p[DETAIL_LOW].pitch_min < 52.0f,
+          "LOW looks further ahead, and lower than it did");
     d = detail_effective(p, DETAIL_MEDIUM, 1);
     CHECK(d.far == p[DETAIL_LOW].far && d.confetti == p[DETAIL_LOW].confetti, "a notch below medium is low");
     d = detail_effective(p, DETAIL_LOW, 2);

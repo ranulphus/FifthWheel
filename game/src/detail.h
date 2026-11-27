@@ -26,6 +26,9 @@ typedef struct detail {
     /* GL fog when the camera sees that far: 1 always, 2 only where the card's transform engine fogs (DOS-GL's
      * GL_DGL_hw_tnl: the Radeon 7500 and 7200, the Quadro2 MXR); else (0, or 2 elsewhere) sky.c's haze instead. */
     int fog;
+    /* seconds of travel the camera aims ahead of the rig at speed: LOW's 1.2 (its camera stays higher, the
+     * owner found little road ahead, 2026-11-27), MEDIUM's and HIGH's 0.6 */
+    float lookahead;
 } detail;
 
 extern const char *const detail_name[DETAILS];

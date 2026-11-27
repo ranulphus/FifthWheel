@@ -224,6 +224,7 @@ static void detail_apply(game *g)
     g->det.far = detail_far(&g->det, g->engine);
     g->fog_on = detail_fog(&g->det, g->engine);
     g->cam.pitch_min = g->det.pitch_min * 3.14159265f / 180.0f;
+    g->cam.lookahead = g->det.lookahead;
     g->w.models = g->det.models;                     /* the world's runs for this detail (CVAR) */
     if (g->det.models == 2 && world_load_hi(&g->w) && !g->w.atlas)
         g->w.atlas = tex_atlas();                    /* HIGH's textures: their world loaded the first time */

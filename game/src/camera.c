@@ -37,9 +37,10 @@ static float drive_pitch(const camera *c, const rig *r)
     return PITCH_HIGH + (lo - PITCH_HIGH) * s * s * (3.0f - 2.0f * s);
 }
 
-static void target(const rig *r, int zoom, float *x, float *y, float *dist)
+static void target(const camera *c, const rig *r, float *x, float *y, float *dist)
 {
-    float ax, ay, ahead = r->v > 0 ? 0.6f * r->v : 0;
+    float ax, ay, ahead = r->v > 0 ? (c->lookahead > 0 ? c->lookahead : 0.6f) * r->v : 0;
+    int zoom = c->zoom;
     rig_trailer_axle(r, &ax, &ay);
     *x = (r->x + 2.0f * cosf(r->heading) + ax) * 0.5f + ahead * cosf(r->heading);
     *y = (r->y + 2.0f * sinf(r->heading) + ay) * 0.5f + ahead * sinf(r->heading);
@@ -53,7 +54,7 @@ void camera_reset(camera *c, const rig *r)
     c->pitch = 64.0f * FW_PI / 180.0f;
     if (c->zoom < 0 || c->zoom > 2)
         c->zoom = 1;
-    target(r, c->zoom, &c->tx, &c->ty, &c->dist);
+    target(c, r, &c->tx, &c->ty, &c->dist);
 }
 
 void camera_tick(camera *c, const rig *r, float dt, const camera_focus *f)
@@ -63,7 +64,7 @@ void camera_tick(camera *c, const rig *r, float dt, const camera_focus *f)
     float err = wrap((f ? f->yaw : r->heading) - c->yaw);
     c->yaw_rate += (w * w * err - 2 * w * c->yaw_rate) * dt;
     c->yaw = wrap(c->yaw + c->yaw_rate * dt);
-    target(r, c->zoom, &tx, &ty, &dist);
+    target(c, r, &tx, &ty, &dist);
     if (f) {
         tx = f->x;
         ty = f->y;

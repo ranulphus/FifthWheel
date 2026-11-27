@@ -16,6 +16,7 @@ typedef struct camera {
     float dist;
     float pitch;                     /* radians down from level */
     float pitch_min;                 /* radians: the lowest it comes at speed (the detail's; 0: 64 degrees) */
+    float lookahead;                 /* seconds of travel it aims ahead at speed (the detail's; 0: 0.6) */
     int zoom;                        /* 0 near, 1 normal, 2 far */
 } camera;
 
