@@ -417,6 +417,47 @@ static void ground_quad(float x0, float y0, float x1, float y1, float x2, float 
     quad(p[0], p[1], p[2], p[3], rgb, light);
 }
 
+/* A box's shadow on the ground: the outline of its footprint swept to the south-east by `off` (its roof's
+ * shadow), corners in ground coordinates, counter-clockwise. The convex hull of the footprint and its shifted
+ * copy, so the shadow meets the walls at their feet; the shifted copy alone left sunlit ground at two corners
+ * and read as a box floating above the ground (the owner, 2026-11-27). Fanned from its first corner, in quads. */
+static void ground_shadow(const float k[4][2], float off, float lift, uint32_t rgb, float light)
+{
+    float p[8][2], h[16][2], t;
+    int n = 0, i, j, lower;
+    for (i = 0; i < 4; i++) {
+        p[i][0] = k[i][0];
+        p[i][1] = k[i][1];
+        p[i + 4][0] = k[i][0] + off;
+        p[i + 4][1] = k[i][1] - off;
+    }
+    for (i = 1; i < 8; i++)                          /* sorted by x, then y (insertion: eight points) */
+        for (j = i; j > 0 && (p[j][0] < p[j - 1][0] || (p[j][0] == p[j - 1][0] && p[j][1] < p[j - 1][1])); j--) {
+            t = p[j][0]; p[j][0] = p[j - 1][0]; p[j - 1][0] = t;
+            t = p[j][1]; p[j][1] = p[j - 1][1]; p[j - 1][1] = t;
+        }
+    /* Andrew's monotone chain: the lower hull left to right, then the upper right to left; counter-clockwise. */
+    for (i = 0; i < 8; i++) {
+        while (n >= 2 && (h[n - 1][0] - h[n - 2][0]) * (p[i][1] - h[n - 2][1]) -
+                         (h[n - 1][1] - h[n - 2][1]) * (p[i][0] - h[n - 2][0]) <= 0)
+            n--;
+        h[n][0] = p[i][0]; h[n][1] = p[i][1]; n++;
+    }
+    for (i = 6, lower = n + 1; i >= 0; i--) {
+        while (n >= lower && (h[n - 1][0] - h[n - 2][0]) * (p[i][1] - h[n - 2][1]) -
+                             (h[n - 1][1] - h[n - 2][1]) * (p[i][0] - h[n - 2][0]) <= 0)
+            n--;
+        h[n][0] = p[i][0]; h[n][1] = p[i][1]; n++;
+    }
+    n--;                                             /* (the last point is the first again) */
+    for (i = 1; i + 2 < n; i += 2)
+        ground_quad(h[0][0], h[0][1], h[i][0], h[i][1], h[i + 1][0], h[i + 1][1], h[i + 2][0], h[i + 2][1], lift,
+                    rgb, light);
+    if (i + 1 < n)                                   /* (an odd triangle left: a quad with its last corner twice) */
+        ground_quad(h[0][0], h[0][1], h[i][0], h[i][1], h[i + 1][0], h[i + 1][1], h[i + 1][0], h[i + 1][1], lift,
+                    rgb, light);
+}
+
 /* ---- collision boxes -------------------------------------------------------- */
 
 typedef struct box2 {
@@ -457,8 +498,7 @@ static void block(float cx, float cy, float hl, float hw, float angle, float h, 
     if (shadow) {
         float off = h * 0.35f;
         uint32_t under = 0x3E6E2Eu;
-        ground_quad(k[0][0] + off, k[0][1] - off, k[1][0] + off, k[1][1] - off, k[2][0] + off, k[2][1] - off,
-                    k[3][0] + off, k[3][1] - off, 0.08f, under, 0.62f);
+        ground_shadow((const float (*)[2])k, off, 0.08f, under, 0.62f);
     }
     for (i = 0; i < 4; i++) {
         v[i][0] = v[i + 4][0] = k[i][0];
@@ -569,12 +609,14 @@ static void walls(cmesh *m, const bframe *f, float hl, float hw, float base, flo
 /* A contact shadow to the south-east, in the ground's own colour, darker. */
 static void bshadow(const bframe *f, float hl, float hw, float h)
 {
-    float off = h * 0.35f, k[4][3];
+    float off = h * 0.35f, k[4][3], g[4][2];
     int i;
-    for (i = 0; i < 4; i++)
+    for (i = 0; i < 4; i++) {
         bpoint(f, (i == 1 || i == 2) ? hl : -hl, i >= 2 ? hw : -hw, 0, k[i]);
-    ground_quad(k[0][0] + off, -k[0][2] - off, k[1][0] + off, -k[1][2] - off, k[2][0] + off, -k[2][2] - off,
-                k[3][0] + off, -k[3][2] - off, 0.08f, ground_colour(f->cx, f->cy), 0.6f);
+        g[i][0] = k[i][0];
+        g[i][1] = -k[i][2];
+    }
+    ground_shadow((const float (*)[2])g, off, 0.08f, ground_colour(f->cx, f->cy), 0.6f);
 }
 
 /* A depot's warehouse for MEDIUM and HIGH, on block()'s footprint: walls,
